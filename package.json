@@ -12,6 +12,10 @@
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "lint": "eslint .",
+    "db:generate": "pnpm --filter @repo/db run generate",
+    "db:migrate": "pnpm --filter @repo/db run migrate",
+    "db:check": "pnpm --filter @repo/db run check",
+    "db:studio": "pnpm --filter @repo/db run studio",
     "format": "prettier --write \"**/*.{ts,tsx,json,md,css}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,json,css}\""
   },

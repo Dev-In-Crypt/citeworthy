@@ -5,16 +5,26 @@
 
 ## Текущий статус
 
-- Следующая задача: **T01** (локальная инфраструктура: docker-compose Postgres+Redis, Drizzle, .env.example)
-- Сделано: T00. Монорепо собирается, все проверки зелёные.
-- Команды проверки: `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`.
+- Следующая задача: **T02** (схема tenancy: agencies/users/clients + миграция + seed)
+- Сделано: T00, T01. Монорепо собирается, БД и Redis поднимаются, соединение проверено.
+- Команды проверки: `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`, `pnpm db:migrate`, `pnpm db:check`.
+- Порты: Postgres `localhost:5433`, Redis `localhost:6380` (нестандартные, чтобы не конфликтовать с локальными сервисами). Перед работой: `docker compose up -d`, `.env` копируется из `.env.example`.
 
 ## Блокеры для человека
 
-- Ничего блокирующего. К сведению: окружение с TLS-перехватом — сетевые загрузки на этапе билда падают (`UNABLE_TO_VERIFY_LEAF_SIGNATURE`). Билд держим герметичным.
+- **БЛОКЕР ЦИКЛА: standalone `claude` CLI не залогинен.** `claude -p` возвращает `"Not logged in · Please run /login"` (exit 1), поэтому `loop/run-loop.ps1` работать не может. Починка: открыть обычный терминал, выполнить `claude` → `/login`, либо задать `ANTHROPIC_API_KEY` в окружении. Проверить успех: `"Reply with exactly: OK" | claude -p --output-format json --max-turns 1` должен вернуть JSON с `is_error:false`.
+  Подтверждено при пробнике: структура JSON корректна, поле `total_cost_usd` присутствует — cost-cap в скрипте будет работать сразу после логина.
+- К сведению: окружение с TLS-перехватом — сетевые загрузки на этапе билда падают (`UNABLE_TO_VERIFY_LEAF_SIGNATURE`). Билд держим герметичным.
 - Docker установлен (29.6.2), но контейнеры для T01 ещё не поднимались — проверить, что демон запущен.
 
 ## Журнал итераций
+
+### 2026-08-11 · iter 2 (ручной прогон) · T01 — done
+- Сделано: docker-compose (Postgres 16, Redis 7, healthchecks), Drizzle + postgres.js, `.env.example`, программный мигратор, `db:check`.
+- Verify: `docker compose up -d && pnpm db:migrate && pnpm db:check` зелёные; typecheck/lint/test/build зелёные и без warning'ов.
+- Вскрыто и починено: dotenv не видел корневой `.env` из папки пакета; `next-env.d.ts` ронял lint; turbo шумел «no output files» (добавлены package-level turbo.json).
+- Дальше: T02.
+- Блокеры: цикл всё ещё заблокирован логином CLI (см. выше).
 
 ### 2026-08-11 · iter 1 (ручной прогон) · T00 — done
 - Сделано: монорепо pnpm+Turborepo (apps/web, apps/worker, packages/core, packages/db), общие tsconfig/eslint/prettier, Tailwind v4 с дизайн-токенами из плана §4.3.
