@@ -4,7 +4,10 @@ import { agencies, clients, users } from "./schema/tenancy";
 import type { Agency, Client, NewClient, User } from "./schema/tenancy";
 import { invitations } from "./schema/auth";
 import { usageCounters } from "./schema/billing";
+import { citationSources, sourcePresence, sources } from "./schema/sources";
+import type { NewSourcePresence, Source, SourcePresence } from "./schema/sources";
 import type { UsageCounter } from "./schema/billing";
+type SourceTypeValue = NonNullable<Source["sourceType"]>;
 import {
   citations,
   mentions,
@@ -502,6 +505,98 @@ export async function listRecentRuns(
     .where(eq(runs.clientId, clientId))
     .orderBy(desc(runs.startedAt))
     .limit(limit);
+}
+
+/**
+ * Заводит источник, если домена ещё нет. Классификация домена глобальна:
+ * один и тот же домен не должен классифицироваться моделью повторно
+ * для каждого агентства — это прямые деньги.
+ */
+export async function ensureSource(
+  db: Database,
+  domain: string,
+  classification?: { sourceType: SourceTypeValue; classifiedBy: string },
+): Promise<Source> {
+  const existing = await db.select().from(sources).where(eq(sources.domain, domain)).limit(1);
+  const found = existing[0];
+
+  if (found) {
+    // Уже классифицирован — не перезаписываем: правило не должно затирать
+    // более точный результат модели, и наоборот.
+    if (found.sourceType === null && classification) {
+      const updated = await db
+        .update(sources)
+        .set({
+          sourceType: classification.sourceType,
+          classifiedBy: classification.classifiedBy,
+          classifiedAt: new Date(),
+        })
+        .where(eq(sources.id, found.id))
+        .returning();
+      return updated[0] ?? found;
+    }
+    return found;
+  }
+
+  const inserted = await db
+    .insert(sources)
+    .values({
+      domain,
+      sourceType: classification?.sourceType ?? null,
+      classifiedBy: classification?.classifiedBy ?? null,
+      classifiedAt: classification ? new Date() : null,
+    })
+    .returning();
+
+  const created = inserted[0];
+  if (!created) {
+    throw new Error(`Failed to create source for domain ${domain}`);
+  }
+  return created;
+}
+
+export async function getSourceByDomain(
+  db: Database,
+  domain: string,
+): Promise<Source | undefined> {
+  const rows = await db.select().from(sources).where(eq(sources.domain, domain)).limit(1);
+  return rows[0];
+}
+
+export async function listUnclassifiedSources(db: Database, limit = 100): Promise<Source[]> {
+  return db.select().from(sources).where(isNull(sources.sourceType)).limit(limit);
+}
+
+export async function linkCitationToSource(
+  db: Database,
+  citationId: string,
+  sourceId: string,
+): Promise<void> {
+  await db.insert(citationSources).values({ citationId, sourceId }).onConflictDoNothing();
+}
+
+export async function upsertSourcePresence(
+  db: Database,
+  values: NewSourcePresence,
+): Promise<void> {
+  await db
+    .insert(sourcePresence)
+    .values(values)
+    .onConflictDoUpdate({
+      target: [sourcePresence.clientId, sourcePresence.sourceId],
+      set: {
+        clientPresent: values.clientPresent ?? false,
+        competitorsPresent: values.competitorsPresent ?? [],
+        checkedAt: new Date(),
+      },
+    });
+}
+
+export async function listSourcePresence(
+  db: Database,
+  clientId: string,
+): Promise<SourcePresence[]> {
+  return db.select().from(sourcePresence).where(eq(sourcePresence.clientId, clientId));
 }
 
 export async function listPromptClusters(
