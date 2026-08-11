@@ -3,8 +3,15 @@ import type { Database } from "./client";
 import { agencies, clients, users } from "./schema/tenancy";
 import type { Agency, Client, NewClient, User } from "./schema/tenancy";
 import { invitations } from "./schema/auth";
-import { promptClusters, prompts, runSchedules, runs } from "./schema/measurement";
-import type { NewRun, Prompt, Run, RunSchedule } from "./schema/measurement";
+import { promptClusters, prompts, responses, runSchedules, runs } from "./schema/measurement";
+import type {
+  NewResponse,
+  NewRun,
+  Prompt,
+  Response,
+  Run,
+  RunSchedule,
+} from "./schema/measurement";
 
 /**
  * Запросы живут здесь, а не в приложениях: drizzle не должен утекать за границу @repo/db.
@@ -138,6 +145,57 @@ export async function listActivePromptsForClient(db: Database, clientId: string)
     .from(prompts)
     .innerJoin(promptClusters, eq(prompts.clusterId, promptClusters.id))
     .where(and(eq(promptClusters.clientId, clientId), eq(prompts.active, true)));
+}
+
+export async function getRunById(db: Database, runId: string): Promise<Run | undefined> {
+  const rows = await db.select().from(runs).where(eq(runs.id, runId)).limit(1);
+  return rows[0];
+}
+
+export async function getRunSchedule(
+  db: Database,
+  scheduleId: string,
+): Promise<RunSchedule | undefined> {
+  const rows = await db.select().from(runSchedules).where(eq(runSchedules.id, scheduleId)).limit(1);
+  return rows[0];
+}
+
+export async function startRun(db: Database, runId: string): Promise<void> {
+  await db.update(runs).set({ status: "running" }).where(eq(runs.id, runId));
+}
+
+export async function finishRun(
+  db: Database,
+  runId: string,
+  status: "done" | "failed",
+): Promise<void> {
+  await db.update(runs).set({ status, finishedAt: new Date() }).where(eq(runs.id, runId));
+}
+
+export async function createResponse(db: Database, values: NewResponse): Promise<Response> {
+  const rows = await db.insert(responses).values(values).returning();
+  const created = rows[0];
+  if (!created) {
+    throw new Error("Failed to create response");
+  }
+  return created;
+}
+
+export async function updateResponseStorageKey(
+  db: Database,
+  responseId: string,
+  key: string,
+): Promise<void> {
+  await db.update(responses).set({ rawStorageKey: key }).where(eq(responses.id, responseId));
+}
+
+export async function countResponsesByRun(db: Database, runId: string): Promise<number> {
+  const rows = await db.select({ id: responses.id }).from(responses).where(eq(responses.runId, runId));
+  return rows.length;
+}
+
+export async function listResponsesByRun(db: Database, runId: string): Promise<Response[]> {
+  return db.select().from(responses).where(eq(responses.runId, runId));
 }
 
 export async function listUsersByAgency(db: Database, agencyId: string): Promise<User[]> {

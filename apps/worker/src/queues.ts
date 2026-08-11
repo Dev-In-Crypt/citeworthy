@@ -1,5 +1,6 @@
 import { Queue } from "bullmq";
 import IORedis from "ioredis";
+import type { Platform } from "@repo/core";
 import { REDIS_URL } from "./env";
 
 /** BullMQ требует maxRetriesPerRequest: null для блокирующих операций воркера. */
@@ -18,9 +19,27 @@ export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
 export interface RunJobData {
   runId: string;
   promptId: string;
-  platform: string;
+  promptText: string;
+  platform: Platform;
   sampleIndex: number;
 }
+
+/**
+ * Отдельная очередь на платформу. Лимиты у провайдеров разные и считаются
+ * независимо, поэтому общий лимитер на одну очередь либо душил бы быструю
+ * платформу, либо упирался в 429 у медленной.
+ */
+export function runsQueueName(platform: Platform): string {
+  // Дефис, не двоеточие: BullMQ 6 запрещает ":" в имени очереди (оно идёт в ключи Redis).
+  return `${QUEUE_NAMES.runs}-${platform}`;
+}
+
+/** Запросов в минуту на платформу. Консервативно: цена ошибки — 429 и потерянный прогон. */
+export const PLATFORM_RATE_LIMITS: Record<Platform, { max: number; duration: number }> = {
+  chatgpt: { max: 60, duration: 60_000 },
+  perplexity: { max: 30, duration: 60_000 },
+  gemini: { max: 60, duration: 60_000 },
+};
 
 export interface ParseJobData {
   responseId: string;

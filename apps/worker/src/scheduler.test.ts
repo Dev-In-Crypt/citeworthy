@@ -107,6 +107,18 @@ describe("tickSchedules", () => {
 });
 
 describe("queues", () => {
+  it("имена очередей платформ валидны для BullMQ", async () => {
+    const { runsQueueName } = await import("./queues");
+    const { PLATFORMS } = await import("@repo/core");
+
+    for (const platform of PLATFORMS) {
+      const name = runsQueueName(platform);
+      // BullMQ 6 отвергает ":" в имени очереди — поймано смоук-тестом, закреплено здесь.
+      expect(name).not.toContain(":");
+      expect(name).toBe(`runs-${platform}`);
+    }
+  });
+
   it("подключаются к Redis и объявляют три очереди", async () => {
     const connection = createConnection();
     const queues = createQueues(connection);
