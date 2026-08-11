@@ -5,15 +5,16 @@
 
 ## Текущий статус
 
-- Следующая задача: **T05** (UI shell: layout с сайдбаром, топбар, тема)
-- Сделано: T00–T04. Auth + tRPC с tenancy guard. Тесты: 4 (db) + 10 (tenancy) юнит, 2 e2e.
+- Следующая задача: **T10** (схема measurement) — Phase 0 закрыта, кроме verify T08.
+- Сделано: T00–T07 отмечены, T08 написан но не отмечен. Тесты: 4 (db) + 10 (tenancy) + 11 (storage) юнит, 8 e2e.
 - Команды проверки: `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`, `pnpm e2e`, `pnpm db:migrate`, `pnpm db:check`, `pnpm db:seed`.
 - e2e поднимает свой сервер на порту 3100 из production-сборки. Если тесты падают мгновенно и «не видят» правок — на 3100 висит старый процесс: `Get-NetTCPConnection -LocalPort 3100 -State Listen` и `Stop-Process`.
 - Порты: Postgres `localhost:5433`, Redis `localhost:6380` (нестандартные, чтобы не конфликтовать с локальными сервисами). Перед работой: `docker compose up -d`, `.env` копируется из `.env.example`.
 
 ## Блокеры для человека
 
-- **БЛОКЕР ЦИКЛА: standalone `claude` CLI не залогинен.** `claude -p` возвращает `"Not logged in · Please run /login"` (exit 1), поэтому `loop/run-loop.ps1` работать не может. Починка: открыть обычный терминал, выполнить `claude` → `/login`, либо задать `ANTHROPIC_API_KEY` в окружении. Проверить успех: `"Reply with exactly: OK" | claude -p --output-format json --max-turns 1` должен вернуть JSON с `is_error:false`.
+- **БЛОКЕР T08: нет удалённого репозитория.** CI-workflow написан, но «зелёный pipeline на PR» проверить негде. Нужно: создать репозиторий на GitHub, `git remote add origin <url>`, `git push -u origin main`, открыть PR. До этого T08 остаётся неотмеченной.
+- Цикл работает через `/loop` в приложении. Отдельный скрипт `loop/run-loop.ps1` требует залогиненного CLI (не обязателен): standalone `claude` не залогинен — `claude -p` возвращает `"Not logged in · Please run /login"` (exit 1), поэтому `loop/run-loop.ps1` работать не может. Починка: открыть обычный терминал, выполнить `claude` → `/login`, либо задать `ANTHROPIC_API_KEY` в окружении. Проверить успех: `"Reply with exactly: OK" | claude -p --output-format json --max-turns 1` должен вернуть JSON с `is_error:false`.
   Подтверждено при пробнике: структура JSON корректна, поле `total_cost_usd` присутствует — cost-cap в скрипте будет работать сразу после логина.
 - К сведению: окружение с TLS-перехватом — сетевые загрузки на этапе билда падают (`UNABLE_TO_VERIFY_LEAF_SIGNATURE`). Билд держим герметичным.
 - Docker установлен (29.6.2), но контейнеры для T01 ещё не поднимались — проверить, что демон запущен.
