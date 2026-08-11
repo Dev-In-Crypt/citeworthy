@@ -40,6 +40,9 @@ test("create a client with brand aliases and competitors, then edit it", async (
 
   // Открыть и убедиться, что списки сохранились ровно как введены.
   await page.getByRole("link", { name: /AcmeCRM/ }).click();
+  await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}$/);
+  // Уточняем область: «Settings» есть и в сайдбаре агентства.
+  await page.getByRole("main").getByRole("link", { name: "Settings" }).click();
   await expect(page.getByLabel("Brand names")).toHaveValue("AcmeCRM, Acme CRM");
   await expect(page.getByLabel("Competitors")).toHaveValue("HubSpot, Pipedrive, Close");
 

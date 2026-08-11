@@ -342,6 +342,35 @@ export async function upsertVisibilitySnapshot(
   await db.insert(visibilitySnapshots).values(values);
 }
 
+/**
+ * Срезы для графика. clusterId/platform === null означает свёртку —
+ * именно её показываем по умолчанию, потому что видимость по одной платформе
+ * это не видимость клиента, а её часть.
+ */
+export async function listVisibilitySeries(
+  db: Database,
+  clientId: string,
+  filter: { clusterId?: string | null; platform?: "chatgpt" | "perplexity" | "gemini" | null } = {},
+): Promise<VisibilitySnapshotRow[]> {
+  const clusterCondition =
+    filter.clusterId == null
+      ? isNull(visibilitySnapshots.clusterId)
+      : eq(visibilitySnapshots.clusterId, filter.clusterId);
+
+  const platformCondition =
+    filter.platform == null
+      ? isNull(visibilitySnapshots.platform)
+      : eq(visibilitySnapshots.platform, filter.platform);
+
+  return db
+    .select()
+    .from(visibilitySnapshots)
+    .where(
+      and(eq(visibilitySnapshots.clientId, clientId), clusterCondition, platformCondition),
+    )
+    .orderBy(visibilitySnapshots.periodStart);
+}
+
 export async function listVisibilitySnapshots(
   db: Database,
   clientId: string,

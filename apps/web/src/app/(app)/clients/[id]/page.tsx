@@ -1,33 +1,14 @@
 "use client";
 
 import { use } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { api } from "@/trpc/react";
 import { PageHeader } from "@/components/page-header";
-import { ClientForm } from "../client-form";
+import { ClientOverview } from "./overview";
 
-export default function EditClientPage({ params }: { params: Promise<{ id: string }> }) {
+export default function ClientOverviewPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const router = useRouter();
-  const utils = api.useUtils();
-
   const client = api.clients.get.useQuery({ id });
-
-  const update = api.clients.update.useMutation({
-    onSuccess: async () => {
-      await Promise.all([utils.clients.list.invalidate(), utils.clients.get.invalidate({ id })]);
-      router.push("/clients");
-      router.refresh();
-    },
-  });
-
-  const remove = api.clients.delete.useMutation({
-    onSuccess: async () => {
-      await utils.clients.list.invalidate();
-      router.push("/clients");
-      router.refresh();
-    },
-  });
 
   if (client.isPending) {
     return <p className="text-sm text-muted-foreground">Loading…</p>;
@@ -51,38 +32,23 @@ export default function EditClientPage({ params }: { params: Promise<{ id: strin
         title={client.data.name}
         description={client.data.domain}
         action={
-          <button
-            type="button"
-            onClick={() => remove.mutate({ id })}
-            disabled={remove.isPending}
-            className="h-10 rounded-md border border-input px-4 text-sm font-medium hover:bg-accent disabled:opacity-60"
-          >
-            Delete
-          </button>
+          <div className="flex gap-2">
+            <Link
+              href={`/clients/${id}/measure`}
+              className="h-10 rounded-md bg-primary px-4 text-sm font-medium leading-10 text-primary-foreground"
+            >
+              Measure
+            </Link>
+            <Link
+              href={`/clients/${id}/settings`}
+              className="h-10 rounded-md border border-input px-4 text-sm font-medium leading-10 hover:bg-accent"
+            >
+              Settings
+            </Link>
+          </div>
         }
       />
-      <ClientForm
-        initial={{
-          name: client.data.name,
-          domain: client.data.domain,
-          industry: client.data.industry ?? "",
-          brandNames: client.data.brandNames,
-          competitorNames: client.data.competitorNames,
-        }}
-        submitLabel="Save changes"
-        pending={update.isPending}
-        error={update.error?.message ?? null}
-        onSubmit={(values) =>
-          update.mutate({
-            id,
-            name: values.name,
-            domain: values.domain,
-            industry: values.industry || undefined,
-            brandNames: values.brandNames,
-            competitorNames: values.competitorNames,
-          })
-        }
-      />
+      <ClientOverview clientId={id} />
     </>
   );
 }
