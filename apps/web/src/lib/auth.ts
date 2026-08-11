@@ -53,6 +53,9 @@ export const auth = betterAuth({
     // id генерирует Postgres (uuid), а не Better Auth.
     database: { generateId: false },
   },
+  // В проде лимит нужен, но e2e делает несколько регистраций подряд с одного адреса
+  // и упирается в него — там он отключается явным флагом окружения.
+  rateLimit: { enabled: process.env.DISABLE_RATE_LIMIT !== "true" },
   databaseHooks: {
     user: {
       create: {

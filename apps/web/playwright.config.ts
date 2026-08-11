@@ -24,6 +24,8 @@ export default defineConfig({
     env: {
       BETTER_AUTH_URL: baseURL,
       NEXT_PUBLIC_APP_URL: baseURL,
+      // Прогон делает несколько регистраций подряд с одного адреса.
+      DISABLE_RATE_LIMIT: "true",
     },
   },
 });

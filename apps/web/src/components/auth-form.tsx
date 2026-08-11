@@ -80,7 +80,7 @@ export function AuthForm({ mode, lockedEmail }: { mode: Mode; lockedEmail?: stri
       </label>
 
       {error && (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" data-testid="form-error" className="text-sm text-destructive">
           {error}
         </p>
       )}

@@ -46,6 +46,6 @@ test("login with a wrong password shows an error and does not sign in", async ({
   await page.getByLabel("Password").fill("definitely-wrong");
   await page.getByRole("button", { name: "Sign in" }).click();
 
-  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(page.getByTestId("form-error")).toBeVisible();
   await expect(page).toHaveURL(/\/login$/);
 });
