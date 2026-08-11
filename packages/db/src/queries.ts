@@ -1,8 +1,10 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNotNull, lte } from "drizzle-orm";
 import type { Database } from "./client";
 import { agencies, clients, users } from "./schema/tenancy";
 import type { Agency, Client, NewClient, User } from "./schema/tenancy";
 import { invitations } from "./schema/auth";
+import { promptClusters, prompts, runSchedules, runs } from "./schema/measurement";
+import type { NewRun, Prompt, Run, RunSchedule } from "./schema/measurement";
 
 /**
  * Запросы живут здесь, а не в приложениях: drizzle не должен утекать за границу @repo/db.
@@ -80,6 +82,62 @@ export async function updateClient(
 
 export async function deleteClient(db: Database, clientId: string): Promise<void> {
   await db.delete(clients).where(eq(clients.id, clientId));
+}
+
+/**
+ * Расписания, которым пора запускаться. Активные, с наступившим next_run_at.
+ * Расписание без next_run_at считается ещё не запланированным и не подхватывается —
+ * иначе первый же тик запустил бы прогоны по всем клиентам сразу.
+ */
+export async function listDueSchedules(db: Database, now: Date): Promise<RunSchedule[]> {
+  return db
+    .select()
+    .from(runSchedules)
+    .where(
+      and(
+        eq(runSchedules.active, true),
+        isNotNull(runSchedules.nextRunAt),
+        lte(runSchedules.nextRunAt, now),
+      ),
+    );
+}
+
+export async function setScheduleNextRun(
+  db: Database,
+  scheduleId: string,
+  nextRunAt: Date,
+): Promise<void> {
+  await db.update(runSchedules).set({ nextRunAt }).where(eq(runSchedules.id, scheduleId));
+}
+
+export async function createRun(db: Database, values: NewRun): Promise<Run> {
+  const rows = await db.insert(runs).values(values).returning();
+  const created = rows[0];
+  if (!created) {
+    throw new Error("Failed to create run");
+  }
+  return created;
+}
+
+export async function listRunsByClient(db: Database, clientId: string): Promise<Run[]> {
+  return db.select().from(runs).where(eq(runs.clientId, clientId));
+}
+
+export async function listActivePromptsForClient(db: Database, clientId: string): Promise<Prompt[]> {
+  return db
+    .select({
+      id: prompts.id,
+      clusterId: prompts.clusterId,
+      text: prompts.text,
+      isControl: prompts.isControl,
+      language: prompts.language,
+      geo: prompts.geo,
+      active: prompts.active,
+      createdAt: prompts.createdAt,
+    })
+    .from(prompts)
+    .innerJoin(promptClusters, eq(prompts.clusterId, promptClusters.id))
+    .where(and(eq(promptClusters.clientId, clientId), eq(prompts.active, true)));
 }
 
 export async function listUsersByAgency(db: Database, agencyId: string): Promise<User[]> {
