@@ -7,6 +7,7 @@ import { runsRouter } from "./routers/runs";
 import { measurementRouter } from "./routers/measurement";
 import { diagnosisRouter } from "./routers/diagnosis";
 import { actionsRouter } from "./routers/actions";
+import { experimentsRouter } from "./routers/experiments";
 
 export const appRouter = router({
   agency: agencyRouter,
@@ -17,6 +18,7 @@ export const appRouter = router({
   measurement: measurementRouter,
   diagnosis: diagnosisRouter,
   actions: actionsRouter,
+  experiments: experimentsRouter,
 });
 
 export type AppRouter = typeof appRouter;

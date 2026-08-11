@@ -7,6 +7,8 @@ import { usageCounters } from "./schema/billing";
 import { citationSources, sourcePresence, sources } from "./schema/sources";
 import { actions } from "./schema/actions";
 import { activityLog } from "./schema/activity";
+import { experimentEvents, experiments } from "./schema/experiments";
+import type { Experiment, ExperimentEvent, NewExperiment, NewExperimentEvent } from "./schema/experiments";
 import type { ActivityEntry, NewActivityEntry } from "./schema/activity";
 import type { Action, NewAction } from "./schema/actions";
 import type { NewSourcePresence, Source, SourcePresence } from "./schema/sources";
@@ -684,6 +686,76 @@ export async function listActivityBetween(
     .orderBy(desc(activityLog.createdAt));
 }
 
+export async function createExperiment(
+  db: Database,
+  values: NewExperiment,
+): Promise<Experiment> {
+  const rows = await db.insert(experiments).values(values).returning();
+  const created = rows[0];
+  if (!created) {
+    throw new Error("Failed to create experiment");
+  }
+  return created;
+}
+
+export async function getExperimentByAction(
+  db: Database,
+  actionId: string,
+): Promise<Experiment | undefined> {
+  const rows = await db
+    .select()
+    .from(experiments)
+    .where(eq(experiments.actionId, actionId))
+    .limit(1);
+  return rows[0];
+}
+
+export async function getExperimentById(
+  db: Database,
+  experimentId: string,
+): Promise<Experiment | undefined> {
+  const rows = await db.select().from(experiments).where(eq(experiments.id, experimentId)).limit(1);
+  return rows[0];
+}
+
+export async function listExperiments(db: Database, clientId: string): Promise<Experiment[]> {
+  return db
+    .select()
+    .from(experiments)
+    .where(eq(experiments.clientId, clientId))
+    .orderBy(desc(experiments.createdAt));
+}
+
+export async function addExperimentEvent(
+  db: Database,
+  values: NewExperimentEvent,
+): Promise<void> {
+  await db.insert(experimentEvents).values(values);
+}
+
+export async function listExperimentEvents(
+  db: Database,
+  experimentId: string,
+): Promise<ExperimentEvent[]> {
+  return db
+    .select()
+    .from(experimentEvents)
+    .where(eq(experimentEvents.experimentId, experimentId))
+    .orderBy(experimentEvents.occurredAt);
+}
+
+/** Все срезы клиента: вход для расчёта baseline (контракт C5). */
+export async function listAllSnapshots(
+  db: Database,
+  clientId: string,
+): Promise<VisibilitySnapshotRow[]> {
+  return db
+    .select()
+    .from(visibilitySnapshots)
+    .where(eq(visibilitySnapshots.clientId, clientId))
+    .orderBy(visibilitySnapshots.periodStart);
+}
+
 export async function listActions(db: Database, clientId: string): Promise<Action[]> {
   return db
     .select()
@@ -726,6 +798,18 @@ export async function updateAction(
 ): Promise<Action | undefined> {
   const rows = await db.update(actions).set(patch).where(eq(actions.id, actionId)).returning();
   return rows[0];
+}
+
+/**
+ * Проставляет дату завершения напрямую. Нужна там, где дату задаёт не «сейчас»:
+ * действие могли выполнить до того, как его завели в системе.
+ */
+export async function setActionCompletedAt(
+  db: Database,
+  actionId: string,
+  completedAt: Date,
+): Promise<void> {
+  await db.update(actions).set({ completedAt }).where(eq(actions.id, actionId));
 }
 
 export async function deleteAction(db: Database, actionId: string): Promise<void> {
