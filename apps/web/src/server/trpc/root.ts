@@ -4,6 +4,7 @@ import { clientsRouter } from "./routers/clients";
 import { billingRouter } from "./routers/billing";
 import { promptsRouter } from "./routers/prompts";
 import { runsRouter } from "./routers/runs";
+import { measurementRouter } from "./routers/measurement";
 
 export const appRouter = router({
   agency: agencyRouter,
@@ -11,6 +12,7 @@ export const appRouter = router({
   billing: billingRouter,
   prompts: promptsRouter,
   runs: runsRouter,
+  measurement: measurementRouter,
 });
 
 export type AppRouter = typeof appRouter;
