@@ -34,6 +34,40 @@ const TYPE_LABELS: Record<string, string> = {
   unclassified: "Not classified yet",
 };
 
+type RecommendationPayload = Parameters<
+  ReturnType<typeof api.actions.convertFromRecommendation.useMutation>["mutate"]
+>[0]["recommendation"];
+
+/** Превращает рекомендацию в действие. Повторный клик дубль не создаёт. */
+function CreateActionButton({
+  clientId,
+  recommendation,
+}: {
+  clientId: string;
+  recommendation: RecommendationPayload;
+}) {
+  const utils = api.useUtils();
+  const convert = api.actions.convertFromRecommendation.useMutation({
+    onSuccess: async () => {
+      await utils.actions.list.invalidate({ clientId });
+    },
+  });
+
+  const done = convert.isSuccess;
+
+  return (
+    <button
+      type="button"
+      data-testid="create-action"
+      disabled={convert.isPending || done}
+      onClick={() => convert.mutate({ clientId, recommendation })}
+      className="h-9 shrink-0 rounded-md border border-input px-3 text-sm font-medium hover:bg-accent disabled:opacity-60"
+    >
+      {done ? "Added to actions" : convert.isPending ? "Adding…" : "Create action"}
+    </button>
+  );
+}
+
 export function DiagnoseView({ clientId }: { clientId: string }) {
   const [clusterId, setClusterId] = useState<string | null>(null);
 
@@ -225,14 +259,7 @@ export function DiagnoseView({ clientId }: { clientId: string }) {
                     {recommendation.reason}
                   </span>
                 </div>
-                <button
-                  type="button"
-                  disabled
-                  title="Action queue lands in T40"
-                  className="h-9 shrink-0 rounded-md border border-input px-3 text-sm font-medium disabled:opacity-50"
-                >
-                  Create action
-                </button>
+                <CreateActionButton clientId={clientId} recommendation={recommendation} />
               </li>
             ))}
           </ul>

@@ -134,6 +134,12 @@ test("a client missing from the answers gets reasoned recommendations", async ({
     expect(text).toMatch(/\d/);
   }
 
-  // Кнопка создания действия ещё не активна — очередь действий появится в T40.
-  await expect(page.getByRole("button", { name: "Create action" }).first()).toBeDisabled();
+  // Рекомендация превращается в действие одним кликом.
+  const createAction = page.getByTestId("create-action").first();
+  await expect(createAction).toBeEnabled();
+  await createAction.click();
+  await expect(createAction).toHaveText("Added to actions");
+
+  // Повторный клик невозможен — очередь действий не журнал нажатий.
+  await expect(createAction).toBeDisabled();
 });

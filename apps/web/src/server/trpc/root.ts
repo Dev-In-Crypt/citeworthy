@@ -6,6 +6,7 @@ import { promptsRouter } from "./routers/prompts";
 import { runsRouter } from "./routers/runs";
 import { measurementRouter } from "./routers/measurement";
 import { diagnosisRouter } from "./routers/diagnosis";
+import { actionsRouter } from "./routers/actions";
 
 export const appRouter = router({
   agency: agencyRouter,
@@ -15,6 +16,7 @@ export const appRouter = router({
   runs: runsRouter,
   measurement: measurementRouter,
   diagnosis: diagnosisRouter,
+  actions: actionsRouter,
 });
 
 export type AppRouter = typeof appRouter;
