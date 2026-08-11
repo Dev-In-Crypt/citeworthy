@@ -5,6 +5,8 @@ import type { Agency, Client, NewClient, User } from "./schema/tenancy";
 import { invitations } from "./schema/auth";
 import { usageCounters } from "./schema/billing";
 import { citationSources, sourcePresence, sources } from "./schema/sources";
+import { actions } from "./schema/actions";
+import type { Action, NewAction } from "./schema/actions";
 import type { NewSourcePresence, Source, SourcePresence } from "./schema/sources";
 import type { UsageCounter } from "./schema/billing";
 type SourceTypeValue = NonNullable<Source["sourceType"]>;
@@ -632,6 +634,77 @@ export async function listCitationFacts(
     .where(and(...conditions));
 
   return rows;
+}
+
+export async function listActions(db: Database, clientId: string): Promise<Action[]> {
+  return db
+    .select()
+    .from(actions)
+    .where(eq(actions.clientId, clientId))
+    .orderBy(desc(actions.createdAt));
+}
+
+export async function getActionById(db: Database, actionId: string): Promise<Action | undefined> {
+  const rows = await db.select().from(actions).where(eq(actions.id, actionId)).limit(1);
+  return rows[0];
+}
+
+export async function createAction(db: Database, values: NewAction): Promise<Action> {
+  const rows = await db.insert(actions).values(values).returning();
+  const created = rows[0];
+  if (!created) {
+    throw new Error("Failed to create action");
+  }
+  return created;
+}
+
+export async function updateAction(
+  db: Database,
+  actionId: string,
+  patch: Partial<
+    Pick<
+      Action,
+      | "title"
+      | "reason"
+      | "actionType"
+      | "status"
+      | "estimatedImpact"
+      | "effort"
+      | "ownerUserId"
+      | "completedAt"
+      | "affectedClusterIds"
+    >
+  >,
+): Promise<Action | undefined> {
+  const rows = await db.update(actions).set(patch).where(eq(actions.id, actionId)).returning();
+  return rows[0];
+}
+
+export async function deleteAction(db: Database, actionId: string): Promise<void> {
+  await db.delete(actions).where(eq(actions.id, actionId));
+}
+
+/** Действие с таким же правилом и источником уже заведено — не плодим дубли. */
+export async function findExistingAction(
+  db: Database,
+  clientId: string,
+  originRule: string,
+  sourceDomain: string | null,
+): Promise<Action | undefined> {
+  const rows = await db
+    .select()
+    .from(actions)
+    .where(
+      and(
+        eq(actions.clientId, clientId),
+        eq(actions.originRule, originRule),
+        sourceDomain === null
+          ? isNull(actions.sourceDomain)
+          : eq(actions.sourceDomain, sourceDomain),
+      ),
+    )
+    .limit(1);
+  return rows[0];
 }
 
 export async function listPromptClusters(
