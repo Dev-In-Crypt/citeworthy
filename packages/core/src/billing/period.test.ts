@@ -1,0 +1,67 @@
+import { describe, expect, it } from "vitest";
+import { billingPeriod, billingPeriodBounds, PLAN_LIMITS, usageStatus } from "./period";
+
+describe("billingPeriod", () => {
+  const cases: [string, string][] = [
+    ["2026-08-11T18:00:00Z", "2026-08"],
+    ["2026-01-01T00:00:00Z", "2026-01"],
+    ["2026-12-31T23:59:59Z", "2026-12"],
+  ];
+
+  it.each(cases)("%s -> %s", (input, expected) => {
+    expect(billingPeriod(new Date(input))).toBe(expected);
+  });
+
+  it("считается в UTC, а не в локальной зоне", () => {
+    // 31 декабря 23:00 UTC — всё ещё декабрь, хотя в UTC+2 уже январь.
+    expect(billingPeriod(new Date("2026-12-31T23:00:00Z"))).toBe("2026-12");
+  });
+});
+
+describe("billingPeriodBounds", () => {
+  it("возвращает полуинтервал [начало, конец)", () => {
+    const { start, end } = billingPeriodBounds("2026-08");
+    expect(start.toISOString()).toBe("2026-08-01T00:00:00.000Z");
+    expect(end.toISOString()).toBe("2026-09-01T00:00:00.000Z");
+  });
+
+  it("переходит через год", () => {
+    expect(billingPeriodBounds("2026-12").end.toISOString()).toBe("2027-01-01T00:00:00.000Z");
+  });
+
+  it("отвергает мусор, а не молча считает не тот период", () => {
+    expect(() => billingPeriodBounds("2026-13")).toThrow(/Month must be/);
+    expect(() => billingPeriodBounds("august")).toThrow(/Expected YYYY-MM/);
+  });
+});
+
+describe("usageStatus", () => {
+  it("считает долю израсходованного", () => {
+    expect(usageStatus(500, 1000).ratio).toBe(0.5);
+    expect(usageStatus(500, 1000).overAllowance).toBe(false);
+  });
+
+  it("превышение — это overage, а не ошибка: измерение не должно останавливаться", () => {
+    const status = usageStatus(1500, 1000);
+    expect(status.overAllowance).toBe(true);
+    expect(status.ratio).toBe(1.5);
+  });
+
+  it("нулевой лимит не делит на ноль", () => {
+    expect(usageStatus(10, 0).ratio).toBe(0);
+  });
+});
+
+describe("PLAN_LIMITS", () => {
+  it("соответствуют спеку: 3/10/25 клиентов", () => {
+    expect(PLAN_LIMITS.starter.clientLimit).toBe(3);
+    expect(PLAN_LIMITS.growth.clientLimit).toBe(10);
+    expect(PLAN_LIMITS.scale.clientLimit).toBe(25);
+  });
+
+  it("цена растёт медленнее лимита клиентов — так и задумано в спеке", () => {
+    const starterPerClient = PLAN_LIMITS.starter.priceUsd / PLAN_LIMITS.starter.clientLimit;
+    const scalePerClient = PLAN_LIMITS.scale.priceUsd / PLAN_LIMITS.scale.clientLimit;
+    expect(scalePerClient).toBeLessThan(starterPerClient);
+  });
+});

@@ -1,8 +1,10 @@
-import { and, eq, isNotNull, isNull, lte } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, lte, sql } from "drizzle-orm";
 import type { Database } from "./client";
 import { agencies, clients, users } from "./schema/tenancy";
 import type { Agency, Client, NewClient, User } from "./schema/tenancy";
 import { invitations } from "./schema/auth";
+import { usageCounters } from "./schema/billing";
+import type { UsageCounter } from "./schema/billing";
 import {
   citations,
   mentions,
@@ -345,6 +347,49 @@ export async function listVisibilitySnapshots(
     .select()
     .from(visibilitySnapshots)
     .where(eq(visibilitySnapshots.clientId, clientId));
+}
+
+/** Инкремент расхода. Атомарен: несколько job'ов пишут в одну строку параллельно. */
+export async function incrementAiChecks(
+  db: Database,
+  agencyId: string,
+  period: string,
+  delta = 1,
+): Promise<void> {
+  await db
+    .insert(usageCounters)
+    .values({ agencyId, period, aiChecksUsed: delta })
+    .onConflictDoUpdate({
+      target: [usageCounters.agencyId, usageCounters.period],
+      set: {
+        aiChecksUsed: sql`${usageCounters.aiChecksUsed} + ${delta}`,
+        updatedAt: new Date(),
+      },
+    });
+}
+
+export async function getUsageCounter(
+  db: Database,
+  agencyId: string,
+  period: string,
+): Promise<UsageCounter | undefined> {
+  const rows = await db
+    .select()
+    .from(usageCounters)
+    .where(and(eq(usageCounters.agencyId, agencyId), eq(usageCounters.period, period)))
+    .limit(1);
+  return rows[0];
+}
+
+/** Агентство, которому принадлежит прогон — нужно для учёта расхода. */
+export async function getAgencyIdForRun(db: Database, runId: string): Promise<string | undefined> {
+  const rows = await db
+    .select({ agencyId: clients.agencyId })
+    .from(runs)
+    .innerJoin(clients, eq(runs.clientId, clients.id))
+    .where(eq(runs.id, runId))
+    .limit(1);
+  return rows[0]?.agencyId;
 }
 
 export async function listUsersByAgency(db: Database, agencyId: string): Promise<User[]> {

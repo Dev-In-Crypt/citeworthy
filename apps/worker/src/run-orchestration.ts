@@ -1,7 +1,9 @@
-import { getAdapter, type AdaptersMode, type Platform } from "@repo/core";
+import { billingPeriod, getAdapter, type AdaptersMode, type Platform } from "@repo/core";
 import {
   createResponse,
   countResponsesByRun,
+  getAgencyIdForRun,
+  incrementAiChecks,
   finishRun,
   getRunById,
   getRunSchedule,
@@ -19,6 +21,8 @@ export interface RunJobSpec {
   promptText: string;
   platform: Platform;
   sampleIndex: number;
+  /** Носитель расхода: считать AI checks нужно на агентство, а не на клиента. */
+  agencyId?: string;
 }
 
 /**
@@ -82,6 +86,13 @@ export async function executeRunJob(
   // поэтому раскладываются сразу; упоминания разбирает ParseJob.
   await storeCitations(db, response.id, result.citations);
 
+  // Расход считается после успешной записи: неудавшийся вызов не должен
+  // попадать в счёт агентству.
+  const agencyId = job.agencyId ?? (await getAgencyIdForRun(db, job.runId));
+  if (agencyId) {
+    await incrementAiChecks(db, agencyId, billingPeriod());
+  }
+
   return response.id;
 }
 
@@ -112,7 +123,8 @@ export async function orchestrateRun(
   const samples = schedule?.samplesPerPrompt ?? 3;
 
   const prompts = await listActivePromptsForClient(db, run.clientId);
-  const jobs = planRunJobs(runId, prompts, platforms, samples);
+  const agencyId = await getAgencyIdForRun(db, runId);
+  const jobs = planRunJobs(runId, prompts, platforms, samples).map((job) => ({ ...job, agencyId }));
 
   await startRun(db, runId);
 
