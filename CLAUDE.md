@@ -46,6 +46,7 @@ pnpm lint && pnpm typecheck
 - Даты в БД — timestamptz UTC; деньги — `cost_usd numeric`.
 - Парсинг/математика (mentions, visibility, experiment math) — чистые функции с table-driven тестами; это самый защищённый тестами код проекта.
 - **Windows/кодировка (важно):** проект на Windows, шелл — Windows PowerShell 5.1. `Get-Content`/`Set-Content` там ломают UTF-8 (кириллицу в доках) — читать/писать файлы с не-ASCII только через `[System.IO.File]::ReadAllText/WriteAllText` с `UTF8Encoding($false)`, либо через Read/Edit/Write-инструменты. Файлы пишем без BOM, LF.
+- **Билд герметичен:** никаких сетевых загрузок на этапе сборки (в окружении TLS-перехват с self-signed CA — любой fetch падает с `UNABLE_TO_VERIFY_LEAF_SIGNATURE`). Шрифты/ассеты только локальные, `next/font/google` не использовать.
 - Секреты только из env; `.env.example` поддерживается актуальным. Отсутствие ключа платформы — понятная ошибка при `ADAPTERS_MODE=live`, а не падение при старте.
 - UI-стиль: раздел 4.3 IMPLEMENTATION_PLAN.md (slate + indigo, Inter, tabular-nums; зелёный = клиент, оранжевый = конкуренты; у каждого экрана есть empty state с CTA).
 - Язык интерфейса — английский (покупатель — англоязычные агентства).

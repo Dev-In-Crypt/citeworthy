@@ -85,7 +85,7 @@ Confidence-эвристика (см. задачу T45): начисление б�
 
 ## Phase 0 — Foundation
 
-- [ ] **T00. Монорепо-скелет.** pnpm workspaces + Turborepo: `apps/web` (Next.js 15, TS, Tailwind, shadcn/ui init), `apps/worker` (пустой TS-процесс), `packages/db`, `packages/core`. Общие tsconfig/eslint/prettier.
+- [x] **T00. Монорепо-скелет.** pnpm workspaces + Turborepo: `apps/web` (Next.js 15, TS, Tailwind, shadcn/ui init), `apps/worker` (пустой TS-процесс), `packages/db`, `packages/core`. Общие tsconfig/eslint/prettier.
   Verify: `pnpm install && pnpm build && pnpm lint` зелёные из корня.
 
 - [ ] **T01. Локальная инфраструктура.** `docker-compose.yml` с Postgres 16 и Redis 7; `packages/db`: Drizzle настроен, скрипты `db:generate`, `db:migrate`, `db:studio`; `.env.example` со всеми переменными.
@@ -253,4 +253,4 @@ Confidence-эвристика (см. задачу T45): начисление б�
 
 ## Log
 
-(пусто — заполняется по ходу)
+- **2026-08-11 · T00 done.** Монорепо: pnpm workspaces + Turborepo 2, apps/web (Next 15 + React 19 + Tailwind v4 + shadcn-совместимые токены), apps/worker (tsx-скелет), packages/core, packages/db. Общие tsconfig.base / eslint flat config / prettier. Verify: `pnpm install && pnpm build && pnpm lint` зелёные (плюс typecheck и test). Отклонение от плана: `next/font/google` убран — в окружении TLS-перехват, шрифт грузился по сети на этапе билда и ронял сборку; вместо него font-stack, self-hosted Inter возможен в T05.
