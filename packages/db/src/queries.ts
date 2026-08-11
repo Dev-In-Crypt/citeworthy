@@ -24,6 +24,9 @@ import type {
   NewRun,
   Prompt,
   Response,
+  NewPrompt,
+  NewPromptCluster,
+  PromptCluster,
   Run,
   RunSchedule,
   NewVisibilitySnapshotRow,
@@ -390,6 +393,98 @@ export async function getAgencyIdForRun(db: Database, runId: string): Promise<st
     .where(eq(runs.id, runId))
     .limit(1);
   return rows[0]?.agencyId;
+}
+
+export async function listPromptClusters(
+  db: Database,
+  clientId: string,
+): Promise<PromptCluster[]> {
+  return db.select().from(promptClusters).where(eq(promptClusters.clientId, clientId));
+}
+
+export async function getPromptClusterById(
+  db: Database,
+  clusterId: string,
+): Promise<PromptCluster | undefined> {
+  const rows = await db
+    .select()
+    .from(promptClusters)
+    .where(eq(promptClusters.id, clusterId))
+    .limit(1);
+  return rows[0];
+}
+
+export async function createPromptCluster(
+  db: Database,
+  values: NewPromptCluster,
+): Promise<PromptCluster> {
+  const rows = await db.insert(promptClusters).values(values).returning();
+  const created = rows[0];
+  if (!created) {
+    throw new Error("Failed to create prompt cluster");
+  }
+  return created;
+}
+
+export async function updatePromptCluster(
+  db: Database,
+  clusterId: string,
+  patch: Partial<Pick<PromptCluster, "name" | "intent">>,
+): Promise<PromptCluster | undefined> {
+  const rows = await db
+    .update(promptClusters)
+    .set(patch)
+    .where(eq(promptClusters.id, clusterId))
+    .returning();
+  return rows[0];
+}
+
+export async function deletePromptCluster(db: Database, clusterId: string): Promise<void> {
+  await db.delete(promptClusters).where(eq(promptClusters.id, clusterId));
+}
+
+export async function listPromptsByClient(db: Database, clientId: string): Promise<Prompt[]> {
+  return db
+    .select({
+      id: prompts.id,
+      clusterId: prompts.clusterId,
+      text: prompts.text,
+      isControl: prompts.isControl,
+      language: prompts.language,
+      geo: prompts.geo,
+      active: prompts.active,
+      createdAt: prompts.createdAt,
+    })
+    .from(prompts)
+    .innerJoin(promptClusters, eq(prompts.clusterId, promptClusters.id))
+    .where(eq(promptClusters.clientId, clientId));
+}
+
+export async function getPromptById(db: Database, promptId: string): Promise<Prompt | undefined> {
+  const rows = await db.select().from(prompts).where(eq(prompts.id, promptId)).limit(1);
+  return rows[0];
+}
+
+export async function createPrompt(db: Database, values: NewPrompt): Promise<Prompt> {
+  const rows = await db.insert(prompts).values(values).returning();
+  const created = rows[0];
+  if (!created) {
+    throw new Error("Failed to create prompt");
+  }
+  return created;
+}
+
+export async function updatePrompt(
+  db: Database,
+  promptId: string,
+  patch: Partial<Pick<Prompt, "text" | "isControl" | "active">>,
+): Promise<Prompt | undefined> {
+  const rows = await db.update(prompts).set(patch).where(eq(prompts.id, promptId)).returning();
+  return rows[0];
+}
+
+export async function deletePrompt(db: Database, promptId: string): Promise<void> {
+  await db.delete(prompts).where(eq(prompts.id, promptId));
 }
 
 export async function listUsersByAgency(db: Database, agencyId: string): Promise<User[]> {
