@@ -29,6 +29,13 @@
       "when": 1786470237332,
       "tag": "0003_ordinary_thunderbird",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786470540440,
+      "tag": "0004_brief_shinko_yamashiro",
+      "breakpoints": true
     }
   ]
 }
