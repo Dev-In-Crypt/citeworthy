@@ -3,6 +3,7 @@ import {
   boolean,
   index,
   integer,
+  jsonb,
   numeric,
   pgEnum,
   pgTable,
@@ -166,6 +167,56 @@ export const citations = pgTable(
     index("citations_domain_idx").on(table.domain),
   ],
 );
+
+/**
+ * Агрегаты visibility (контракт C3). Единственный источник цифр для UI и отчётов:
+ * показывать долю по одному ответу запрещено инвариантом 6.
+ */
+export const visibilitySnapshots = pgTable(
+  "visibility_snapshots",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    clientId: uuid("client_id")
+      .notNull()
+      .references(() => clients.id, { onDelete: "cascade" }),
+    /** null — свёртка по всем кластерам. */
+    clusterId: uuid("cluster_id").references(() => promptClusters.id, { onDelete: "cascade" }),
+    /** null — свёртка по всем платформам. */
+    platform: platformEnum("platform"),
+    periodStart: timestamp("period_start", { withTimezone: true }).notNull(),
+    periodEnd: timestamp("period_end", { withTimezone: true }).notNull(),
+    clientVisibilityPct: numeric("client_visibility_pct", { precision: 5, scale: 1 }).notNull(),
+    competitorVisibility: jsonb("competitor_visibility")
+      .$type<Record<string, number>>()
+      .notNull()
+      .default({}),
+    sampleCount: integer("sample_count").notNull(),
+    /** false — сэмплов меньше порога, цифру нельзя показывать как измерение. */
+    sufficient: boolean("sufficient").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("visibility_snapshots_client_idx").on(table.clientId),
+    /**
+     * Индекс для поиска ячейки, НЕ уникальный.
+     *
+     * Уникальность здесь потребовала бы `NULLS NOT DISTINCT` (cluster_id и platform
+     * содержат null у свёрток, а Postgres по умолчанию считает NULL-ы различными),
+     * а drizzle-kit этой версии такой индекс выразить не умеет. Поэтому идемпотентность
+     * пересчёта обеспечивается явным upsert'ом в коде (`upsertVisibilitySnapshot`),
+     * а не ограничением БД. Агрегация по клиенту идёт одним заданием, гонки нет.
+     */
+    index("visibility_snapshots_cell_idx").on(
+      table.clientId,
+      table.clusterId,
+      table.platform,
+      table.periodStart,
+    ),
+  ],
+);
+
+export type VisibilitySnapshotRow = typeof visibilitySnapshots.$inferSelect;
+export type NewVisibilitySnapshotRow = typeof visibilitySnapshots.$inferInsert;
 
 export const promptClustersRelations = relations(promptClusters, ({ one, many }) => ({
   client: one(clients, { fields: [promptClusters.clientId], references: [clients.id] }),

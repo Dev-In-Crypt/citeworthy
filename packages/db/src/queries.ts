@@ -1,4 +1,4 @@
-import { and, eq, isNotNull, lte } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, lte } from "drizzle-orm";
 import type { Database } from "./client";
 import { agencies, clients, users } from "./schema/tenancy";
 import type { Agency, Client, NewClient, User } from "./schema/tenancy";
@@ -11,6 +11,7 @@ import {
   responses,
   runSchedules,
   runs,
+  visibilitySnapshots,
 } from "./schema/measurement";
 import type {
   Citation,
@@ -23,6 +24,8 @@ import type {
   Response,
   Run,
   RunSchedule,
+  NewVisibilitySnapshotRow,
+  VisibilitySnapshotRow,
 } from "./schema/measurement";
 
 /**
@@ -269,6 +272,79 @@ export async function listCitationsByResponse(
   responseId: string,
 ): Promise<Citation[]> {
   return db.select().from(citations).where(eq(citations.responseId, responseId));
+}
+
+/** Ответы клиента с признаками упоминаний — вход агрегации (контракт C3). */
+export async function listResponseFactsForClient(db: Database, clientId: string) {
+  const rows = await db
+    .select({
+      responseId: responses.id,
+      clusterId: prompts.clusterId,
+      platform: responses.platform,
+      createdAt: responses.createdAt,
+      entityName: mentions.entityName,
+      isClient: mentions.isClient,
+      isCompetitor: mentions.isCompetitor,
+    })
+    .from(responses)
+    .innerJoin(runs, eq(responses.runId, runs.id))
+    .innerJoin(prompts, eq(responses.promptId, prompts.id))
+    .leftJoin(mentions, eq(mentions.responseId, responses.id))
+    .where(eq(runs.clientId, clientId));
+
+  return rows;
+}
+
+/**
+ * Идемпотентная запись среза. Уникального ограничения в БД нет (см. комментарий
+ * к индексу в схеме), поэтому существующая строка ищется явно.
+ */
+export async function upsertVisibilitySnapshot(
+  db: Database,
+  values: NewVisibilitySnapshotRow,
+): Promise<void> {
+  const existing = await db
+    .select({ id: visibilitySnapshots.id })
+    .from(visibilitySnapshots)
+    .where(
+      and(
+        eq(visibilitySnapshots.clientId, values.clientId),
+        values.clusterId == null
+          ? isNull(visibilitySnapshots.clusterId)
+          : eq(visibilitySnapshots.clusterId, values.clusterId),
+        values.platform == null
+          ? isNull(visibilitySnapshots.platform)
+          : eq(visibilitySnapshots.platform, values.platform),
+        eq(visibilitySnapshots.periodStart, values.periodStart),
+      ),
+    )
+    .limit(1);
+
+  const row = existing[0];
+  if (row) {
+    await db
+      .update(visibilitySnapshots)
+      .set({
+        clientVisibilityPct: values.clientVisibilityPct,
+        competitorVisibility: values.competitorVisibility,
+        sampleCount: values.sampleCount,
+        sufficient: values.sufficient,
+      })
+      .where(eq(visibilitySnapshots.id, row.id));
+    return;
+  }
+
+  await db.insert(visibilitySnapshots).values(values);
+}
+
+export async function listVisibilitySnapshots(
+  db: Database,
+  clientId: string,
+): Promise<VisibilitySnapshotRow[]> {
+  return db
+    .select()
+    .from(visibilitySnapshots)
+    .where(eq(visibilitySnapshots.clientId, clientId));
 }
 
 export async function listUsersByAgency(db: Database, agencyId: string): Promise<User[]> {
