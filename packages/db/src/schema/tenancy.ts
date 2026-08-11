@@ -1,5 +1,14 @@
 import { relations } from "drizzle-orm";
-import { index, pgEnum, pgTable, text, timestamp, integer, uuid } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  index,
+  integer,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
 
 export const planEnum = pgEnum("plan", ["starter", "growth", "scale"]);
 export const userRoleEnum = pgEnum("user_role", ["owner", "admin", "member"]);
@@ -26,7 +35,11 @@ export const users = pgTable(
     email: text("email").notNull().unique(),
     name: text("name").notNull(),
     role: userRoleEnum("role").notNull().default("member"),
+    // Поля ниже требует Better Auth (таблица users выступает его user-моделью).
+    emailVerified: boolean("email_verified").notNull().default(false),
+    image: text("image"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index("users_agency_id_idx").on(table.agencyId)],
 );
