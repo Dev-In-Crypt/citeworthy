@@ -19,3 +19,6 @@ export {
 export { RESPONSE_FIXTURES, fixturesForPlatform } from "./fixtures/responses";
 export type { ResponseFixture } from "./fixtures/responses";
 export * from "./storage/types";
+export * from "./parsing/types";
+export { findAlias, matchEntities, mentionsFromText } from "./parsing/matcher";
+export { domainOf, mergeMentions, parseResponse } from "./parsing/parse";

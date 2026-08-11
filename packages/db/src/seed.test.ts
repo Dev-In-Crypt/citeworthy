@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createDb } from "./client";
 import {
@@ -64,8 +64,14 @@ describe("seed", () => {
     expect(clusters).toHaveLength(2);
     expect(clusters.map((c) => c.intent).sort()).toEqual(["comparison", "learning"]);
 
-    const allPrompts = await db.select().from(prompts);
-    expect(allPrompts).toHaveLength(10);
+    // Счёт строго по кластерам seed: другие тесты создают свои данные в той же БД,
+    // и глобальный count делал бы этот тест зависимым от порядка запуска.
+    const clusterIds = clusters.map((c) => c.id);
+    const seedPrompts = await db
+      .select()
+      .from(prompts)
+      .where(inArray(prompts.clusterId, clusterIds));
+    expect(seedPrompts).toHaveLength(10);
   });
 
   it("в каждом кластере есть контрольный промпт — база сравнения для экспериментов", async () => {

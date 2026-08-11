@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   createAgency,
   createClient,
@@ -85,6 +85,12 @@ describe("orchestrateRun (mock-режим)", () => {
     runId = (await createRun(db, { clientId, scheduleId, trigger: "manual" })).id;
   });
 
+  afterEach(async () => {
+    // Тесты делят одну БД: за собой нужно убирать, иначе чужие проверки
+    // начнут зависеть от порядка запуска.
+    await deleteAgency(db, agencyId);
+  });
+
   afterAll(async () => {
     await close();
   });
@@ -99,7 +105,6 @@ describe("orchestrateRun (mock-режим)", () => {
 
     const written = await listResponsesByRun(db, runId);
     expect(written).toHaveLength(18);
-    await deleteAgency(db, agencyId);
   });
 
   it("на каждом ответе есть версия модели и стоимость", async () => {
@@ -112,7 +117,6 @@ describe("orchestrateRun (mock-режим)", () => {
       expect(Number(response.costUsd)).toBeGreaterThan(0);
       expect(response.rawText.length).toBeGreaterThan(0);
     }
-    await deleteAgency(db, agencyId);
   });
 
   it("сырой ответ уходит в storage — переобработка парсером возможна", async () => {
@@ -122,7 +126,6 @@ describe("orchestrateRun (mock-режим)", () => {
     for (const response of written) {
       expect(response.rawStorageKey).toMatch(new RegExp(`^runs/${runId}/`));
     }
-    await deleteAgency(db, agencyId);
   });
 
   it("сэмплы одного промпта покрывают все три платформы", async () => {
@@ -134,7 +137,6 @@ describe("orchestrateRun (mock-режим)", () => {
 
     const perPlatform = written.filter((r) => r.platform === "chatgpt");
     expect(perPlatform).toHaveLength(6); // 2 промпта × 3 сэмпла
-    await deleteAgency(db, agencyId);
   });
 
   it("повторная оркестрация того же прогона не удваивает ответы", async () => {
@@ -146,6 +148,5 @@ describe("orchestrateRun (mock-режим)", () => {
     expect(second.failed).toBe(18);
     expect(second.status).toBe("failed");
     expect(await listResponsesByRun(db, runId)).toHaveLength(18);
-    await deleteAgency(db, agencyId);
   });
 });
