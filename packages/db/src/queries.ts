@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, isNotNull, isNull, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, isNull, lte, sql } from "drizzle-orm";
 import type { Database } from "./client";
 import { agencies, clients, users } from "./schema/tenancy";
 import type { Agency, Client, NewClient, User } from "./schema/tenancy";
@@ -684,6 +684,48 @@ export async function listActivityBetween(
       ),
     )
     .orderBy(desc(activityLog.createdAt));
+}
+
+/** Наблюдения цитирования по кластерам — вход для детекта новых источников. */
+export async function listCitationObservations(
+  db: Database,
+  clientId: string,
+  clusterIds: string[],
+): Promise<{ domain: string; observedAt: Date }[]> {
+  if (clusterIds.length === 0) return [];
+
+  return db
+    .select({ domain: citations.domain, observedAt: responses.createdAt })
+    .from(citations)
+    .innerJoin(responses, eq(citations.responseId, responses.id))
+    .innerJoin(runs, eq(responses.runId, runs.id))
+    .innerJoin(prompts, eq(responses.promptId, prompts.id))
+    .where(and(eq(runs.clientId, clientId), inArray(prompts.clusterId, clusterIds)));
+}
+
+/** Эксперименты, которые ещё собирают данные. */
+export async function listCollectingExperiments(
+  db: Database,
+  clientId: string,
+): Promise<Experiment[]> {
+  return db
+    .select()
+    .from(experiments)
+    .where(and(eq(experiments.clientId, clientId), eq(experiments.status, "collecting")));
+}
+
+/** Есть ли уже событие такого типа — детект обязан быть идемпотентным. */
+export async function hasExperimentEvent(
+  db: Database,
+  experimentId: string,
+  type: ExperimentEvent["type"],
+): Promise<boolean> {
+  const rows = await db
+    .select({ id: experimentEvents.id })
+    .from(experimentEvents)
+    .where(and(eq(experimentEvents.experimentId, experimentId), eq(experimentEvents.type, type)))
+    .limit(1);
+  return rows.length > 0;
 }
 
 export async function createExperiment(

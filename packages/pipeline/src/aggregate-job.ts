@@ -2,6 +2,7 @@ import { computeVisibilitySnapshots } from "@repo/core";
 import type { Platform, ResponseRecord } from "@repo/core";
 import { listResponseFactsForClient, upsertVisibilitySnapshot } from "@repo/db";
 import type { Database } from "@repo/db";
+import { detectExperimentEvents } from "./experiment-events";
 
 /**
  * Пересчитывает visibility_snapshots клиента (контракт C3).
@@ -52,6 +53,9 @@ export async function aggregateClient(db: Database, clientId: string): Promise<n
       sufficient: snapshot.sufficient,
     });
   }
+
+  // Свежие срезы посчитаны — можно дописать события на таймлайны экспериментов.
+  await detectExperimentEvents(db, clientId);
 
   return snapshots.length;
 }

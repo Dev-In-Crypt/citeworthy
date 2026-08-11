@@ -1,0 +1,105 @@
+import { averageVisibility, findFirstNewCitation, findVisibilityChange } from "@repo/core";
+import type { SnapshotPoint } from "@repo/core";
+import {
+  addExperimentEvent,
+  hasExperimentEvent,
+  listAllSnapshots,
+  listCitationObservations,
+  listCollectingExperiments,
+} from "@repo/db";
+import type { Database } from "@repo/db";
+
+/** Верхняя граница открытого интервала «после действия». */
+const OPEN_ENDED = new Date("9999-12-31T00:00:00Z");
+
+export interface DetectedEvents {
+  experimentId: string;
+  firstNewCitation: boolean;
+  visibilityChange: boolean;
+}
+
+/**
+ * Дописывает события на таймлайны активных экспериментов клиента.
+ *
+ * Вызывается после агрегации: свежие срезы уже посчитаны, и можно сравнить
+ * «после» с зафиксированным baseline. Идемпотентен — каждое событие
+ * записывается один раз, иначе таймлайн превратился бы в поток дублей.
+ */
+export async function detectExperimentEvents(
+  db: Database,
+  clientId: string,
+): Promise<DetectedEvents[]> {
+  const experiments = await listCollectingExperiments(db, clientId);
+  if (experiments.length === 0) return [];
+
+  const snapshotRows = await listAllSnapshots(db, clientId);
+  const snapshots: SnapshotPoint[] = snapshotRows.map((row) => ({
+    clusterId: row.clusterId,
+    periodStart: row.periodStart,
+    clientVisibilityPct: Number(row.clientVisibilityPct),
+    sampleCount: row.sampleCount,
+  }));
+
+  const results: DetectedEvents[] = [];
+
+  for (const experiment of experiments) {
+    const detected: DetectedEvents = {
+      experimentId: experiment.id,
+      firstNewCitation: false,
+      visibilityChange: false,
+    };
+
+    // 1. Источник, которого до действия в измерениях не было.
+    if (!(await hasExperimentEvent(db, experiment.id, "first_new_citation"))) {
+      const observations = await listCitationObservations(
+        db,
+        clientId,
+        experiment.treatmentClusterIds,
+      );
+      const finding = findFirstNewCitation(observations, experiment.actionDate);
+
+      if (finding) {
+        await addExperimentEvent(db, {
+          experimentId: experiment.id,
+          type: "first_new_citation",
+          occurredAt: finding.observedAt,
+          note: finding.domain,
+          payload: { domain: finding.domain, daysAfterAction: finding.daysAfterAction },
+        });
+        detected.firstNewCitation = true;
+      }
+    }
+
+    // 2. Сдвиг видимости относительно baseline выше порога шума.
+    if (!(await hasExperimentEvent(db, experiment.id, "visibility_change"))) {
+      const baseline = averageVisibility(snapshots, experiment.treatmentClusterIds, {
+        start: experiment.baselineStart,
+        end: experiment.baselineEnd,
+      });
+
+      const after = averageVisibility(snapshots, experiment.treatmentClusterIds, {
+        start: experiment.actionDate,
+        // «После» — открытый интервал. Ограничивать его текущим моментом нельзя:
+        // при расхождении часов между БД и процессом свежий срез выпал бы из окна.
+        end: OPEN_ENDED,
+      });
+
+      const change = findVisibilityChange(baseline.visibilityPct, after.visibilityPct);
+
+      if (change) {
+        await addExperimentEvent(db, {
+          experimentId: experiment.id,
+          type: "visibility_change",
+          occurredAt: new Date(),
+          note: `${change.deltaPp >= 0 ? "+" : ""}${change.deltaPp} pp vs baseline`,
+          payload: { ...change },
+        });
+        detected.visibilityChange = true;
+      }
+    }
+
+    results.push(detected);
+  }
+
+  return results;
+}
