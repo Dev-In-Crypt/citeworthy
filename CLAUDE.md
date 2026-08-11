@@ -43,6 +43,7 @@ pnpm lint && pnpm typecheck
 
 - TypeScript strict; никаких `any` в `packages/core`.
 - Все внешние LLM/API-вызовы — за интерфейсами из `packages/core`, с mock-реализацией; `ADAPTERS_MODE=mock|live`. Тесты никогда не ходят в сеть.
+- Импорты внутри пакетов — **без расширений** (`from "./client"`, не `"./client.js"`): drizzle-kit собирает схему как CJS и ESM-расширения не резолвит.
 - Даты в БД — timestamptz UTC; деньги — `cost_usd numeric`.
 - Парсинг/математика (mentions, visibility, experiment math) — чистые функции с table-driven тестами; это самый защищённый тестами код проекта.
 - **Windows/кодировка (важно):** проект на Windows, шелл — Windows PowerShell 5.1. `Get-Content`/`Set-Content` там ломают UTF-8 (кириллицу в доках) — читать/писать файлы с не-ASCII только через `[System.IO.File]::ReadAllText/WriteAllText` с `UTF8Encoding($false)`, либо через Read/Edit/Write-инструменты. Файлы пишем без BOM, LF.

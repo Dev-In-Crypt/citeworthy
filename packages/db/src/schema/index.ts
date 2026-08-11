@@ -4,4 +4,4 @@
  * T40/T43 actions+experiments, T50 reporting.
  */
 
-export {};
+export * from "./tenancy";

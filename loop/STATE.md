@@ -5,9 +5,9 @@
 
 ## Текущий статус
 
-- Следующая задача: **T02** (схема tenancy: agencies/users/clients + миграция + seed)
-- Сделано: T00, T01. Монорепо собирается, БД и Redis поднимаются, соединение проверено.
-- Команды проверки: `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`, `pnpm db:migrate`, `pnpm db:check`.
+- Следующая задача: **T03** (auth: Better Auth email+password, signup создаёт agency+owner, страницы /login и /signup)
+- Сделано: T00, T01, T02. Монорепо собирается, БД поднимается, схема tenancy применена, seed идемпотентен, 4 теста зелёные.
+- Команды проверки: `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`, `pnpm db:migrate`, `pnpm db:check`, `pnpm db:seed`.
 - Порты: Postgres `localhost:5433`, Redis `localhost:6380` (нестандартные, чтобы не конфликтовать с локальными сервисами). Перед работой: `docker compose up -d`, `.env` копируется из `.env.example`.
 
 ## Блокеры для человека
@@ -18,6 +18,13 @@
 - Docker установлен (29.6.2), но контейнеры для T01 ещё не поднимались — проверить, что демон запущен.
 
 ## Журнал итераций
+
+### 2026-08-11 · iter 3 (ручной прогон) · T02 — done
+- Сделано: схема tenancy + первая миграция + идемпотентный seed + 4 интеграционных теста.
+- Verify: двойной `pnpm db:seed` без дублей, `pnpm --filter @repo/db test` 4/4; typecheck/lint/test/build зелёные.
+- Вскрыто и починено: drizzle-kit не резолвит ESM-расширения `.js` (импорты без расширений, правило в CLAUDE.md).
+- Дальше: T03.
+- Блокеры: цикл заблокирован логином CLI (см. выше).
 
 ### 2026-08-11 · iter 2 (ручной прогон) · T01 — done
 - Сделано: docker-compose (Postgres 16, Redis 7, healthchecks), Drizzle + postgres.js, `.env.example`, программный мигратор, `db:check`.

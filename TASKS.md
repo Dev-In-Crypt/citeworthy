@@ -91,7 +91,7 @@ Confidence-эвристика (см. задачу T45): начисление б�
 - [x] **T01. Локальная инфраструктура.** `docker-compose.yml` с Postgres 16 и Redis 7; `packages/db`: Drizzle настроен, скрипты `db:generate`, `db:migrate`, `db:check`, `db:studio`; `.env.example` со всеми переменными.
   Verify: `docker compose up -d && pnpm db:migrate && pnpm db:check` проходит на чистой БД (`db:check` обязателен — `db:migrate` при пустой схеме не подключается к БД и сам по себе ничего не доказывает).
 
-- [ ] **T02. Схема tenancy.** Таблицы `agencies`, `users`, `clients` по разделу 2.1 плана + миграция + seed-скрипт (`pnpm db:seed`: 1 агентство, 1 owner, 2 клиента с brand/competitor names).
+- [x] **T02. Схема tenancy.** Таблицы `agencies`, `users`, `clients` по разделу 2.1 плана + миграция + seed-скрипт (`pnpm db:seed`: 1 агентство, 1 owner, 2 клиента с brand/competitor names).
   Verify: `pnpm db:seed` идемпотентен; юнит-тест на select seed-данных.
 
 - [ ] **T03. Auth.** Better Auth (email+password) в `apps/web`: signup создаёт agency+owner, login, session; страницы `/login`, `/signup`.
@@ -253,5 +253,6 @@ Confidence-эвристика (см. задачу T45): начисление б�
 
 ## Log
 
+- **2026-08-11 · T02 done.** Схема tenancy (agencies/users/clients + enum'ы plan/user_role/client_status, индексы по agency_id, brand_names/competitor_names как text[]), миграция `0000_square_professor_monster.sql`, идемпотентный seed (Demo Agency, owner, AcmeCRM + Northwind Analytics) и 4 интеграционных теста на его содержимое. Verify: `pnpm db:seed` дважды подряд даёт тот же результат; `pnpm --filter @repo/db test` — 4/4 зелёные. Починено по ходу: drizzle-kit собирает конфиг и схему как CJS и не резолвит ESM-расширения `.js` в импортах — в `packages/db` перешли на импорты без расширений (bundler-резолюция TS их не требует).
 - **2026-08-11 · T01 done.** docker-compose (Postgres 16 на 5433, Redis 7 на 6380 — нестандартные порты, чтобы не конфликтовать с локальными установками), Drizzle + postgres.js, `.env.example`, программный мигратор (переживает пустую папку миграций). Verify: `docker compose up -d && pnpm db:migrate && pnpm db:check` зелёные, плюс typecheck/lint/test/build. Уточнение плана: verify T01 усилен `db:check`, т.к. `db:migrate` при пустой схеме не открывает соединение. Починено по ходу: `dotenv` не находил корневой `.env` при запуске из папки пакета (теперь поиск вверх по дереву); `next-env.d.ts` ронял eslint (в ignore + gitignore).
 - **2026-08-11 · T00 done.** Монорепо: pnpm workspaces + Turborepo 2, apps/web (Next 15 + React 19 + Tailwind v4 + shadcn-совместимые токены), apps/worker (tsx-скелет), packages/core, packages/db. Общие tsconfig.base / eslint flat config / prettier. Verify: `pnpm install && pnpm build && pnpm lint` зелёные (плюс typecheck и test). Отклонение от плана: `next/font/google` убран — в окружении TLS-перехват, шрифт грузился по сети на этапе билда и ронял сборку; вместо него font-stack, self-hosted Inter возможен в T05.
