@@ -5,8 +5,8 @@
 
 ## Текущий статус
 
-- Следующая задача: **T10** (схема measurement) — Phase 0 закрыта, кроме verify T08.
-- Сделано: T00–T07 отмечены, T08 написан но не отмечен. Тесты: 4 (db) + 10 (tenancy) + 11 (storage) юнит, 8 e2e.
+- Следующая задача: **T11** (fixture-ответы платформ)
+- Сделано: T00–T07, T10 отмечены; T08 написан но не отмечен (нет remote). Тесты: 4 (db) + 10 (tenancy) + 11 (storage) юнит, 8 e2e.
 - Команды проверки: `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`, `pnpm e2e`, `pnpm db:migrate`, `pnpm db:check`, `pnpm db:seed`.
 - e2e поднимает свой сервер на порту 3100 из production-сборки. Если тесты падают мгновенно и «не видят» правок — на 3100 висит старый процесс: `Get-NetTCPConnection -LocalPort 3100 -State Listen` и `Stop-Process`.
 - Порты: Postgres `localhost:5433`, Redis `localhost:6380` (нестандартные, чтобы не конфликтовать с локальными сервисами). Перед работой: `docker compose up -d`, `.env` копируется из `.env.example`.
@@ -20,6 +20,12 @@
 - Docker установлен (29.6.2), но контейнеры для T01 ещё не поднимались — проверить, что демон запущен.
 
 ## Журнал итераций
+
+### 2026-08-11 · iter 6 (/loop) · T10 — done
+- Сделано: схема measurement (7 таблиц, миграция 0002), seed с кластерами/промптами/расписанием, 4 новых теста.
+- Verify: 8 тестов db зелёные, seed идемпотентен, типы экспортированы; typecheck/lint/test/build зелёные.
+- Дальше: T11 (fixtures).
+- Блокеры: только T08 (нет remote).
 
 ### 2026-08-11 · iter 5 (/loop) · T04 — done
 - Сделано: tRPC-каркас, protectedProcedure/roleProcedure/assertTenant, роутеры agency и clients, приглашения с токеном, /invite/[token], React-провайдер tRPC.
