@@ -27,3 +27,4 @@ export * from "./billing/period";
 export * from "./import/csv";
 export * from "./parsing/highlight";
 export * from "./sources/domains";
+export * from "./sources/classifier";
