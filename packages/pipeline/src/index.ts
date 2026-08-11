@@ -12,4 +12,5 @@ export type { RunJobSpec, RunOutcome } from "./run-orchestration";
 export { parseRun, parseStoredResponse, storeCitations } from "./parse-job";
 export type { ParseOutcome } from "./parse-job";
 export { aggregateClient } from "./aggregate-job";
-export { storage, rawResponseKey } from "./storage";
+export { storage, rawResponseKey } from "./storage";export { classifyRunSources } from "./classify-sources";
+export type { ClassifyOutcome } from "./classify-sources";
