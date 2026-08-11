@@ -162,7 +162,7 @@ export function estimateExperiment(inputs: ExperimentInputs): ExperimentEstimate
   };
 }
 
-/** Формулировка эффекта для интерфейса. Всегда «estimated», никогда «proven». */
+/** Формулировка эффекта для интерфейса: всегда «estimated» — см. инвариант 2. */
 export function formatEstimate(estimate: ExperimentEstimate): string {
   if (estimate.incrementalPp === null) {
     return "Not enough data to estimate an effect yet.";
