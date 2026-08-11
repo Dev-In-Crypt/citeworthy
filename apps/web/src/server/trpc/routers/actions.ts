@@ -8,6 +8,8 @@ import {
   getClientById,
   getSourceByDomain,
   listActions,
+  listActivity,
+  logActivity,
   updateAction,
 } from "@repo/db";
 import { assertTenant, protectedProcedure, roleProcedure, router } from "../trpc";
@@ -16,6 +18,14 @@ const IMPACT = ["low", "medium", "high"] as const;
 const STATUS = ["backlog", "in_progress", "done", "dropped"] as const;
 
 export const actionsRouter = router({
+  activity: protectedProcedure
+    .input(z.object({ clientId: z.uuid(), limit: z.number().int().min(1).max(100).default(20) }))
+    .query(async ({ ctx, input }) => {
+      const client = await getClientById(ctx.db, input.clientId);
+      assertTenant(client, ctx.user.agencyId);
+      return listActivity(ctx.db, input.clientId, input.limit);
+    }),
+
   list: protectedProcedure
     .input(z.object({ clientId: z.uuid() }))
     .query(async ({ ctx, input }) => {
@@ -46,7 +56,7 @@ export const actionsRouter = router({
       const { clientId, sourceDomain, ...rest } = input;
       const source = sourceDomain ? await getSourceByDomain(ctx.db, sourceDomain) : undefined;
 
-      return createAction(ctx.db, {
+      const action = await createAction(ctx.db, {
         clientId,
         ...rest,
         sourceDomain: sourceDomain ?? null,
@@ -54,6 +64,16 @@ export const actionsRouter = router({
         // Владелец назначается явно, а не автоматически: тот, кто завёл действие,
         // не обязательно тот, кто будет его выполнять.
       });
+
+      await logActivity(ctx.db, {
+        agencyId: ctx.user.agencyId,
+        clientId,
+        actorUserId: null,
+        eventType: "action_created",
+        payload: { actionId: action.id, title: action.title, actionType: action.actionType },
+      });
+
+      return action;
     }),
 
   /**
@@ -98,6 +118,19 @@ export const actionsRouter = router({
         originRule: recommendation.rule,
       });
 
+      await logActivity(ctx.db, {
+        agencyId: ctx.user.agencyId,
+        clientId: input.clientId,
+        actorUserId: null,
+        eventType: "action_created",
+        payload: {
+          actionId: action.id,
+          title: action.title,
+          actionType: action.actionType,
+          fromRule: recommendation.rule,
+        },
+      });
+
       return { action, created: true };
     }),
 
@@ -128,11 +161,25 @@ export const actionsRouter = router({
       const completedAt =
         status === "done" ? (action.completedAt ?? new Date()) : status ? null : undefined;
 
-      return updateAction(ctx.db, id, {
+      const updated = await updateAction(ctx.db, id, {
         ...patch,
         ...(status ? { status } : {}),
         ...(completedAt !== undefined ? { completedAt } : {}),
       });
+
+      if (status && status !== action.status) {
+        await logActivity(ctx.db, {
+          agencyId: ctx.user.agencyId,
+          clientId: action.clientId,
+          actorUserId: null,
+          // Завершение — отдельное событие: именно оно попадёт в отчёт клиенту
+          // и станет точкой отсчёта для эксперимента.
+          eventType: status === "done" ? "action_completed" : "action_status_changed",
+          payload: { actionId: action.id, title: action.title, from: action.status, to: status },
+        });
+      }
+
+      return updated;
     }),
 
   delete: roleProcedure("member")

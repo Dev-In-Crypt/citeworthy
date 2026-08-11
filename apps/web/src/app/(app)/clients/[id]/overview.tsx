@@ -198,6 +198,53 @@ export function ClientOverview({ clientId }: { clientId: string }) {
           taken. Never a single answer.
         </p>
       </section>
+
+      <ActivityFeed clientId={clientId} />
     </div>
+  );
+}
+
+const EVENT_LABELS: Record<string, string> = {
+  action_created: "Action created",
+  action_status_changed: "Action moved",
+  action_completed: "Action completed",
+  run_finished: "Check finished",
+  report_generated: "Report generated",
+  report_approved: "Report approved",
+};
+
+/** Лента событий — то, из чего собирается раздел «что сделано» в отчёте клиенту. */
+function ActivityFeed({ clientId }: { clientId: string }) {
+  const activity = api.actions.activity.useQuery({ clientId, limit: 10 });
+  const entries = activity.data ?? [];
+
+  return (
+    <section className="flex flex-col gap-3 rounded-lg border p-4">
+      <h2 className="text-base font-medium">Recent activity</h2>
+
+      {entries.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          Nothing has happened for this client yet. Runs and actions show up here as they land.
+        </p>
+      ) : (
+        <ul data-testid="activity-feed" className="flex flex-col gap-2 text-sm">
+          {entries.map((entry) => (
+            <li key={entry.id} className="flex items-baseline gap-3">
+              <span className="metric shrink-0 text-muted-foreground">
+                {new Date(entry.createdAt).toLocaleString()}
+              </span>
+              <span className="font-medium">{EVENT_LABELS[entry.eventType] ?? entry.eventType}</span>
+              <span className="truncate text-muted-foreground">
+                {typeof entry.payload["title"] === "string"
+                  ? entry.payload["title"]
+                  : typeof entry.payload["status"] === "string"
+                    ? `${String(entry.payload["answers"] ?? "")} answers · ${entry.payload["status"]}`
+                    : ""}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
