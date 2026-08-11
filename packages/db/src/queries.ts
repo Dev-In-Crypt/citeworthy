@@ -395,6 +395,31 @@ export async function getAgencyIdForRun(db: Database, runId: string): Promise<st
   return rows[0]?.agencyId;
 }
 
+/** Ответы на промпт вместе с разобранными упоминаниями и ссылками. */
+export async function listResponsesForPrompt(db: Database, promptId: string, limit = 30) {
+  const rows = await db
+    .select()
+    .from(responses)
+    .where(eq(responses.promptId, promptId))
+    .orderBy(desc(responses.createdAt))
+    .limit(limit);
+
+  return Promise.all(
+    rows.map(async (response) => ({
+      id: response.id,
+      platform: response.platform,
+      modelVersion: response.modelVersion,
+      sampleIndex: response.sampleIndex,
+      rawText: response.rawText,
+      costUsd: response.costUsd,
+      latencyMs: response.latencyMs,
+      createdAt: response.createdAt,
+      mentions: await listMentionsByResponse(db, response.id),
+      citations: await listCitationsByResponse(db, response.id),
+    })),
+  );
+}
+
 export async function getScheduleForClient(
   db: Database,
   clientId: string,

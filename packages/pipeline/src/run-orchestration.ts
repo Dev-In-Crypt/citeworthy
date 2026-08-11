@@ -1,4 +1,4 @@
-import { billingPeriod, getAdapter, type AdaptersMode, type Platform } from "@repo/core";
+import { billingPeriod, getAdapter, PLATFORMS, type AdaptersMode, type Platform } from "@repo/core";
 import {
   createResponse,
   countResponsesByRun,
@@ -119,7 +119,10 @@ export async function orchestrateRun(
   }
 
   const schedule = run.scheduleId ? await getRunSchedule(db, run.scheduleId) : undefined;
-  const platforms = (schedule?.platforms ?? ["chatgpt"]) as Platform[];
+  // Без расписания берём весь запускной набор платформ, а не одну.
+  // Молча измерить только ChatGPT и показать это как «видимость» — хуже,
+  // чем потратить больше: агентство не узнало бы, что охват неполный.
+  const platforms = (schedule?.platforms ?? PLATFORMS) as Platform[];
   const samples = schedule?.samplesPerPrompt ?? 3;
 
   const prompts = await listActivePromptsForClient(db, run.clientId);

@@ -6,8 +6,11 @@ import {
   createRun,
   getClientById,
   getRunById,
+  getPromptById,
+  getPromptClusterById,
   getScheduleForClient,
   listActivePromptsForClient,
+  listResponsesForPrompt,
   listRecentRuns,
   upsertRunSchedule,
 } from "@repo/db";
@@ -62,6 +65,34 @@ export const runsRouter = router({
     assertTenant(client, ctx.user.agencyId);
     return run;
   }),
+
+  /** История ответов на промпт — то, из чего складывается цифра видимости. */
+  responses: protectedProcedure
+    .input(z.object({ promptId: z.uuid(), limit: z.number().int().min(1).max(100).default(30) }))
+    .query(async ({ ctx, input }) => {
+      const prompt = await getPromptById(ctx.db, input.promptId);
+      if (!prompt) {
+        assertTenant(null, ctx.user.agencyId);
+        throw new Error("unreachable");
+      }
+
+      const cluster = await getPromptClusterById(ctx.db, prompt.clusterId);
+      const client = cluster ? await getClientById(ctx.db, cluster.clientId) : undefined;
+      assertTenant(client, ctx.user.agencyId);
+
+      const rows = await listResponsesForPrompt(ctx.db, input.promptId, input.limit);
+
+      return {
+        prompt: { id: prompt.id, text: prompt.text, isControl: prompt.isControl },
+        // Словарь отдаётся вместе с ответами: подсветка на клиенте должна
+        // использовать те же имена, что и парсер.
+        dictionary: {
+          brandNames: client.brandNames.length > 0 ? client.brandNames : [],
+          competitorNames: client.competitorNames,
+        },
+        responses: rows,
+      };
+    }),
 
   triggerManual: roleProcedure("member")
     .input(z.object({ clientId: z.uuid() }))

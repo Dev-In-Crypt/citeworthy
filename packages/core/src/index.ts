@@ -25,3 +25,4 @@ export { domainOf, mergeMentions, parseResponse } from "./parsing/parse";
 export * from "./metrics/visibility";
 export * from "./billing/period";
 export * from "./import/csv";
+export * from "./parsing/highlight";
