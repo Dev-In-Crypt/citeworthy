@@ -1,9 +1,16 @@
 import { Queue, Worker } from "bullmq";
 import { createDb } from "@repo/db";
-import { parseAdaptersMode } from "@repo/core";
+import { PLATFORMS, parseAdaptersMode } from "@repo/core";
 import { ADAPTERS_MODE_RAW } from "./env";
-import { createConnection, createQueues } from "./queues";
+import {
+  createConnection,
+  createQueues,
+  PLATFORM_RATE_LIMITS,
+  runsQueueName,
+  type RunJobData,
+} from "./queues";
 import { tickSchedules } from "./scheduler";
+import { executeRunJob } from "./run-orchestration";
 
 const TICK_QUEUE = "scheduler-tick";
 const TICK_JOB = "find-due-schedules";
@@ -30,11 +37,28 @@ async function main(): Promise<void> {
     { connection },
   );
 
-  tickWorker.on("failed", (job, error) => {
-    console.error(`[worker] tick job ${job?.id ?? "?"} failed:`, error.message);
-  });
+  // По воркеру на платформу: свой лимит частоты у каждого провайдера.
+  const runWorkers = PLATFORMS.map(
+    (platform) =>
+      new Worker<RunJobData>(
+        runsQueueName(platform),
+        async (job) => {
+          const responseId = await executeRunJob(db, job.data, mode);
+          return { responseId };
+        },
+        { connection, limiter: PLATFORM_RATE_LIMITS[platform], concurrency: 4 },
+      ),
+  );
 
-  console.log(`[worker] started · adapters=${mode} · tick every ${TICK_EVERY_MS / 1000}s`);
+  for (const worker of [tickWorker, ...runWorkers]) {
+    worker.on("failed", (job, error) => {
+      console.error(`[worker] job ${job?.id ?? "?"} failed:`, error.message);
+    });
+  }
+
+  console.log(
+    `[worker] started · adapters=${mode} · tick every ${TICK_EVERY_MS / 1000}s · run queues: ${PLATFORMS.join(", ")}`,
+  );
 
   let shuttingDown = false;
   async function shutdown(signal: string): Promise<void> {
@@ -42,7 +66,7 @@ async function main(): Promise<void> {
     shuttingDown = true;
     console.log(`[worker] received ${signal}, shutting down`);
 
-    await tickWorker.close();
+    await Promise.all([tickWorker.close(), ...runWorkers.map((w) => w.close())]);
     await Promise.all([
       tickQueue.close(),
       queues.runs.close(),
