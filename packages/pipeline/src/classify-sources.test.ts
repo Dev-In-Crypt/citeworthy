@@ -1,4 +1,5 @@
-import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { SourceClassifier } from "@repo/core";
 import {
   createAgency,
   createClient,
@@ -10,6 +11,7 @@ import {
   listUnclassifiedSources,
 } from "@repo/db";
 import { promptClusters, prompts, runSchedules } from "@repo/db/schema/measurement";
+import { sources } from "@repo/db/schema/sources";
 import { orchestrateRun } from "./run-orchestration";
 import { classifyRunSources } from "./classify-sources";
 
@@ -22,6 +24,11 @@ describe("classifyRunSources", () => {
   let runId = "";
 
   beforeEach(async () => {
+    // sources — глобальная таблица-кэш и не удаляется вместе с агентством.
+    // Без явной очистки тесты зависели бы от порядка запуска: второй тест
+    // видел бы домены уже классифицированными и не вызывал бы классификатор.
+    await db.delete(sources);
+
     const agency = await createAgency(db, { name: "Sources Agency", clientLimit: 10 });
     agencyId = agency.id;
 
@@ -85,13 +92,37 @@ describe("classifyRunSources", () => {
     expect(own?.sourceType).toBe("owned");
   });
 
-  it("неизвестные домены остаются без типа и ждут модель", async () => {
+  it("домен вне словаря классифицируется моделью", async () => {
     const outcome = await classifyRunSources(db, runId);
+
+    // blog.hubspot.com словарём не покрыт, но подсказка «blog» в домене
+    // позволяет классификатору отнести его к editorial.
+    expect(outcome.classifiedByModel).toBeGreaterThan(0);
+    const blog = await getSourceByDomain(db, "blog.hubspot.com");
+    expect(blog?.sourceType).toBe("editorial");
+    expect(blog?.classifiedBy).toBe("model");
+  });
+
+  it("классификатор не вызывается повторно для уже известного домена", async () => {
+    const spy = vi.fn().mockResolvedValue("editorial");
+    const classifier: SourceClassifier = { classify: spy };
+
+    await classifyRunSources(db, runId, classifier);
+    const callsAfterFirst = spy.mock.calls.length;
+    expect(callsAfterFirst).toBeGreaterThan(0);
+
+    // Verify T31: sources — постоянный кэш, второй прогон не платит заново.
+    await classifyRunSources(db, runId, classifier);
+    expect(spy.mock.calls.length).toBe(callsAfterFirst);
+  });
+
+  it("классификатор без уверенности оставляет домен без типа", async () => {
+    const classifier: SourceClassifier = { classify: vi.fn().mockResolvedValue(null) };
+
+    const outcome = await classifyRunSources(db, runId, classifier);
     const unclassified = await listUnclassifiedSources(db);
 
-    // blog.hubspot.com словарём не покрыт — он должен ждать классификации,
-    // а не быть молча записанным в "other".
-    expect(outcome.awaitingModel).toBeGreaterThan(0);
+    expect(outcome.unclassified).toBeGreaterThan(0);
     expect(unclassified.some((s) => s.domain === "blog.hubspot.com")).toBe(true);
   });
 

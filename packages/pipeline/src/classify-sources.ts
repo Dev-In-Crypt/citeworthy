@@ -1,4 +1,5 @@
-import { classifyDomain } from "@repo/core";
+import { CachingSourceClassifier, classifyDomain, HeuristicSourceClassifier } from "@repo/core";
+import type { SourceClassifier } from "@repo/core";
 import {
   ensureSource,
   getClientById,
@@ -12,25 +13,35 @@ import type { Database } from "@repo/db";
 export interface ClassifyOutcome {
   domains: number;
   classifiedByRule: number;
-  awaitingModel: number;
+  classifiedByModel: number;
+  unclassified: number;
 }
 
 /**
- * Заводит источники по процитированным доменам прогона и классифицирует
- * их правилами. Домены, которые правило не узнало, остаются без типа
- * и уходят классификатору-модели (T31).
+ * Заводит источники по процитированным доменам прогона и классифицирует их.
+ *
+ * Порядок: словарь → классификатор. Домен, уже лежащий в `sources` с типом,
+ * не переклассифицируется вовсе — таблица и есть постоянный кэш, а объект
+ * CachingSourceClassifier снимает повторы внутри одного прогона.
  */
-export async function classifyRunSources(db: Database, runId: string): Promise<ClassifyOutcome> {
+export async function classifyRunSources(
+  db: Database,
+  runId: string,
+  classifier: SourceClassifier = new HeuristicSourceClassifier(),
+): Promise<ClassifyOutcome> {
   const responses = await listResponsesByRun(db, runId);
   if (responses.length === 0) {
-    return { domains: 0, classifiedByRule: 0, awaitingModel: 0 };
+    return { domains: 0, classifiedByRule: 0, classifiedByModel: 0, unclassified: 0 };
   }
 
-  const firstResponse = responses[0]!;
-  const client = await getClientForRun(db, firstResponse.runId);
+  const run = await getRunById(db, runId);
+  const client = run ? await getClientById(db, run.clientId) : undefined;
+  const cached = new CachingSourceClassifier(classifier);
 
   const seen = new Map<string, string>();
   let classifiedByRule = 0;
+  let classifiedByModel = 0;
+  let unclassified = 0;
 
   for (const response of responses) {
     for (const citation of await listCitationsByResponse(db, response.id)) {
@@ -38,18 +49,12 @@ export async function classifyRunSources(db: Database, runId: string): Promise<C
 
       let sourceId = seen.get(citation.domain);
       if (!sourceId) {
-        const ruleType = classifyDomain(citation.domain, {
-          ...(client?.domain ? { clientDomain: client.domain } : {}),
+        const source = await resolveSource(db, citation, client?.domain, cached, {
+          onRule: () => classifiedByRule++,
+          onModel: () => classifiedByModel++,
+          onUnknown: () => unclassified++,
         });
-
-        const source = await ensureSource(
-          db,
-          citation.domain,
-          ruleType ? { sourceType: ruleType, classifiedBy: "rule" } : undefined,
-        );
-
-        if (ruleType) classifiedByRule++;
-        sourceId = source.id;
+        sourceId = source;
         seen.set(citation.domain, sourceId);
       }
 
@@ -57,14 +62,50 @@ export async function classifyRunSources(db: Database, runId: string): Promise<C
     }
   }
 
-  return {
-    domains: seen.size,
-    classifiedByRule,
-    awaitingModel: seen.size - classifiedByRule,
-  };
+  return { domains: seen.size, classifiedByRule, classifiedByModel, unclassified };
 }
 
-async function getClientForRun(db: Database, runId: string) {
-  const run = await getRunById(db, runId);
-  return run ? getClientById(db, run.clientId) : undefined;
+async function resolveSource(
+  db: Database,
+  citation: { domain: string; title: string | null },
+  clientDomain: string | undefined,
+  classifier: SourceClassifier,
+  counters: { onRule: () => void; onModel: () => void; onUnknown: () => void },
+): Promise<string> {
+  // Уже классифицированный домен не тревожим: sources — постоянный кэш,
+  // и повторный вызов модели за тот же домен это чистые деньги на ветер.
+  const existing = await ensureSource(db, citation.domain);
+  if (existing.sourceType !== null) {
+    return existing.id;
+  }
+
+  const byRule = classifyDomain(citation.domain, {
+    ...(clientDomain ? { clientDomain } : {}),
+  });
+
+  if (byRule) {
+    counters.onRule();
+    const updated = await ensureSource(db, citation.domain, {
+      sourceType: byRule,
+      classifiedBy: "rule",
+    });
+    return updated.id;
+  }
+
+  const byModel = await classifier.classify(citation.domain, {
+    ...(citation.title ? { title: citation.title } : {}),
+  });
+
+  if (byModel) {
+    counters.onModel();
+    const updated = await ensureSource(db, citation.domain, {
+      sourceType: byModel,
+      classifiedBy: "model",
+    });
+    return updated.id;
+  }
+
+  // Остаётся без типа — это видно в данных и чинится расширением словаря.
+  counters.onUnknown();
+  return existing.id;
 }
