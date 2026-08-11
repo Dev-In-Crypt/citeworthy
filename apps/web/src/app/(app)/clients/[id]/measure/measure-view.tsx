@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { api } from "@/trpc/react";
 import { EmptyState } from "@/components/page-header";
 import { SchedulePanel } from "./schedule-panel";
@@ -121,6 +122,7 @@ export function MeasureView({ clientId }: { clientId: string }) {
               </div>
 
               <PromptList
+                clientId={clientId}
                 clusterId={cluster.id}
                 prompts={promptsByCluster.get(cluster.id) ?? []}
                 onChanged={refresh}
@@ -140,10 +142,12 @@ type PromptRow = {
 };
 
 function PromptList({
+  clientId,
   clusterId,
   prompts,
   onChanged,
 }: {
+  clientId: string;
   clusterId: string;
   prompts: PromptRow[];
   onChanged: () => Promise<void>;
@@ -169,7 +173,13 @@ function PromptList({
             className="flex items-center justify-between gap-3 rounded-md bg-secondary/50 px-3 py-1.5 text-sm"
           >
             <span className="flex items-center gap-2">
-              {prompt.text}
+              {/* Клик ведёт к сырым ответам: возможность проверить цифру — часть продукта. */}
+              <Link
+                href={`/clients/${clientId}/prompts/${prompt.id}`}
+                className="underline-offset-4 hover:underline"
+              >
+                {prompt.text}
+              </Link>
               {prompt.isControl && (
                 <span
                   data-testid="control-badge"
