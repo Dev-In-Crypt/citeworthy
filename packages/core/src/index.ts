@@ -7,6 +7,15 @@
 export const CORE_PACKAGE_NAME = "@repo/core";
 
 export * from "./adapters/types";
+export { MockAdapter, stableHash } from "./adapters/mock";
+export {
+  getAdapter,
+  getAdapters,
+  isPlatform,
+  parseAdaptersMode,
+  registerLiveAdapter,
+  type AdaptersMode,
+} from "./adapters/registry";
 export { RESPONSE_FIXTURES, fixturesForPlatform } from "./fixtures/responses";
 export type { ResponseFixture } from "./fixtures/responses";
 export * from "./storage/types";
