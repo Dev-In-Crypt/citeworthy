@@ -1,6 +1,15 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { accounts, agencies, createDb, sessions, users, verifications } from "@repo/db";
+import {
+  accounts,
+  agencies,
+  createDb,
+  getPendingInvitationByEmail,
+  markInvitationAccepted,
+  sessions,
+  users,
+  verifications,
+} from "@repo/db";
 
 const { db } = createDb();
 
@@ -48,11 +57,19 @@ export const auth = betterAuth({
     user: {
       create: {
         /**
-         * Регистрация = создание агентства. Первый пользователь становится его owner'ом
+         * Регистрация по приглашению присоединяет к существующему агентству;
+         * обычная регистрация создаёт новое, и пользователь становится его owner'ом
          * (инвариант 1 из CLAUDE.md: у каждого пользователя есть agency_id).
          */
         before: async (user) => {
           const email = user.email;
+
+          const invitation = await getPendingInvitationByEmail(db, email);
+          if (invitation) {
+            await markInvitationAccepted(db, invitation.token);
+            return { data: { ...user, agencyId: invitation.agencyId, role: invitation.role } };
+          }
+
           const [agency] = await db
             .insert(agencies)
             .values({ name: deriveAgencyName(email) })

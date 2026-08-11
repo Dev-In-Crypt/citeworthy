@@ -6,10 +6,10 @@ import { signIn, signUp } from "@/lib/auth-client";
 
 type Mode = "login" | "signup";
 
-export function AuthForm({ mode }: { mode: Mode }) {
+export function AuthForm({ mode, lockedEmail }: { mode: Mode; lockedEmail?: string }) {
   const router = useRouter();
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(lockedEmail ?? "");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -59,6 +59,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
+          readOnly={Boolean(lockedEmail)}
           autoComplete="email"
           className="h-10 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />

@@ -4,5 +4,5 @@
 
 export { createDb, type Database } from "./client";
 export { requireEnv, optionalEnv } from "./env";
-export { getAgencyById, listClientsByAgency } from "./queries";
+export * from "./queries";
 export * from "./schema/index";
