@@ -67,7 +67,11 @@ test("actions board moves cards and offers an experiment on completion", async (
   await expect(page.getByTestId("experiment-dialog")).toBeVisible();
   await expect(page.getByTestId("experiment-dialog")).toContainText("baseline");
 
-  await page.getByRole("button", { name: "Not now" }).click();
+  // Эксперимент создаётся из диалога: baseline фиксируется в этот момент.
+  await page.getByTestId("create-experiment").click();
+  await expect(page.getByTestId("experiment-warnings")).toBeVisible();
+
+  await page.getByRole("button", { name: /Not now|Close/ }).click();
   await expect(page.getByTestId("experiment-dialog")).toHaveCount(0);
   await expect(page.getByTestId("column-done").locator("article")).toHaveCount(1);
 
@@ -77,4 +81,19 @@ test("actions board moves cards and offers an experiment on completion", async (
 
   await page.goto(`/clients/${clientId}`);
   await expect(page.getByTestId("activity-feed")).toContainText("Action completed");
+
+  // Экран эксперимента: оценка, уверенность, дисклеймер, таймлайн и график.
+  await page.goto(`/clients/${clientId}/experiments`);
+  await expect(page.getByTestId("experiments-list").locator("li")).toHaveCount(1);
+
+  const headline = page.getByTestId("estimate-headline");
+  await expect(headline).toBeVisible();
+  // Инвариант 2: цифра подаётся как оценка, а не как доказанный результат.
+  await expect(headline).not.toContainText(/proven|proof|guaranteed|caused/i);
+
+  await expect(page.getByTestId("confidence-badge")).toContainText(/Confidence: (low|medium|high)/);
+  await expect(page.getByTestId("estimate-disclaimer")).toContainText("not attribution of cause");
+  await expect(page.getByTestId("evidence-list").locator("li").first()).toBeVisible();
+  await expect(page.getByTestId("experiment-timeline")).toContainText("Action shipped");
+  await expect(page.getByTestId("experiment-chart")).toBeVisible();
 });

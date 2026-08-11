@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { planExperiment } from "@repo/core";
+import { averageVisibility, estimateExperiment, formatEstimate, planExperiment } from "@repo/core";
 import type { SnapshotPoint } from "@repo/core";
 import {
   addExperimentEvent,
@@ -35,7 +35,83 @@ export const experimentsRouter = router({
     const client = await getClientById(ctx.db, experiment.clientId);
     assertTenant(client, ctx.user.agencyId);
 
-    return { experiment, events: await listExperimentEvents(ctx.db, experiment.id) };
+    const [events, snapshotRows] = await Promise.all([
+      listExperimentEvents(ctx.db, experiment.id),
+      listAllSnapshots(ctx.db, experiment.clientId),
+    ]);
+
+    const snapshots: SnapshotPoint[] = snapshotRows.map((row) => ({
+      clusterId: row.clusterId,
+      periodStart: row.periodStart,
+      clientVisibilityPct: Number(row.clientVisibilityPct),
+      sampleCount: row.sampleCount,
+    }));
+
+    const baselineWindow = { start: experiment.baselineStart, end: experiment.baselineEnd };
+    // «После» — открытый интервал: ограничивать его текущим моментом нельзя
+    // (та же причина, что в детекте событий: расхождение часов).
+    const afterWindow = { start: experiment.actionDate, end: new Date("9999-12-31T00:00:00Z") };
+
+    const treatmentBefore = averageVisibility(
+      snapshots,
+      experiment.treatmentClusterIds,
+      baselineWindow,
+    );
+    const treatmentAfter = averageVisibility(
+      snapshots,
+      experiment.treatmentClusterIds,
+      afterWindow,
+    );
+    const controlBefore = averageVisibility(snapshots, experiment.controlClusterIds, baselineWindow);
+    const controlAfter = averageVisibility(snapshots, experiment.controlClusterIds, afterWindow);
+
+    const estimate = estimateExperiment({
+      treatmentBefore: treatmentBefore.visibilityPct,
+      treatmentAfter: treatmentAfter.visibilityPct,
+      controlBefore: controlBefore.visibilityPct,
+      controlAfter: controlAfter.visibilityPct,
+      treatmentSamplesAfter: treatmentAfter.samples,
+      baselineSnapshots: treatmentBefore.snapshots,
+      hasControlGroup: experiment.controlClusterIds.length > 0,
+      hasNewCitation: events.some((event) => event.type === "first_new_citation"),
+    });
+
+    /** Ряды для графика: лечёная и контрольная группы по неделям. */
+    const weeks = [...new Set(snapshots.map((point) => point.periodStart.toISOString()))].sort();
+    const series = weeks.map((week) => {
+      const weekStart = new Date(week);
+      const forGroup = (clusterIds: string[]): number | null => {
+        const points = snapshots.filter(
+          (point) =>
+            point.clusterId !== null &&
+            clusterIds.includes(point.clusterId) &&
+            point.periodStart.getTime() === weekStart.getTime(),
+        );
+        if (points.length === 0) return null;
+        const samples = points.reduce((sum, p) => sum + p.sampleCount, 0);
+        if (samples === 0) return null;
+        return (
+          Math.round(
+            (points.reduce((sum, p) => sum + p.clientVisibilityPct * p.sampleCount, 0) / samples) *
+              10,
+          ) / 10
+        );
+      };
+
+      return {
+        week: week.slice(0, 10),
+        treatment: forGroup(experiment.treatmentClusterIds),
+        control: forGroup(experiment.controlClusterIds),
+      };
+    });
+
+    return {
+      experiment,
+      events,
+      estimate,
+      series,
+      formattedEstimate: formatEstimate(estimate),
+    };
   }),
 
   /**
