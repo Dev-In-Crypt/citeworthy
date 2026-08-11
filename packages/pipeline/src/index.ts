@@ -14,3 +14,4 @@ export type { ParseOutcome } from "./parse-job";
 export { aggregateClient } from "./aggregate-job";
 export { storage, rawResponseKey } from "./storage";export { classifyRunSources } from "./classify-sources";
 export type { ClassifyOutcome } from "./classify-sources";
+export { detectExperimentEvents } from "./experiment-events";

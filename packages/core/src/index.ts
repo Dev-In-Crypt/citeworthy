@@ -32,3 +32,4 @@ export * from "./diagnosis/source-graph";
 export * from "./copy";
 export * from "./diagnosis/recommendations";
 export * from "./experiments/baseline";
+export * from "./experiments/events";
