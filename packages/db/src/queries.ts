@@ -3,8 +3,20 @@ import type { Database } from "./client";
 import { agencies, clients, users } from "./schema/tenancy";
 import type { Agency, Client, NewClient, User } from "./schema/tenancy";
 import { invitations } from "./schema/auth";
-import { promptClusters, prompts, responses, runSchedules, runs } from "./schema/measurement";
+import {
+  citations,
+  mentions,
+  promptClusters,
+  prompts,
+  responses,
+  runSchedules,
+  runs,
+} from "./schema/measurement";
 import type {
+  Citation,
+  Mention,
+  NewCitation,
+  NewMention,
   NewResponse,
   NewRun,
   Prompt,
@@ -196,6 +208,67 @@ export async function countResponsesByRun(db: Database, runId: string): Promise<
 
 export async function listResponsesByRun(db: Database, runId: string): Promise<Response[]> {
   return db.select().from(responses).where(eq(responses.runId, runId));
+}
+
+export async function getResponseById(
+  db: Database,
+  responseId: string,
+): Promise<Response | undefined> {
+  const rows = await db.select().from(responses).where(eq(responses.id, responseId)).limit(1);
+  return rows[0];
+}
+
+/** Клиент, которому принадлежит ответ — нужен парсеру для словаря брендов. */
+export async function getClientForResponse(
+  db: Database,
+  responseId: string,
+): Promise<Client | undefined> {
+  const rows = await db
+    .select({ client: clients })
+    .from(responses)
+    .innerJoin(runs, eq(responses.runId, runs.id))
+    .innerJoin(clients, eq(runs.clientId, clients.id))
+    .where(eq(responses.id, responseId))
+    .limit(1);
+  return rows[0]?.client;
+}
+
+export async function replaceMentions(
+  db: Database,
+  responseId: string,
+  values: NewMention[],
+): Promise<void> {
+  // Переразбор должен быть идемпотентным: старые упоминания удаляются целиком,
+  // иначе улучшение парсера удваивало бы данные (инвариант 6 — переобработка).
+  await db.delete(mentions).where(eq(mentions.responseId, responseId));
+  if (values.length > 0) {
+    await db.insert(mentions).values(values);
+  }
+}
+
+export async function replaceCitations(
+  db: Database,
+  responseId: string,
+  values: NewCitation[],
+): Promise<void> {
+  await db.delete(citations).where(eq(citations.responseId, responseId));
+  if (values.length > 0) {
+    await db.insert(citations).values(values);
+  }
+}
+
+export async function listMentionsByResponse(
+  db: Database,
+  responseId: string,
+): Promise<Mention[]> {
+  return db.select().from(mentions).where(eq(mentions.responseId, responseId));
+}
+
+export async function listCitationsByResponse(
+  db: Database,
+  responseId: string,
+): Promise<Citation[]> {
+  return db.select().from(citations).where(eq(citations.responseId, responseId));
 }
 
 export async function listUsersByAgency(db: Database, agencyId: string): Promise<User[]> {

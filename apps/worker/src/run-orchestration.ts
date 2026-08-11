@@ -11,6 +11,7 @@ import {
 } from "@repo/db";
 import type { Database } from "@repo/db";
 import { rawResponseKey, storage } from "./storage";
+import { storeCitations } from "./parse-job";
 
 export interface RunJobSpec {
   runId: string;
@@ -76,6 +77,10 @@ export async function executeRunJob(
   const key = rawResponseKey(job.runId, response.id);
   await storage.put(key, new TextEncoder().encode(result.text), "text/plain; charset=utf-8");
   await updateResponseStorageKey(db, response.id, key);
+
+  // Ссылки приходят от платформы вместе с ответом и дальше нигде не восстановимы,
+  // поэтому раскладываются сразу; упоминания разбирает ParseJob.
+  await storeCitations(db, response.id, result.citations);
 
   return response.id;
 }

@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   createAgency,
   createClient,
@@ -49,6 +49,10 @@ describe("tickSchedules", () => {
     scheduleId = rows[0]!.id;
   });
 
+  afterEach(async () => {
+    await deleteAgency(db, agencyId);
+  });
+
   afterAll(async () => {
     await close();
   });
@@ -57,7 +61,6 @@ describe("tickSchedules", () => {
     const started = await tickSchedules(db, new Date());
     expect(started.filter((r) => r.scheduleId === scheduleId)).toHaveLength(0);
     expect(await listRunsByClient(db, clientId)).toHaveLength(0);
-    await deleteAgency(db, agencyId);
   });
 
   it("не трогает расписание, чей срок ещё не наступил", async () => {
@@ -66,7 +69,6 @@ describe("tickSchedules", () => {
     const started = await tickSchedules(db, new Date());
     expect(started.filter((r) => r.scheduleId === scheduleId)).toHaveLength(0);
     expect(await listRunsByClient(db, clientId)).toHaveLength(0);
-    await deleteAgency(db, agencyId);
   });
 
   it("подхватывает созревшее расписание и создаёт прогон", async () => {
@@ -82,7 +84,6 @@ describe("tickSchedules", () => {
     expect(runs[0]?.status).toBe("pending");
     expect(runs[0]?.trigger).toBe("scheduled");
     expect(runs[0]?.scheduleId).toBe(scheduleId);
-    await deleteAgency(db, agencyId);
   });
 
   it("повторный тик не создаёт дубль — next_run_at сдвинут вперёд", async () => {
@@ -93,7 +94,6 @@ describe("tickSchedules", () => {
 
     // Главная проверка: двойной прогон означал бы двойные расходы на API.
     expect(await listRunsByClient(db, clientId)).toHaveLength(1);
-    await deleteAgency(db, agencyId);
   });
 
   it("неактивное расписание игнорируется", async () => {
@@ -102,7 +102,6 @@ describe("tickSchedules", () => {
 
     const started = await tickSchedules(db, new Date());
     expect(started.filter((r) => r.scheduleId === scheduleId)).toHaveLength(0);
-    await deleteAgency(db, agencyId);
   });
 });
 
