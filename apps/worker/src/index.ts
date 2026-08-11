@@ -10,7 +10,7 @@ import {
   type RunJobData,
 } from "./queues";
 import { tickSchedules } from "./scheduler";
-import { executeRunJob } from "./run-orchestration";
+import { executeRunJob } from "@repo/pipeline";
 
 const TICK_QUEUE = "scheduler-tick";
 const TICK_JOB = "find-due-schedules";
