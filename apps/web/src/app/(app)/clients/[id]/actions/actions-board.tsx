@@ -38,6 +38,19 @@ export function ActionsBoard({ clientId }: { clientId: string }) {
 
   const [selected, setSelected] = useState<ActionRow | null>(null);
   const [experimentPrompt, setExperimentPrompt] = useState<ActionRow | null>(null);
+  const [experimentWarnings, setExperimentWarnings] = useState<string[]>([]);
+
+  const createExperiment = api.experiments.createFromAction.useMutation({
+    onSuccess: async (result) => {
+      // Предупреждения о слабой базе сравнения показываются сразу, а не прячутся:
+      // агентство должно понимать, чего стоит будущая оценка.
+      setExperimentWarnings(result.warnings);
+      if (result.warnings.length === 0) {
+        setExperimentPrompt(null);
+      }
+      await utils.experiments.list.invalidate({ clientId });
+    },
+  });
 
   const update = api.actions.update.useMutation({
     onSuccess: async () => {
@@ -229,20 +242,32 @@ export function ActionsBoard({ clientId }: { clientId: string }) {
             <div className="flex gap-2">
               <button
                 type="button"
-                disabled
-                title="Experiments land in T43"
+                data-testid="create-experiment"
+                disabled={createExperiment.isPending}
+                onClick={() => createExperiment.mutate({ actionId: experimentPrompt.id })}
                 className="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60"
               >
-                Create experiment
+                {createExperiment.isPending ? "Creating…" : "Create experiment"}
               </button>
               <button
                 type="button"
-                onClick={() => setExperimentPrompt(null)}
+                onClick={() => {
+                  setExperimentPrompt(null);
+                  setExperimentWarnings([]);
+                }}
                 className="h-9 rounded-md border border-input px-4 text-sm font-medium hover:bg-accent"
               >
-                Not now
+                {createExperiment.isSuccess ? "Close" : "Not now"}
               </button>
             </div>
+
+            {experimentWarnings.length > 0 && (
+              <ul data-testid="experiment-warnings" className="flex flex-col gap-1 text-sm text-muted-foreground">
+                {experimentWarnings.map((warning) => (
+                  <li key={warning}>{warning}</li>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
       )}

@@ -57,6 +57,13 @@
       "when": 1786476206493,
       "tag": "0007_fuzzy_toad_men",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786477236731,
+      "tag": "0008_clear_jigsaw",
+      "breakpoints": true
     }
   ]
 }
