@@ -599,6 +599,41 @@ export async function listSourcePresence(
   return db.select().from(sourcePresence).where(eq(sourcePresence.clientId, clientId));
 }
 
+/**
+ * Факты цитирования для диагностики: домен, его тип и кто упомянут
+ * в том же ответе. Присутствие в источнике приближается упоминанием
+ * в ответе, где источник процитирован (MVP; так и подписано в UI).
+ */
+export async function listCitationFacts(
+  db: Database,
+  clientId: string,
+  clusterId?: string | null,
+) {
+  const conditions = [eq(runs.clientId, clientId)];
+  if (clusterId) {
+    conditions.push(eq(prompts.clusterId, clusterId));
+  }
+
+  const rows = await db
+    .select({
+      responseId: responses.id,
+      domain: citations.domain,
+      sourceType: sources.sourceType,
+      entityName: mentions.entityName,
+      isClient: mentions.isClient,
+      isCompetitor: mentions.isCompetitor,
+    })
+    .from(citations)
+    .innerJoin(responses, eq(citations.responseId, responses.id))
+    .innerJoin(runs, eq(responses.runId, runs.id))
+    .innerJoin(prompts, eq(responses.promptId, prompts.id))
+    .leftJoin(sources, eq(sources.domain, citations.domain))
+    .leftJoin(mentions, eq(mentions.responseId, responses.id))
+    .where(and(...conditions));
+
+  return rows;
+}
+
 export async function listPromptClusters(
   db: Database,
   clientId: string,

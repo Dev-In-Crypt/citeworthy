@@ -28,3 +28,5 @@ export * from "./import/csv";
 export * from "./parsing/highlight";
 export * from "./sources/domains";
 export * from "./sources/classifier";
+export * from "./diagnosis/source-graph";
+export * from "./copy";

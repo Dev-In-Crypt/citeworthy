@@ -5,8 +5,8 @@
 
 ## Текущий статус
 
-- Следующая задача: **T32** (Diagnosis service: source mix, influential sources, gap statement). T13–T15 (live-адаптеры, [H]) — их live-часть требует ключей; при их отсутствии переходить к T16 (worker-скелет).
-- Сделано: Phase 0 и Phase 1 закрыты (кроме T08 и T13–T15, заблокированы человеком), T30–T31 done; тестов 250 юнит/интеграционных + 16 e2e; пайплайн вынесен в @repo/pipeline; T08 написан но не отмечен (нет remote). Тестов: 48 core + 8 db + 10 tenancy + 8 e2e. Тесты: 4 (db) + 10 (tenancy) + 11 (storage) юнит, 8 e2e.
+- Следующая задача: **T33** (Recommendations: rule-based генератор с обязательным reason). T13–T15 (live-адаптеры, [H]) — их live-часть требует ключей; при их отсутствии переходить к T16 (worker-скелет).
+- Сделано: Phase 0 и Phase 1 закрыты (кроме T08 и T13–T15, заблокированы человеком), T30–T32 done; тестов 271 юнит/интеграционных + 16 e2e; пайплайн вынесен в @repo/pipeline; T08 написан но не отмечен (нет remote). Тестов: 48 core + 8 db + 10 tenancy + 8 e2e. Тесты: 4 (db) + 10 (tenancy) + 11 (storage) юнит, 8 e2e.
 - Команды проверки: `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`, `pnpm e2e`, `pnpm db:migrate`, `pnpm db:check`, `pnpm db:seed`.
 - e2e поднимает свой сервер на порту 3100 из production-сборки. Если тесты падают мгновенно и «не видят» правок — на 3100 висит старый процесс: `Get-NetTCPConnection -LocalPort 3100 -State Listen` и `Stop-Process`.
 - Порты: Postgres `localhost:5433`, Redis `localhost:6380` (нестандартные, чтобы не конфликтовать с локальными сервисами). Перед работой: `docker compose up -d`, `.env` копируется из `.env.example`.
@@ -20,6 +20,13 @@
 - Docker установлен (29.6.2), но контейнеры для T01 ещё не поднимались — проверить, что демон запущен.
 
 ## Журнал итераций
+
+### 2026-08-11 · iter 20 (/loop) · T32 — done
+- Сделано: copy.ts с утверждёнными формулировками, диагностика (mix/influential/gap/statement), роутер diagnosis.sourceGraph.
+- Verify: пример из спека (16/25 vs 4/25) воспроизводится; 271 тест; typecheck/lint/build зелёные.
+- Урок: интеграционные тесты над общей БД нельзя гонять параллельно — включена сериализация в pipeline.
+- Дальше: T33.
+- Блокеры: T08 (нет remote); T13–T15 (ключи платформ).
 
 ### 2026-08-11 · iter 19 (/loop) · T31 — done
 - Сделано: SourceClassifier с эвристической реализацией, кэш в памяти и постоянный кэш в таблице sources.
