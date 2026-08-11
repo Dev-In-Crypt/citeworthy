@@ -1,0 +1,121 @@
+import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  createAgency,
+  createClient,
+  createDb,
+  deleteAgency,
+  listRunsByClient,
+  setScheduleNextRun,
+} from "@repo/db";
+import { runSchedules } from "@repo/db/schema/measurement";
+import { nextRunAfter, tickSchedules } from "./scheduler";
+import { createConnection, createQueues } from "./queues";
+
+/** Verify T16. Требует поднятых Postgres и Redis. */
+
+const { db, close } = createDb();
+
+describe("nextRunAfter", () => {
+  const from = new Date("2026-08-11T10:00:00Z");
+
+  it("weekly сдвигает на 7 дней", () => {
+    expect(nextRunAfter("weekly", from).toISOString()).toBe("2026-08-18T10:00:00.000Z");
+  });
+
+  it("daily сдвигает на сутки", () => {
+    expect(nextRunAfter("daily", from).toISOString()).toBe("2026-08-12T10:00:00.000Z");
+  });
+});
+
+describe("tickSchedules", () => {
+  let agencyId = "";
+  let clientId = "";
+  let scheduleId = "";
+
+  beforeEach(async () => {
+    const agency = await createAgency(db, { name: "Tick Agency", clientLimit: 10 });
+    agencyId = agency.id;
+    const client = await createClient(db, {
+      agencyId,
+      name: "Tick Client",
+      domain: "tick.test",
+    });
+    clientId = client.id;
+
+    const rows = await db
+      .insert(runSchedules)
+      .values({ clientId, cadence: "weekly", platforms: ["chatgpt"], samplesPerPrompt: 3 })
+      .returning();
+    scheduleId = rows[0]!.id;
+  });
+
+  afterAll(async () => {
+    await close();
+  });
+
+  it("не трогает расписание без next_run_at — иначе первый тик запустил бы всех сразу", async () => {
+    const started = await tickSchedules(db, new Date());
+    expect(started.filter((r) => r.scheduleId === scheduleId)).toHaveLength(0);
+    expect(await listRunsByClient(db, clientId)).toHaveLength(0);
+    await deleteAgency(db, agencyId);
+  });
+
+  it("не трогает расписание, чей срок ещё не наступил", async () => {
+    await setScheduleNextRun(db, scheduleId, new Date(Date.now() + 60 * 60 * 1000));
+
+    const started = await tickSchedules(db, new Date());
+    expect(started.filter((r) => r.scheduleId === scheduleId)).toHaveLength(0);
+    expect(await listRunsByClient(db, clientId)).toHaveLength(0);
+    await deleteAgency(db, agencyId);
+  });
+
+  it("подхватывает созревшее расписание и создаёт прогон", async () => {
+    await setScheduleNextRun(db, scheduleId, new Date(Date.now() - 1000));
+
+    const started = await tickSchedules(db, new Date());
+    const mine = started.filter((r) => r.scheduleId === scheduleId);
+
+    expect(mine).toHaveLength(1);
+
+    const runs = await listRunsByClient(db, clientId);
+    expect(runs).toHaveLength(1);
+    expect(runs[0]?.status).toBe("pending");
+    expect(runs[0]?.trigger).toBe("scheduled");
+    expect(runs[0]?.scheduleId).toBe(scheduleId);
+    await deleteAgency(db, agencyId);
+  });
+
+  it("повторный тик не создаёт дубль — next_run_at сдвинут вперёд", async () => {
+    await setScheduleNextRun(db, scheduleId, new Date(Date.now() - 1000));
+
+    await tickSchedules(db, new Date());
+    await tickSchedules(db, new Date());
+
+    // Главная проверка: двойной прогон означал бы двойные расходы на API.
+    expect(await listRunsByClient(db, clientId)).toHaveLength(1);
+    await deleteAgency(db, agencyId);
+  });
+
+  it("неактивное расписание игнорируется", async () => {
+    await setScheduleNextRun(db, scheduleId, new Date(Date.now() - 1000));
+    await db.update(runSchedules).set({ active: false });
+
+    const started = await tickSchedules(db, new Date());
+    expect(started.filter((r) => r.scheduleId === scheduleId)).toHaveLength(0);
+    await deleteAgency(db, agencyId);
+  });
+});
+
+describe("queues", () => {
+  it("подключаются к Redis и объявляют три очереди", async () => {
+    const connection = createConnection();
+    const queues = createQueues(connection);
+
+    expect(Object.keys(queues).sort()).toEqual(["aggregate", "parse", "runs"]);
+    // Реальный round-trip к Redis: конфигурация подключения проверяется, а не только типы.
+    await expect(queues.runs.getJobCounts()).resolves.toHaveProperty("waiting");
+
+    await Promise.all([queues.runs.close(), queues.parse.close(), queues.aggregate.close()]);
+    connection.disconnect();
+  });
+});
