@@ -1,7 +1,7 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { requireEnv } from "./env.js";
-import * as schema from "./schema/index.js";
+import { requireEnv } from "./env";
+import * as schema from "./schema/index";
 
 export type Database = ReturnType<typeof createDb>["db"];
 

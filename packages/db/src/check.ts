@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { createDb } from "./client.js";
+import { createDb } from "./client";
 
 /** Проверка живого соединения с БД — используется в verify T01 и в CI. */
 async function main(): Promise<void> {
