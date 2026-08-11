@@ -33,3 +33,4 @@ export * from "./copy";
 export * from "./diagnosis/recommendations";
 export * from "./experiments/baseline";
 export * from "./experiments/events";
+export * from "./experiments/math";
