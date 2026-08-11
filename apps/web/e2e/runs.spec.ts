@@ -1,0 +1,91 @@
+import { expect, test } from "@playwright/test";
+import type { Page } from "@playwright/test";
+
+/** Verify T22: «Run now» в mock-режиме доходит до done, прогон виден в истории. */
+
+const CSV = [
+  "cluster,intent,prompt,is_control",
+  "CRM comparison,comparison,best CRM for startups,false",
+  "CRM comparison,comparison,HubSpot alternatives,false",
+].join("\n");
+
+async function setUpClientWithPrompts(page: Page): Promise<string> {
+  const email = `runs-${Math.random().toString(36).slice(2, 10)}@northwind-agency.test`;
+
+  await page.goto("/signup");
+  await page.getByLabel("Your name").fill("Runs Tester");
+  await page.getByLabel("Work email").fill(email);
+  await page.getByLabel("Password").fill("correct-horse-battery");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(page).toHaveURL(/\/dashboard$/);
+
+  await page.goto("/clients/new");
+  await page.getByLabel("Client name").fill("AcmeCRM");
+  await page.getByLabel("Domain").fill("acmecrm.test");
+  await page.getByLabel("Brand names").fill("AcmeCRM, Acme CRM");
+  await page.getByLabel("Competitors").fill("HubSpot, Pipedrive");
+  await page.getByRole("button", { name: "Create client" }).click();
+  await expect(page).toHaveURL(/\/clients$/);
+
+  await page.getByRole("link", { name: /AcmeCRM/ }).click();
+  await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}$/);
+  const clientId = page.url().split("/").pop()!;
+
+  await page.goto(`/clients/${clientId}/measure`);
+  await page.getByLabel("Prompts CSV").setInputFiles({
+    name: "prompts.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from(CSV, "utf8"),
+  });
+  await expect(page.getByTestId("import-summary")).toContainText("2 prompts");
+
+  return clientId;
+}
+
+test("saving a schedule and running a check produces a completed run", async ({ page }) => {
+  const clientId = await setUpClientWithPrompts(page);
+  await page.goto(`/clients/${clientId}/measure`);
+
+  await page.getByLabel("Samples per prompt").fill("3");
+  await page.getByRole("button", { name: "Save schedule" }).click();
+  await expect(page.getByTestId("schedule-summary")).toContainText("3 samples per prompt");
+  await expect(page.getByTestId("schedule-summary")).toContainText("chatgpt");
+
+  await page.getByRole("button", { name: "Run now" }).click();
+
+  // Главная проверка: прогон действительно доходит до конца.
+  await expect(page.getByTestId("run-status")).toContainText("done", { timeout: 30_000 });
+
+  const history = page.getByTestId("runs-list");
+  await expect(history).toContainText("manual");
+  await expect(history).toContainText("done");
+
+  // История переживает перезагрузку — прогон записан, а не показан оптимистично.
+  await page.reload();
+  await expect(page.getByTestId("runs-list")).toContainText("done");
+});
+
+test("running a check without prompts explains what to do", async ({ page }) => {
+  const email = `runs-empty-${Math.random().toString(36).slice(2, 10)}@northwind-agency.test`;
+
+  await page.goto("/signup");
+  await page.getByLabel("Your name").fill("Empty Tester");
+  await page.getByLabel("Work email").fill(email);
+  await page.getByLabel("Password").fill("correct-horse-battery");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(page).toHaveURL(/\/dashboard$/);
+
+  await page.goto("/clients/new");
+  await page.getByLabel("Client name").fill("No Prompts");
+  await page.getByLabel("Domain").fill("noprompts.test");
+  await page.getByRole("button", { name: "Create client" }).click();
+  await page.getByRole("link", { name: /No Prompts/ }).click();
+  await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}$/);
+  const clientId = page.url().split("/").pop()!;
+
+  await page.goto(`/clients/${clientId}/measure`);
+  await page.getByRole("button", { name: "Run now" }).click();
+
+  // Пустой прогон не создаётся: он стоил бы денег и дал бы пустое окно измерения.
+  await expect(page.getByTestId("form-error")).toContainText("at least one prompt");
+});

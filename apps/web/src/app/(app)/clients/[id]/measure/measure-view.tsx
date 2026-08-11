@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { api } from "@/trpc/react";
 import { EmptyState } from "@/components/page-header";
+import { SchedulePanel } from "./schedule-panel";
 
 const INTENTS = ["comparison", "learning", "purchase", "other"] as const;
 
@@ -46,6 +47,7 @@ export function MeasureView({ clientId }: { clientId: string }) {
 
   return (
     <div className="flex flex-col gap-8">
+      <SchedulePanel clientId={clientId} />
       <CsvImport clientId={clientId} onImported={refresh} />
 
       <section className="flex flex-col gap-3">

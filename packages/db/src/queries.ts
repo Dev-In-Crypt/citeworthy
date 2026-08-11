@@ -1,4 +1,4 @@
-import { and, eq, isNotNull, isNull, lte, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, lte, sql } from "drizzle-orm";
 import type { Database } from "./client";
 import { agencies, clients, users } from "./schema/tenancy";
 import type { Agency, Client, NewClient, User } from "./schema/tenancy";
@@ -393,6 +393,61 @@ export async function getAgencyIdForRun(db: Database, runId: string): Promise<st
     .where(eq(runs.id, runId))
     .limit(1);
   return rows[0]?.agencyId;
+}
+
+export async function getScheduleForClient(
+  db: Database,
+  clientId: string,
+): Promise<RunSchedule | undefined> {
+  const rows = await db
+    .select()
+    .from(runSchedules)
+    .where(eq(runSchedules.clientId, clientId))
+    .limit(1);
+  return rows[0];
+}
+
+/** У клиента одно расписание: повторный вызов обновляет существующее. */
+export async function upsertRunSchedule(
+  db: Database,
+  clientId: string,
+  values: Pick<RunSchedule, "cadence" | "platforms" | "samplesPerPrompt" | "active">,
+): Promise<RunSchedule> {
+  const existing = await getScheduleForClient(db, clientId);
+
+  if (existing) {
+    const rows = await db
+      .update(runSchedules)
+      .set(values)
+      .where(eq(runSchedules.id, existing.id))
+      .returning();
+    return rows[0]!;
+  }
+
+  const rows = await db
+    .insert(runSchedules)
+    .values({
+      clientId,
+      ...values,
+      // Первый прогон по расписанию — сразу: иначе агентство создаёт расписание
+      // и неделю не понимает, почему данных нет.
+      nextRunAt: new Date(),
+    })
+    .returning();
+  return rows[0]!;
+}
+
+export async function listRecentRuns(
+  db: Database,
+  clientId: string,
+  limit = 10,
+): Promise<Run[]> {
+  return db
+    .select()
+    .from(runs)
+    .where(eq(runs.clientId, clientId))
+    .orderBy(desc(runs.startedAt))
+    .limit(limit);
 }
 
 export async function listPromptClusters(

@@ -1,0 +1,15 @@
+/**
+ * @repo/pipeline — измерительный конвейер: прогон, разбор, агрегация.
+ *
+ * Живёт отдельным пакетом, потому что нужен обоим приложениям: воркеру
+ * для прогонов по расписанию и web для ручного запуска. Дублировать
+ * оркестрацию нельзя — это единственное место, где решается, сколько
+ * вызовов уйдёт к платформам и что попадёт в метрику.
+ */
+
+export { orchestrateRun, executeRunJob, planRunJobs } from "./run-orchestration";
+export type { RunJobSpec, RunOutcome } from "./run-orchestration";
+export { parseRun, parseStoredResponse, storeCitations } from "./parse-job";
+export type { ParseOutcome } from "./parse-job";
+export { aggregateClient } from "./aggregate-job";
+export { storage, rawResponseKey } from "./storage";
