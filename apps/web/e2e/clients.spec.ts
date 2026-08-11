@@ -1,0 +1,74 @@
+import { expect, test } from "@playwright/test";
+import type { Page } from "@playwright/test";
+
+/**
+ * Verify T07: создать клиента с 2 alias бренда и 3 конкурентами, увидеть в списке.
+ */
+
+async function signUpFreshAgency(page: Page): Promise<void> {
+  const email = `clients-${Math.random().toString(36).slice(2, 10)}@northwind-agency.test`;
+  await page.goto("/signup");
+  await page.getByLabel("Your name").fill("Clients Tester");
+  await page.getByLabel("Work email").fill(email);
+  await page.getByLabel("Password").fill("correct-horse-battery");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(page).toHaveURL(/\/dashboard$/);
+}
+
+test("create a client with brand aliases and competitors, then edit it", async ({ page }) => {
+  await signUpFreshAgency(page);
+
+  await page.goto("/clients");
+  await expect(page.getByText("No clients yet")).toBeVisible();
+
+  await page.getByRole("link", { name: "Add client" }).first().click();
+  await expect(page).toHaveURL(/\/clients\/new$/);
+
+  await page.getByLabel("Client name").fill("AcmeCRM");
+  await page.getByLabel("Domain").fill("acmecrm.com");
+  await page.getByLabel("Industry").fill("B2B SaaS / CRM");
+  await page.getByLabel("Brand names").fill("AcmeCRM, Acme CRM");
+  await page.getByLabel("Competitors").fill("HubSpot, Pipedrive, Close");
+  await page.getByRole("button", { name: "Create client" }).click();
+
+  await expect(page).toHaveURL(/\/clients$/);
+  const list = page.getByTestId("clients-list");
+  await expect(list).toContainText("AcmeCRM");
+  await expect(list).toContainText("acmecrm.com");
+  // Три конкурента доехали до карточки.
+  await expect(list).toContainText("3");
+
+  // Открыть и убедиться, что списки сохранились ровно как введены.
+  await page.getByRole("link", { name: /AcmeCRM/ }).click();
+  await expect(page.getByLabel("Brand names")).toHaveValue("AcmeCRM, Acme CRM");
+  await expect(page.getByLabel("Competitors")).toHaveValue("HubSpot, Pipedrive, Close");
+
+  await page.getByLabel("Client name").fill("AcmeCRM Renamed");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page).toHaveURL(/\/clients$/);
+  await expect(page.getByTestId("clients-list")).toContainText("AcmeCRM Renamed");
+});
+
+test("a client from another agency is not reachable", async ({ page, browser }) => {
+  // Первое агентство создаёт клиента и запоминает его id.
+  await signUpFreshAgency(page);
+  await page.goto("/clients/new");
+  await page.getByLabel("Client name").fill("Secret Client");
+  await page.getByLabel("Domain").fill("secret.test");
+  await page.getByRole("button", { name: "Create client" }).click();
+  await expect(page).toHaveURL(/\/clients$/);
+  await page.getByRole("link", { name: /Secret Client/ }).click();
+  // Дождаться перехода: без этого page.url() ещё отдаёт страницу списка.
+  await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}$/);
+  const foreignUrl = page.url();
+
+  // Второе агентство в отдельном контексте открывает тот же URL.
+  const otherContext = await browser.newContext();
+  const otherPage = await otherContext.newPage();
+  await signUpFreshAgency(otherPage);
+  await otherPage.goto(foreignUrl);
+
+  await expect(otherPage.getByText("Client not found")).toBeVisible();
+  await expect(otherPage.getByText("Secret Client")).toHaveCount(0);
+  await otherContext.close();
+});
