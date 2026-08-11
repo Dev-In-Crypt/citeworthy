@@ -30,3 +30,4 @@ export * from "./sources/domains";
 export * from "./sources/classifier";
 export * from "./diagnosis/source-graph";
 export * from "./copy";
+export * from "./diagnosis/recommendations";
