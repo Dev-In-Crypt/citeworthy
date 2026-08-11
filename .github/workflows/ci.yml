@@ -1,0 +1,123 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Совпадает с docker-compose.yml, но внутри CI сервисы доступны на стандартных портах.
+  DATABASE_URL: postgresql://aisdos:aisdos@localhost:5432/aisdos
+  REDIS_URL: redis://localhost:6379
+  ADAPTERS_MODE: mock
+  BETTER_AUTH_SECRET: ci-secret-not-used-outside-ci
+  BETTER_AUTH_URL: http://127.0.0.1:3100
+  NEXT_PUBLIC_APP_URL: http://127.0.0.1:3100
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: aisdos
+          POSTGRES_PASSWORD: aisdos
+          POSTGRES_DB: aisdos
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U aisdos -d aisdos"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Apply migrations
+        run: pnpm db:migrate
+
+      - name: Check database connection
+        run: pnpm db:check
+
+      - run: pnpm lint
+
+      - run: pnpm typecheck
+
+      - name: Unit and integration tests
+        run: pnpm test
+
+      - run: pnpm build
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: verify
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: aisdos
+          POSTGRES_PASSWORD: aisdos
+          POSTGRES_DB: aisdos
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U aisdos -d aisdos"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm db:migrate
+
+      - name: Install Playwright browser
+        run: pnpm --filter @repo/web exec playwright install --with-deps chromium
+
+      - run: pnpm e2e
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: apps/web/test-results/
+          retention-days: 7
