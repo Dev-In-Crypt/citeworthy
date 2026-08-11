@@ -8,6 +8,7 @@ import {
   getRunById,
   getRunSchedule,
   listActivePromptsForClient,
+  logActivity,
   startRun,
   updateResponseStorageKey,
 } from "@repo/db";
@@ -146,6 +147,17 @@ export async function orchestrateRun(
   // что окно измерения неполное, а не считать долю по обрезанной выборке.
   const status = failed === 0 ? "done" : "failed";
   await finishRun(db, runId, status);
+
+  if (agencyId) {
+    await logActivity(db, {
+      agencyId,
+      clientId: run.clientId,
+      // Прогон по расписанию делает система, а не человек.
+      actorUserId: null,
+      eventType: "run_finished",
+      payload: { runId, status, answers: written, expected: jobs.length, failed },
+    });
+  }
 
   return { runId, expected: jobs.length, written, failed, status };
 }

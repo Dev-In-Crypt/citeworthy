@@ -1,4 +1,4 @@
-import { and, desc, eq, isNotNull, isNull, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, isNotNull, isNull, lte, sql } from "drizzle-orm";
 import type { Database } from "./client";
 import { agencies, clients, users } from "./schema/tenancy";
 import type { Agency, Client, NewClient, User } from "./schema/tenancy";
@@ -6,6 +6,8 @@ import { invitations } from "./schema/auth";
 import { usageCounters } from "./schema/billing";
 import { citationSources, sourcePresence, sources } from "./schema/sources";
 import { actions } from "./schema/actions";
+import { activityLog } from "./schema/activity";
+import type { ActivityEntry, NewActivityEntry } from "./schema/activity";
 import type { Action, NewAction } from "./schema/actions";
 import type { NewSourcePresence, Source, SourcePresence } from "./schema/sources";
 import type { UsageCounter } from "./schema/billing";
@@ -634,6 +636,52 @@ export async function listCitationFacts(
     .where(and(...conditions));
 
   return rows;
+}
+
+/**
+ * Пишет событие в журнал. Никогда не бросает исключение наружу: сбой записи
+ * в журнал не должен отменять само действие — потерять запись хуже,
+ * чем потерять работу, но отменить выполненную работу хуже всего.
+ */
+export async function logActivity(db: Database, entry: NewActivityEntry): Promise<void> {
+  try {
+    await db.insert(activityLog).values(entry);
+  } catch (error) {
+    console.error("[activity] failed to record event:", error);
+  }
+}
+
+export async function listActivity(
+  db: Database,
+  clientId: string,
+  limit = 20,
+): Promise<ActivityEntry[]> {
+  return db
+    .select()
+    .from(activityLog)
+    .where(eq(activityLog.clientId, clientId))
+    .orderBy(desc(activityLog.createdAt))
+    .limit(limit);
+}
+
+/** События за период — материал для раздела «что сделано» в отчёте (T50). */
+export async function listActivityBetween(
+  db: Database,
+  clientId: string,
+  from: Date,
+  to: Date,
+): Promise<ActivityEntry[]> {
+  return db
+    .select()
+    .from(activityLog)
+    .where(
+      and(
+        eq(activityLog.clientId, clientId),
+        gte(activityLog.createdAt, from),
+        lte(activityLog.createdAt, to),
+      ),
+    )
+    .orderBy(desc(activityLog.createdAt));
 }
 
 export async function listActions(db: Database, clientId: string): Promise<Action[]> {
