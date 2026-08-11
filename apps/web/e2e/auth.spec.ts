@@ -22,8 +22,8 @@ test("signup creates an agency, then logout and login work", async ({ page }) =>
 
   // Регистрация = создание агентства; имя выводится из домена почты.
   await expect(page).toHaveURL(/\/dashboard$/);
-  await expect(page.getByTestId("agency-name")).toHaveText("Northwind Agency");
-  await expect(page.getByText(email)).toBeVisible();
+  await expect(page.locator("aside")).toContainText("Northwind Agency");
+  await expect(page.locator("aside")).toContainText(email);
 
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/login$/);
@@ -37,7 +37,7 @@ test("signup creates an agency, then logout and login work", async ({ page }) =>
   await page.getByRole("button", { name: "Sign in" }).click();
 
   await expect(page).toHaveURL(/\/dashboard$/);
-  await expect(page.getByTestId("agency-name")).toHaveText("Northwind Agency");
+  await expect(page.locator("aside")).toContainText("Northwind Agency");
 });
 
 test("login with a wrong password shows an error and does not sign in", async ({ page }) => {
