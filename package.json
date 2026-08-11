@@ -12,6 +12,7 @@
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "lint": "eslint .",
+    "e2e": "pnpm --filter @repo/web run e2e",
     "db:generate": "pnpm --filter @repo/db run generate",
     "db:migrate": "pnpm --filter @repo/db run migrate",
     "db:seed": "pnpm --filter @repo/db run seed",

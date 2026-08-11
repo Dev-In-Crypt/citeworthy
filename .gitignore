@@ -13,3 +13,6 @@ next-env.d.ts
 loop/run.log
 
 .DS_Store
+
+test-results/
+playwright-report/

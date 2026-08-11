@@ -5,9 +5,10 @@
 
 ## Текущий статус
 
-- Следующая задача: **T03** (auth: Better Auth email+password, signup создаёт agency+owner, страницы /login и /signup)
-- Сделано: T00, T01, T02. Монорепо собирается, БД поднимается, схема tenancy применена, seed идемпотентен, 4 теста зелёные.
-- Команды проверки: `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`, `pnpm db:migrate`, `pnpm db:check`, `pnpm db:seed`.
+- Следующая задача: **T04** (tRPC + tenancy guard + RBAC + invite по токену)
+- Сделано: T00–T03. Монорепо собирается, БД поднимается, auth работает, e2e 2/2, юнит 4/4.
+- Команды проверки: `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`, `pnpm e2e`, `pnpm db:migrate`, `pnpm db:check`, `pnpm db:seed`.
+- e2e поднимает свой сервер на порту 3100 из production-сборки. Если тесты падают мгновенно и «не видят» правок — на 3100 висит старый процесс: `Get-NetTCPConnection -LocalPort 3100 -State Listen` и `Stop-Process`.
 - Порты: Postgres `localhost:5433`, Redis `localhost:6380` (нестандартные, чтобы не конфликтовать с локальными сервисами). Перед работой: `docker compose up -d`, `.env` копируется из `.env.example`.
 
 ## Блокеры для человека
@@ -18,6 +19,13 @@
 - Docker установлен (29.6.2), но контейнеры для T01 ещё не поднимались — проверить, что демон запущен.
 
 ## Журнал итераций
+
+### 2026-08-11 · iter 4 (/loop, dynamic) · T03 — done
+- Сделано: Better Auth email+password поверх `users`, таблицы сессий/аккаунтов/верификаций/приглашений, страницы login/signup, защищённый /dashboard, Playwright-конфиг и первый e2e.
+- Verify: `pnpm e2e` 2/2 зелёные; typecheck/lint/build зелёные, юнит-тесты T02 не сломались.
+- Вскрыто и починено: ключи schema у drizzle-адаптера должны совпадать с `modelName`; `drizzle-orm` утекал в apps/web (вынесено в `@repo/db/queries`); Next выбирал корнем чужой lockfile (`outputFileTracingRoot`); зависший сервер на 3100 переиспользовался Playwright'ом и маскировал исправления.
+- Дальше: T04.
+- Блокеры: нет. Цикл работает в приложении (`/loop`), логин CLI нужен только для внешнего скрипта.
 
 ### 2026-08-11 · iter 3 (ручной прогон) · T02 — done
 - Сделано: схема tenancy + первая миграция + идемпотентный seed + 4 интеграционных теста.
