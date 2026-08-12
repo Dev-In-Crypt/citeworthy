@@ -5,7 +5,7 @@
 
 ## Текущий статус
 
-- Следующая задача: **T52** (approve by link). T13–T15 (live-адаптеры, [H]) — их live-часть требует ключей; при их отсутствии переходить к T16 (worker-скелет).
+- Следующая задача: **T53** (PDF через Playwright). T13–T15 (live-адаптеры, [H]) — их live-часть требует ключей; при их отсутствии переходить к T16 (worker-скелет).
 - Сделано: Phase 0 и Phase 1 закрыты (кроме T08 и T13–T15, заблокированы человеком), Phase 0–3 закрыты (кроме T08 и T13–T15); тестов 367 юнит/интеграционных + 19 e2e; пайплайн вынесен в @repo/pipeline; T08 написан но не отмечен (нет remote). Тестов: 48 core + 8 db + 10 tenancy + 8 e2e. Тесты: 4 (db) + 10 (tenancy) + 11 (storage) юнит, 8 e2e.
 - Команды проверки: `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`, `pnpm e2e`, `pnpm db:migrate`, `pnpm db:check`, `pnpm db:seed`.
 - e2e поднимает свой сервер на порту 3100 из production-сборки. Если тесты падают мгновенно и «не видят» правок — на 3100 висит старый процесс: `Get-NetTCPConnection -LocalPort 3100 -State Listen` и `Stop-Process`.
