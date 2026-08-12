@@ -1,5 +1,26 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalEnv": [
+    "NODE_ENV",
+    "DATABASE_URL",
+    "REDIS_URL",
+    "ADAPTERS_MODE",
+    "BETTER_AUTH_SECRET",
+    "BETTER_AUTH_URL",
+    "NEXT_PUBLIC_APP_URL",
+    "SENTRY_DSN",
+    "NEXT_PUBLIC_SENTRY_DSN",
+    "STORAGE_ENDPOINT",
+    "STORAGE_BUCKET",
+    "STORAGE_ACCESS_KEY_ID",
+    "STORAGE_SECRET_ACCESS_KEY",
+    "OPENAI_API_KEY",
+    "PERPLEXITY_API_KEY",
+    "GEMINI_API_KEY",
+    "STRIPE_SECRET_KEY",
+    "STRIPE_WEBHOOK_SECRET",
+    "DISABLE_RATE_LIMIT"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

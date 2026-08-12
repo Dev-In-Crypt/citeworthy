@@ -33,7 +33,9 @@ describe("seed", () => {
   });
 
   afterAll(async () => {
-    await close();
+    // Если beforeAll упал (например, не задан DATABASE_URL), close так и не
+    // появился, и `close is not a function` затёр бы настоящую причину.
+    await close?.();
   });
 
   it("создаёт ровно одно агентство", async () => {
