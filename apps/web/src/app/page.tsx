@@ -1,11 +1,55 @@
-export default function HomePage() {
+import type { Metadata } from "next";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { auth } from "@/lib/auth";
+import { MarketingFooter, MarketingHeader } from "@/components/marketing-chrome";
+import {
+  Audience,
+  ClosingCta,
+  DeliverySystem,
+  Faq,
+  FreeAudit,
+  Hero,
+  HonestLimits,
+  HowItWorks,
+  Pricing,
+  ReportIsTheProduct,
+} from "@/components/landing/sections";
+
+/**
+ * Вход в продукт. Залогиненного корень не задерживает: он пришёл работать,
+ * а не читать про продукт.
+ */
+
+export const metadata: Metadata = {
+  title: "Citeworthy — sell and deliver AI Search retainers",
+  description:
+    "Measure how ChatGPT, Perplexity and Gemini answer about your clients, diagnose which sources decide it, and report to the client in your own brand.",
+};
+
+export default async function HomePage() {
+  const session = await auth.api.getSession({ headers: await headers() });
+
+  if (session) {
+    redirect("/dashboard");
+  }
+
   return (
-    <main className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center gap-4 px-6">
-      <h1 className="text-2xl font-semibold tracking-tight">Citeworthy</h1>
-      <p className="text-muted-foreground">
-        Measure how AI assistants answer about your clients, find why competitors get cited
-        instead, and hand the client a report in your own brand.
-      </p>
-    </main>
+    <>
+      <MarketingHeader />
+      <main>
+        <Hero />
+        <ReportIsTheProduct />
+        <DeliverySystem />
+        <HowItWorks />
+        <FreeAudit />
+        <Pricing />
+        <HonestLimits />
+        <Audience />
+        <Faq />
+        <ClosingCta />
+      </main>
+      <MarketingFooter />
+    </>
   );
 }

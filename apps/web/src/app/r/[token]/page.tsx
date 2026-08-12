@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { reportPayloadSchema } from "@repo/core";
 import { createDb, getAgencyById, getClientById, getReportById, getShareByToken } from "@repo/db";
-import { ReportView } from "./report-view";
+import { ReportView } from "@/components/report-view";
 import { ApproveForm } from "./approve-form";
 
 /**
