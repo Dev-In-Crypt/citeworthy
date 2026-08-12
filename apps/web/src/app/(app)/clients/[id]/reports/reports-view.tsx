@@ -62,6 +62,13 @@ export function ReportsView({ clientId }: { clientId: string }) {
                     <span className="rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground">
                       {report.status}
                     </span>
+                    <a
+                      href={`/api/reports/${report.id}/pdf`}
+                      data-testid={`pdf-${report.id}`}
+                      className="h-9 rounded-md border border-input px-3 text-sm font-medium leading-9 hover:bg-accent"
+                    >
+                      Download PDF
+                    </a>
                     <button
                       type="button"
                       data-testid={`share-${report.id}`}
