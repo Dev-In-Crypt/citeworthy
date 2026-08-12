@@ -58,4 +58,5 @@ pnpm db:migrate | db:seed | db:studio
 - [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) — architecture, schema, screens, design system
 - [TASKS.md](TASKS.md) — the task queue with verify criteria and a log of what was decided and why
 - [CLAUDE.md](CLAUDE.md) — invariants that must not be broken
-- [docs/startup-spec.md](docs/startup-spec.md) — the product spec
+
+The product spec lives outside this repository.
