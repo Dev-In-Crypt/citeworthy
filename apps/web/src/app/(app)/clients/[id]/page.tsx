@@ -58,6 +58,12 @@ export default function ClientOverviewPage({ params }: { params: Promise<{ id: s
               Actions
             </Link>
             <Link
+              href={`/clients/${id}/reports`}
+              className="h-10 rounded-md border border-input px-4 text-sm font-medium leading-10 hover:bg-accent"
+            >
+              Reports
+            </Link>
+            <Link
               href={`/clients/${id}/settings`}
               className="h-10 rounded-md border border-input px-4 text-sm font-medium leading-10 hover:bg-accent"
             >
