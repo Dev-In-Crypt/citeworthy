@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { groupByCluster, parsePromptCsv } from "@repo/core";
+import {
+  DEFAULT_GENERATED_PROMPT_COUNT,
+  GENERATED_PROMPT_RANGE,
+  groupByCluster,
+  parsePromptCsv,
+  TemplatePromptGenerator,
+} from "@repo/core";
 import {
   createPrompt,
   createPromptCluster,
@@ -31,6 +37,19 @@ async function assertClusterAccess(
   assertTenant(client, ctx.user.agencyId);
   return cluster;
 }
+
+const generatedPrompt = z.object({
+  text: z.string().min(1).max(1000),
+  intent: z.enum(INTENTS),
+  cluster: z.string().min(1).max(200),
+  isControl: z.boolean(),
+});
+
+/**
+ * В mock-режиме промпты собираются из шаблонов. Живой генератор появится
+ * вместе с live-адаптерами (T13–T15) — интерфейс для него уже есть в core.
+ */
+const promptGenerator = new TemplatePromptGenerator();
 
 export const promptsRouter = router({
   clusters: protectedProcedure
@@ -131,6 +150,81 @@ export const promptsRouter = router({
 
       await deletePrompt(ctx.db, input.id);
       return { id: input.id };
+    }),
+
+  /**
+   * Черновик набора промптов. Ничего не сохраняет: список правится человеком,
+   * и сохранять предложение модели до правки — значит измерять чужие догадки.
+   */
+  generate: roleProcedure("member")
+    .input(
+      z.object({
+        clientId: z.uuid(),
+        industry: z.string().max(200).optional(),
+        count: z
+          .number()
+          .int()
+          .min(GENERATED_PROMPT_RANGE.min)
+          .max(GENERATED_PROMPT_RANGE.max)
+          .default(DEFAULT_GENERATED_PROMPT_COUNT),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const client = await getClientById(ctx.db, input.clientId);
+      assertTenant(client, ctx.user.agencyId);
+
+      const prompts = await promptGenerator.generate(
+        {
+          domain: client.domain,
+          industry: input.industry ?? client.industry ?? "",
+          brandNames: client.brandNames.length > 0 ? client.brandNames : [client.name],
+          competitorNames: client.competitorNames,
+        },
+        input.count,
+      );
+
+      return { prompts };
+    }),
+
+  /** Сохраняет отредактированный черновик: кластеры создаются по именам из него. */
+  saveGenerated: roleProcedure("member")
+    .input(
+      z.object({
+        clientId: z.uuid(),
+        prompts: z.array(generatedPrompt).min(1).max(GENERATED_PROMPT_RANGE.max),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const client = await getClientById(ctx.db, input.clientId);
+      assertTenant(client, ctx.user.agencyId);
+
+      const existing = await listPromptClusters(ctx.db, input.clientId);
+      const byName = new Map(existing.map((cluster) => [cluster.name.toLowerCase(), cluster]));
+
+      let createdClusters = 0;
+      let createdPrompts = 0;
+
+      for (const prompt of input.prompts) {
+        let cluster = byName.get(prompt.cluster.toLowerCase());
+        if (!cluster) {
+          cluster = await createPromptCluster(ctx.db, {
+            clientId: input.clientId,
+            name: prompt.cluster,
+            intent: prompt.intent,
+          });
+          byName.set(prompt.cluster.toLowerCase(), cluster);
+          createdClusters++;
+        }
+
+        await createPrompt(ctx.db, {
+          clusterId: cluster.id,
+          text: prompt.text,
+          isControl: prompt.isControl,
+        });
+        createdPrompts++;
+      }
+
+      return { createdClusters, createdPrompts };
     }),
 
   importCsv: roleProcedure("member")

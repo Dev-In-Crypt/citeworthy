@@ -8,6 +8,7 @@ export interface ClientFormValues {
   industry: string;
   brandNames: string[];
   competitorNames: string[];
+  isProspect: boolean;
 }
 
 /** Списки имён вводятся через запятую — самый предсказуемый ввод для агентства. */
@@ -41,6 +42,7 @@ export function ClientForm({
   const [competitorNames, setCompetitorNames] = useState(
     (initial?.competitorNames ?? []).join(", "),
   );
+  const [isProspect, setIsProspect] = useState(initial?.isProspect ?? false);
 
   return (
     <form
@@ -53,6 +55,7 @@ export function ClientForm({
           industry: industry.trim(),
           brandNames: parseList(brandNames),
           competitorNames: parseList(competitorNames),
+          isProspect,
         });
       }}
     >
@@ -106,6 +109,23 @@ export function ClientForm({
           placeholder="HubSpot, Pipedrive, Close"
           className={inputClass}
         />
+      </label>
+
+      <label className="flex items-start gap-2">
+        <input
+          type="checkbox"
+          checked={isProspect}
+          aria-label="Prospect (free audit)"
+          onChange={(e) => setIsProspect(e.target.checked)}
+          className="mt-1"
+        />
+        <span className="flex flex-col gap-0.5">
+          <span className="text-sm font-medium">Prospect (free audit)</span>
+          <span className="text-sm text-muted-foreground">
+            Measured the same way as a paying client, but marked as a prospect so audits stay
+            separate from delivery work.
+          </span>
+        </span>
       </label>
 
       {error && (

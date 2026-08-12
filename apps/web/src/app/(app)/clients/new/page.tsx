@@ -34,6 +34,7 @@ export default function NewClientPage() {
             industry: values.industry || undefined,
             brandNames: values.brandNames,
             competitorNames: values.competitorNames,
+            status: values.isProspect ? "prospect" : "active",
           })
         }
       />

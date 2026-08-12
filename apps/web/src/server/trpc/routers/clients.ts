@@ -17,6 +17,11 @@ const clientInput = z.object({
   industry: z.string().max(200).optional(),
   brandNames: z.array(z.string().min(1)).default([]),
   competitorNames: z.array(z.string().min(1)).default([]),
+  /**
+   * `prospect` — клиент для бесплатного аудита: ещё не платит, но измеряется
+   * тем же пайплайном. Отдельного флага нет — статус и так перечисление.
+   */
+  status: z.enum(["active", "paused", "prospect"]).optional(),
 });
 
 export const clientsRouter = router({

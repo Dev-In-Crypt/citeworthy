@@ -5,6 +5,7 @@ import Link from "next/link";
 import { api } from "@/trpc/react";
 import { EmptyState } from "@/components/page-header";
 import { SchedulePanel } from "./schedule-panel";
+import { GeneratePrompts } from "./generate-prompts";
 
 const INTENTS = ["comparison", "learning", "purchase", "other"] as const;
 
@@ -13,6 +14,7 @@ const inputClass =
 
 export function MeasureView({ clientId }: { clientId: string }) {
   const utils = api.useUtils();
+  const client = api.clients.get.useQuery({ id: clientId });
   const clusters = api.prompts.clusters.useQuery({ clientId });
   const prompts = api.prompts.list.useQuery({ clientId });
 
@@ -49,6 +51,11 @@ export function MeasureView({ clientId }: { clientId: string }) {
   return (
     <div className="flex flex-col gap-8">
       <SchedulePanel clientId={clientId} />
+      <GeneratePrompts
+        clientId={clientId}
+        industry={client.data?.industry ?? null}
+        onSaved={refresh}
+      />
       <CsvImport clientId={clientId} onImported={refresh} />
 
       <section className="flex flex-col gap-3">

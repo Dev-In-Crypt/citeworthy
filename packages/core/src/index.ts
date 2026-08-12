@@ -26,6 +26,7 @@ export * from "./metrics/visibility";
 export * from "./billing/period";
 export * from "./billing/cost";
 export * from "./import/csv";
+export * from "./prompts/generate";
 export * from "./parsing/highlight";
 export * from "./sources/domains";
 export * from "./sources/classifier";
