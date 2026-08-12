@@ -142,6 +142,60 @@ export function ReportView({
         </section>
       )}
 
+      {payload.opportunity && (
+        <section data-testid="report-opportunity" className="flex flex-col gap-4">
+          <h2 className="text-lg font-medium">Where the opportunity is</h2>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Stat
+              label="Visibility today"
+              testId="opportunity-visibility"
+              value={`${payload.opportunity.currentVisibilityPct}%`}
+              hint="Share of answers mentioning the brand"
+            />
+            <Stat
+              label="Tracked competitors, average"
+              testId="opportunity-competitors"
+              value={`${payload.opportunity.competitorAverageVisibilityPct}%`}
+              hint={`${formatPp(payload.opportunity.gapPp)} versus the average`}
+            />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <h3 className="text-sm font-medium">
+              Ranked work for the next {payload.opportunity.scopeDays} days
+            </h3>
+            {/* Причина стоит рядом с каждой строкой: без неё это список задач,
+                который клиент не может ни проверить, ни оспорить (инвариант 7). */}
+            <ol
+              data-testid="opportunity-actions"
+              className="flex list-inside list-decimal flex-col gap-2 text-sm"
+            >
+              {payload.opportunity.rankedActions.map((action) => (
+                <li key={action.title} className="border-b py-2 last:border-0">
+                  <span className="font-medium">{action.title}</span>
+                  <span className="block pl-5 text-muted-foreground">{action.reason}</span>
+                  <span className="block pl-5 text-xs text-muted-foreground">
+                    Estimated impact: {action.estimatedImpact} · Effort: {action.effort}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </div>
+
+          <div className="flex flex-col gap-1 rounded-lg border p-5 text-sm">
+            <span className="text-muted-foreground">Proposed engagement</span>
+            <span data-testid="opportunity-retainer" className="metric text-lg font-semibold">
+              ${payload.opportunity.suggestedRetainerUsd.toLocaleString("en-US")} / month
+            </span>
+            <span className="metric text-muted-foreground">
+              Estimated effort: {payload.opportunity.estimatedEffortHours.min}–
+              {payload.opportunity.estimatedEffortHours.max} h per month
+            </span>
+          </div>
+        </section>
+      )}
+
       {payload.nextSprint.length > 0 && (
         <section className="flex flex-col gap-3">
           <h2 className="text-lg font-medium">Next sprint</h2>

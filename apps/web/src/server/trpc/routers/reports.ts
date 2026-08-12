@@ -1,8 +1,17 @@
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
-import { buildReportPayload, REPORT_COPY } from "@repo/core";
-import type { VisibilitySnapshot } from "@repo/core";
 import {
+  buildOpportunity,
+  buildRecommendations,
+  buildReportPayload,
+  diagnose,
+  OPPORTUNITY_CAVEATS,
+  OPPORTUNITY_DEFAULTS,
+  REPORT_COPY,
+} from "@repo/core";
+import type { CitationFact, SourceType, VisibilitySnapshot } from "@repo/core";
+import {
+  listCitationFacts,
   countClientMentionsBetween,
   countNewCitedDomains,
   createReport,
@@ -19,6 +28,38 @@ import {
   setReportStatus,
 } from "@repo/db";
 import { assertTenant, protectedProcedure, roleProcedure, router } from "../trpc";
+
+/** Та же схлопка, что в роутере диагностики: один факт на пару (ответ, домен). */
+function toFacts(
+  rows: {
+    responseId: string;
+    domain: string;
+    sourceType: string | null;
+    entityName: string | null;
+    isClient: boolean | null;
+    isCompetitor: boolean | null;
+  }[],
+): CitationFact[] {
+  const byKey = new Map<string, CitationFact>();
+
+  for (const row of rows) {
+    const key = `${row.responseId}|${row.domain}`;
+    let entry = byKey.get(key);
+    if (!entry) {
+      entry = {
+        domain: row.domain,
+        sourceType: (row.sourceType as SourceType | null) ?? null,
+        clientMentioned: false,
+        competitorsMentioned: [],
+      };
+      byKey.set(key, entry);
+    }
+    if (row.isClient) entry.clientMentioned = true;
+    if (row.isCompetitor && row.entityName) entry.competitorsMentioned.push(row.entityName);
+  }
+
+  return [...byKey.values()];
+}
 
 /** Период по умолчанию — календарный месяц назад от конца. */
 function defaultPeriod(): { start: Date; end: Date } {
@@ -146,6 +187,118 @@ export const reportsRouter = router({
         actorUserId: null,
         eventType: "report_generated",
         payload: { reportId: report.id, period: payload.period },
+      });
+
+      return report;
+    }),
+
+  /**
+   * Отчёт по бесплатному аудиту: что показали измерения, что предлагается
+   * сделать и во что это обойдётся.
+   *
+   * Ретейнер и часы приходят из формы, а не считаются: их знает только
+   * агентство. Дефолты из спека подставляются, если поле не заполнено.
+   */
+  generateOpportunity: roleProcedure("member")
+    .input(
+      z.object({
+        clientId: z.uuid(),
+        retainerUsd: z.number().int().positive().max(1_000_000).optional(),
+        effortHoursMin: z.number().positive().max(1000).optional(),
+        effortHoursMax: z.number().positive().max(1000).optional(),
+        hourlyCostUsd: z.number().positive().max(10_000).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const client = await getClientById(ctx.db, input.clientId);
+      assertTenant(client, ctx.user.agencyId);
+
+      const [snapshotRows, citationRows] = await Promise.all([
+        listAllSnapshots(ctx.db, input.clientId),
+        listCitationFacts(ctx.db, input.clientId, null),
+      ]);
+
+      // Аудит — снимок «как сейчас», поэтому берётся последняя свёртка,
+      // а не движение за период: движения ещё не было.
+      const rollups = snapshotRows.filter(
+        (row) => row.clusterId === null && row.platform === null,
+      );
+      const latest = rollups.at(-1);
+
+      const snapshots: VisibilitySnapshot[] = latest
+        ? [
+            {
+              clusterId: null,
+              platform: null,
+              periodStart: latest.periodStart,
+              periodEnd: latest.periodEnd,
+              clientVisibilityPct: Number(latest.clientVisibilityPct),
+              competitorVisibility: latest.competitorVisibility,
+              sampleCount: latest.sampleCount,
+              sufficient: latest.sufficient,
+            },
+          ]
+        : [];
+
+      const recommendations = buildRecommendations(diagnose(toFacts(citationRows)));
+
+      const effortHours = {
+        min: input.effortHoursMin ?? OPPORTUNITY_DEFAULTS.effortHours.min,
+        max: input.effortHoursMax ?? OPPORTUNITY_DEFAULTS.effortHours.max,
+      };
+
+      const opportunity = buildOpportunity({
+        currentVisibilityPct: latest ? Number(latest.clientVisibilityPct) : 0,
+        competitorVisibility: latest?.competitorVisibility ?? {},
+        rankedActions: recommendations.map((recommendation) => ({
+          title: recommendation.title,
+          reason: recommendation.reason,
+          estimatedImpact: recommendation.estimatedImpact,
+          effort: recommendation.effort,
+        })),
+        ...(input.retainerUsd !== undefined ? { retainerUsd: input.retainerUsd } : {}),
+        effortHours,
+        ...(input.hourlyCostUsd !== undefined ? { hourlyCostUsd: input.hourlyCostUsd } : {}),
+      });
+
+      const caveats: string[] = [...OPPORTUNITY_CAVEATS];
+      // Недобор сэмплов в аудите — обычное дело: прогон один.
+      if (latest && !latest.sufficient) {
+        caveats.push(REPORT_COPY.shortPeriod);
+      }
+
+      const periodEnd = latest?.periodEnd ?? new Date();
+      const periodStart = latest?.periodStart ?? periodEnd;
+
+      const payload = buildReportPayload({
+        clientName: client.name,
+        periodStart,
+        periodEnd,
+        snapshots,
+        completedActions: [],
+        newCitedUrls: 0,
+        newBrandMentions: 0,
+        highestImpact: null,
+        // Ближайшие шаги — верх того же ранжированного списка, без выдумок.
+        nextSprint: opportunity.rankedActions.slice(0, 3).map((action) => action.title),
+        caveats,
+        opportunity,
+      });
+
+      const report = await createReport(ctx.db, {
+        clientId: input.clientId,
+        periodStart,
+        periodEnd,
+        status: "draft",
+        payload,
+      });
+
+      await logActivity(ctx.db, {
+        agencyId: ctx.user.agencyId,
+        clientId: input.clientId,
+        actorUserId: null,
+        eventType: "report_generated",
+        payload: { reportId: report.id, audit: true },
       });
 
       return report;

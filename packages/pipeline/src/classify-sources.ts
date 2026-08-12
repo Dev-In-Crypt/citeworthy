@@ -83,6 +83,15 @@ async function resolveSource(
     ...(clientDomain ? { clientDomain } : {}),
   });
 
+  // `owned` — свойство пары (клиент, домен), а не домена: таблица `sources`
+  // общая на всех, и запись «owned» из одного агентства объявила бы этот
+  // домен собственным для любого другого клиента, который его процитировал.
+  // Признак владения проставляется при чтении, по домену самого клиента.
+  if (byRule === "owned") {
+    counters.onRule();
+    return existing.id;
+  }
+
   if (byRule) {
     counters.onRule();
     const updated = await ensureSource(db, citation.domain, {

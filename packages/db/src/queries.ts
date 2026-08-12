@@ -677,7 +677,19 @@ export async function listCitationFacts(
     .select({
       responseId: responses.id,
       domain: citations.domain,
-      sourceType: sources.sourceType,
+      /**
+       * Владение считается здесь, а не берётся из `sources`: таблица источников
+       * общая на все агентства, а «свой домен» — свойство пары (клиент, домен).
+       * Домен клиента и его поддомены — owned, всё остальное — глобальный тип.
+       */
+      sourceType: sql<string | null>`
+        case
+          when ${citations.domain} = ${clients.domain}
+            or ${citations.domain} like '%.' || ${clients.domain}
+          then 'owned'
+          else ${sources.sourceType}
+        end
+      `,
       entityName: mentions.entityName,
       isClient: mentions.isClient,
       isCompetitor: mentions.isCompetitor,
@@ -685,6 +697,7 @@ export async function listCitationFacts(
     .from(citations)
     .innerJoin(responses, eq(citations.responseId, responses.id))
     .innerJoin(runs, eq(responses.runId, runs.id))
+    .innerJoin(clients, eq(clients.id, runs.clientId))
     .innerJoin(prompts, eq(responses.promptId, prompts.id))
     .leftJoin(sources, eq(sources.domain, citations.domain))
     .leftJoin(mentions, eq(mentions.responseId, responses.id))

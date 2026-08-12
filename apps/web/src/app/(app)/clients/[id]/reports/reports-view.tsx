@@ -1,11 +1,16 @@
 "use client";
 
 import { useState } from "react";
+import { OPPORTUNITY_DEFAULTS } from "@repo/core";
 import { api } from "@/trpc/react";
 import { EmptyState } from "@/components/page-header";
 
+const inputClass =
+  "h-10 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
+
 export function ReportsView({ clientId }: { clientId: string }) {
   const utils = api.useUtils();
+  const client = api.clients.get.useQuery({ id: clientId });
   const reports = api.reports.list.useQuery({ clientId });
   const [shareLinks, setShareLinks] = useState<Record<string, string>>({});
 
@@ -40,6 +45,10 @@ export function ReportsView({ clientId }: { clientId: string }) {
           Covers the last 30 days. Numbers are frozen at generation time.
         </span>
       </div>
+
+      {client.data?.status === "prospect" && (
+        <OpportunityForm clientId={clientId} onGenerated={() => utils.reports.list.invalidate({ clientId })} />
+      )}
 
       {rows.length === 0 ? (
         <EmptyState
@@ -101,5 +110,131 @@ export function ReportsView({ clientId }: { clientId: string }) {
         </ul>
       )}
     </div>
+  );
+}
+
+/**
+ * Отчёт по бесплатному аудиту.
+ *
+ * Ретейнер, часы и стоимость часа вводит агентство: продукт их не знает и
+ * подставлять «рыночные» значения не должен. Маржа считается тут же, но
+ * остаётся внутренней — в клиентский отчёт она не попадает.
+ */
+function OpportunityForm({
+  clientId,
+  onGenerated,
+}: {
+  clientId: string;
+  onGenerated: () => Promise<void> | void;
+}) {
+  const [retainer, setRetainer] = useState<number>(OPPORTUNITY_DEFAULTS.retainerUsd);
+  const [effortMin, setEffortMin] = useState<number>(OPPORTUNITY_DEFAULTS.effortHours.min);
+  const [effortMax, setEffortMax] = useState<number>(OPPORTUNITY_DEFAULTS.effortHours.max);
+  const [hourlyCost, setHourlyCost] = useState<number>(OPPORTUNITY_DEFAULTS.hourlyCostUsd);
+
+  const generate = api.reports.generateOpportunity.useMutation({
+    onSuccess: async () => {
+      await onGenerated();
+    },
+  });
+
+  const margin =
+    retainer > 0
+      ? {
+          min: Math.round(((retainer - effortMax * hourlyCost) / retainer) * 1000) / 10,
+          max: Math.round(((retainer - effortMin * hourlyCost) / retainer) * 1000) / 10,
+        }
+      : null;
+
+  return (
+    <section className="flex flex-col gap-3 rounded-lg border border-dashed p-4">
+      <h2 className="text-base font-medium">Opportunity report (audit)</h2>
+      <p className="max-w-prose text-sm text-muted-foreground">
+        Shows where this prospect stands today, the ranked work behind it and what you propose to
+        charge. Your margin stays here — the client report never shows it.
+      </p>
+
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium">Retainer, $ / month</span>
+          <input
+            type="number"
+            min={1}
+            aria-label="Retainer"
+            value={retainer}
+            onChange={(event) => setRetainer(Number(event.target.value))}
+            className={`${inputClass} w-32`}
+          />
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium">Effort, hours from</span>
+          <input
+            type="number"
+            min={1}
+            aria-label="Effort hours minimum"
+            value={effortMin}
+            onChange={(event) => setEffortMin(Number(event.target.value))}
+            className={`${inputClass} w-24`}
+          />
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium">to</span>
+          <input
+            type="number"
+            min={1}
+            aria-label="Effort hours maximum"
+            value={effortMax}
+            onChange={(event) => setEffortMax(Number(event.target.value))}
+            className={`${inputClass} w-24`}
+          />
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium">Your cost, $ / hour</span>
+          <input
+            type="number"
+            min={1}
+            aria-label="Hourly cost"
+            value={hourlyCost}
+            onChange={(event) => setHourlyCost(Number(event.target.value))}
+            className={`${inputClass} w-28`}
+          />
+        </label>
+        <button
+          type="button"
+          data-testid="generate-opportunity"
+          disabled={generate.isPending || effortMin > effortMax}
+          onClick={() =>
+            generate.mutate({
+              clientId,
+              retainerUsd: retainer,
+              effortHoursMin: effortMin,
+              effortHoursMax: effortMax,
+              hourlyCostUsd: hourlyCost,
+            })
+          }
+          className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60"
+        >
+          {generate.isPending ? "Generating…" : "Generate opportunity report"}
+        </button>
+      </div>
+
+      {margin && (
+        <p data-testid="opportunity-margin" className="metric text-sm text-muted-foreground">
+          Estimated margin: {margin.min}%–{margin.max}% (internal)
+        </p>
+      )}
+
+      {effortMin > effortMax && (
+        <p data-testid="form-error" className="text-sm text-destructive">
+          The effort range is inverted — the lower bound is above the upper one.
+        </p>
+      )}
+
+      {generate.error && (
+        <p data-testid="form-error" className="text-sm text-destructive">
+          {generate.error.message}
+        </p>
+      )}
+    </section>
   );
 }
