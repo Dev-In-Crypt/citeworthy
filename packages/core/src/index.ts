@@ -34,3 +34,5 @@ export * from "./diagnosis/recommendations";
 export * from "./experiments/baseline";
 export * from "./experiments/events";
 export * from "./experiments/math";
+export * from "./reports/schema";
+export * from "./reports/build";

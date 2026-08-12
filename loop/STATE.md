@@ -5,13 +5,15 @@
 
 ## Текущий статус
 
-- Следующая задача: **T50** (Report generator, контракт C4) — начало Phase 4. ЦИКЛ НА ПАУЗЕ по просьбе пользователя. T13–T15 (live-адаптеры, [H]) — их live-часть требует ключей; при их отсутствии переходить к T16 (worker-скелет).
+- Следующая задача: **T50** — дописан код, но НЕ отмечен: нужна БД для миграции и интеграционных тестов. ЦИКЛ ОСТАНОВЛЕН: Docker не запускается. T13–T15 (live-адаптеры, [H]) — их live-часть требует ключей; при их отсутствии переходить к T16 (worker-скелет).
 - Сделано: Phase 0 и Phase 1 закрыты (кроме T08 и T13–T15, заблокированы человеком), Phase 0–3 закрыты (кроме T08 и T13–T15); тестов 367 юнит/интеграционных + 19 e2e; пайплайн вынесен в @repo/pipeline; T08 написан но не отмечен (нет remote). Тестов: 48 core + 8 db + 10 tenancy + 8 e2e. Тесты: 4 (db) + 10 (tenancy) + 11 (storage) юнит, 8 e2e.
 - Команды проверки: `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`, `pnpm e2e`, `pnpm db:migrate`, `pnpm db:check`, `pnpm db:seed`.
 - e2e поднимает свой сервер на порту 3100 из production-сборки. Если тесты падают мгновенно и «не видят» правок — на 3100 висит старый процесс: `Get-NetTCPConnection -LocalPort 3100 -State Listen` и `Stop-Process`.
 - Порты: Postgres `localhost:5433`, Redis `localhost:6380` (нестандартные, чтобы не конфликтовать с локальными сервисами). Перед работой: `docker compose up -d`, `.env` копируется из `.env.example`.
 
 ## Блокеры для человека
+
+- **БЛОКЕР (2026-08-12): Docker Desktop не поднимается.** Процессы запущены, но WSL-дистрибутив `docker-desktop` в состоянии Stopped; `wsl --shutdown` и рестарт приложения не помогли. Скорее всего Docker Desktop показывает окно, требующее действия (обновление, вход, принятие условий). Открыть приложение и посмотреть. Проверка: `docker info` должен отвечать, затем `docker compose up -d && pnpm db:migrate`.
 
 - **БЛОКЕР T08: нет удалённого репозитория.** CI-workflow написан, но «зелёный pipeline на PR» проверить негде. Нужно: создать репозиторий на GitHub, `git remote add origin <url>`, `git push -u origin main`, открыть PR. До этого T08 остаётся неотмеченной.
 - Цикл работает через `/loop` в приложении. Отдельный скрипт `loop/run-loop.ps1` требует залогиненного CLI (не обязателен): standalone `claude` не залогинен — `claude -p` возвращает `"Not logged in · Please run /login"` (exit 1), поэтому `loop/run-loop.ps1` работать не может. Починка: открыть обычный терминал, выполнить `claude` → `/login`, либо задать `ANTHROPIC_API_KEY` в окружении. Проверить успех: `"Reply with exactly: OK" | claude -p --output-format json --max-turns 1` должен вернуть JSON с `is_error:false`.

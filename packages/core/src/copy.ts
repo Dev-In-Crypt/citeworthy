@@ -42,6 +42,18 @@ export const DIAGNOSIS_COPY = {
   evidenceNote: "Based on the sources models actually cited in the measured period.",
 } as const;
 
+export const REPORT_COPY = {
+  /** Идёт в каждый отчёт: клиент должен понимать, что именно измерено. */
+  measurementBasis:
+    "Visibility is the share of AI answers mentioning the brand, measured across repeated samples on several platforms over weekly windows.",
+  /** Ставится, когда движение нельзя отделить от общего дрейфа платформ. */
+  noComparisonGroup:
+    "There were no untouched topics to compare against in this period, so movement cannot be separated from platform-wide changes.",
+  /** Ставится при коротком периоде наблюдения. */
+  shortPeriod:
+    "Models typically take weeks to re-crawl and shift citations, so a short period shows early signal rather than settled results.",
+} as const;
+
 export const EXPERIMENT_COPY = {
   /** Заголовок оценки эффекта: всегда «estimated» — см. инвариант 2. */
   estimatedEffect: "Estimated incremental effect",
