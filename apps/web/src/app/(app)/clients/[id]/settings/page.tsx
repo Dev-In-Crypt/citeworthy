@@ -68,6 +68,7 @@ export default function EditClientPage({ params }: { params: Promise<{ id: strin
           industry: client.data.industry ?? "",
           brandNames: client.data.brandNames,
           competitorNames: client.data.competitorNames,
+          isProspect: client.data.status === "prospect",
         }}
         submitLabel="Save changes"
         pending={update.isPending}
@@ -80,6 +81,7 @@ export default function EditClientPage({ params }: { params: Promise<{ id: strin
             industry: values.industry || undefined,
             brandNames: values.brandNames,
             competitorNames: values.competitorNames,
+            status: values.isProspect ? "prospect" : "active",
           })
         }
       />

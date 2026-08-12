@@ -45,7 +45,17 @@ export function ClientsView() {
             className="flex h-full flex-col gap-3 rounded-lg border p-4 transition-colors hover:bg-accent"
           >
             <div className="flex flex-col gap-0.5">
-              <span className="font-medium">{client.name}</span>
+              <span className="flex items-center gap-2">
+                <span className="font-medium">{client.name}</span>
+                {client.status === "prospect" && (
+                  <span
+                    data-testid="prospect-badge"
+                    className="rounded-full border px-2 py-0.5 text-xs text-muted-foreground"
+                  >
+                    prospect
+                  </span>
+                )}
+              </span>
               <span className="text-sm text-muted-foreground">{client.domain}</span>
             </div>
 
