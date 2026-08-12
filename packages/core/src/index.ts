@@ -16,6 +16,14 @@ export {
   openAiCostUsd,
 } from "./adapters/openai";
 export type { OpenAiAdapterConfig, OpenAiPricing, ReasoningEffort } from "./adapters/openai";
+export {
+  DEFAULT_PERPLEXITY_ENDPOINT,
+  DEFAULT_PERPLEXITY_MODEL,
+  PerplexityAdapter,
+  PERPLEXITY_PRICING,
+  perplexityCostUsd,
+} from "./adapters/perplexity";
+export type { PerplexityAdapterConfig, PerplexityPricing } from "./adapters/perplexity";
 export { registerLiveAdapters } from "./adapters/live";
 export {
   getAdapter,

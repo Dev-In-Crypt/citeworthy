@@ -1,6 +1,7 @@
 import { registerLiveAdapter } from "./registry";
 import { OpenAiAdapter } from "./openai";
 import type { ReasoningEffort } from "./openai";
+import { PerplexityAdapter } from "./perplexity";
 
 /**
  * Подключение живых адаптеров.
@@ -29,7 +30,23 @@ export function registerLiveAdapters(env: NodeJS.ProcessEnv = process.env): stri
     registered.push("chatgpt");
   }
 
-  // perplexity и gemini подключатся здесь же — T14 и T15.
+  const perplexityKey = env["PERPLEXITY_API_KEY"]?.trim();
+  if (perplexityKey) {
+    const model = env["PERPLEXITY_MODEL"]?.trim();
+    const endpoint = env["PERPLEXITY_ENDPOINT"]?.trim();
+    registerLiveAdapter(
+      "perplexity",
+      () =>
+        new PerplexityAdapter({
+          apiKey: perplexityKey,
+          ...(model ? { model } : {}),
+          ...(endpoint ? { endpoint } : {}),
+        }),
+    );
+    registered.push("perplexity");
+  }
+
+  // gemini подключится здесь же — T15.
 
   return registered;
 }
