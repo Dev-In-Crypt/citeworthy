@@ -1,4 +1,4 @@
-# CLAUDE.md — AI Search Delivery OS
+# CLAUDE.md — Citeworthy
 
 Agency-first SaaS: агентства измеряют AI-visibility своих клиентов (ChatGPT/Perplexity/Gemini), диагностируют source gaps, ведут actions/experiments и отдают white-label отчёты.
 

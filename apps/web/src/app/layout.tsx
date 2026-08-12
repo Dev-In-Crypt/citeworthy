@@ -4,8 +4,8 @@ import { ClientErrorReporting } from "@/components/client-error-reporting";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AI Search Delivery OS",
-  description: "Sell and deliver AI Search retainers without adding headcount.",
+  title: "Citeworthy",
+  description: "AI visibility measurement and delivery for agencies.",
 };
 
 export default function RootLayout({

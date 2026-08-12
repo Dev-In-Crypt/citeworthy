@@ -11,10 +11,14 @@ const CSV = [
   "CRM comparison,comparison,best CRM for startups,false",
 ].join("\n");
 
-/** Название продукта не должно встречаться на клиентской странице ни в каком виде. */
+/**
+ * Название продукта не должно встречаться на клиентской странице ни в каком виде.
+ * При переименовании продукта этот список обязан обновиться вместе с ним —
+ * иначе проверка инварианта 3 продолжит искать строку, которой больше нет.
+ */
 const PRODUCT_BRANDING = [
-  "AI Search Delivery OS",
-  "Delivery OS",
+  "Citeworthy",
+  "citeworthy",
   "northwind-agency.test",
 ] as const;
 
