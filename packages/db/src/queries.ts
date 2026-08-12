@@ -411,6 +411,57 @@ export async function incrementAiChecks(
     });
 }
 
+export interface CostRow {
+  clientId: string;
+  clientName: string;
+  platform: "chatgpt" | "perplexity" | "gemini";
+  responses: number;
+  costUsd: string;
+}
+
+/**
+ * Стоимость измерений за период по клиентам и платформам.
+ *
+ * Сумма считается в БД, а не в приложении: строк ответов на агентство — тысячи
+ * за месяц, и тянуть их в память ради сложения бессмысленно. numeric остаётся
+ * строкой (инвариант «деньги — numeric»), округление — на стороне отображения.
+ */
+export async function listCostsByClientAndPlatform(
+  db: Database,
+  agencyId: string,
+  from: Date,
+  to: Date,
+): Promise<CostRow[]> {
+  const rows = await db
+    .select({
+      clientId: clients.id,
+      clientName: clients.name,
+      platform: responses.platform,
+      responses: sql<string>`count(*)`,
+      costUsd: sql<string>`coalesce(sum(${responses.costUsd}), 0)`,
+    })
+    .from(responses)
+    .innerJoin(runs, eq(runs.id, responses.runId))
+    .innerJoin(clients, eq(clients.id, runs.clientId))
+    .where(
+      and(
+        eq(clients.agencyId, agencyId),
+        gte(responses.createdAt, from),
+        lte(responses.createdAt, to),
+      ),
+    )
+    .groupBy(clients.id, clients.name, responses.platform)
+    .orderBy(clients.name, responses.platform);
+
+  return rows.map((row) => ({
+    clientId: row.clientId,
+    clientName: row.clientName,
+    platform: row.platform,
+    responses: Number(row.responses),
+    costUsd: String(row.costUsd),
+  }));
+}
+
 export async function getUsageCounter(
   db: Database,
   agencyId: string,

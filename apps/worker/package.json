@@ -14,6 +14,7 @@
     "@repo/core": "workspace:*",
     "@repo/db": "workspace:*",
     "@repo/pipeline": "workspace:*",
+    "@sentry/node": "^10.70.0",
     "bullmq": "^6.0.11",
     "ioredis": "^6.0.0"
   },

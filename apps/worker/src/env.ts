@@ -23,3 +23,6 @@ loadRootEnv();
 
 export const REDIS_URL = process.env.REDIS_URL ?? "redis://localhost:6380";
 export const ADAPTERS_MODE_RAW = process.env.ADAPTERS_MODE;
+export const NODE_ENV = process.env.NODE_ENV ?? "development";
+/** Пусто — ошибки идут только в лог; это рабочий режим, а не поломка. */
+export const SENTRY_DSN = process.env.SENTRY_DSN?.trim() || undefined;

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Settings, Users } from "lucide-react";
+import { BarChart3, Settings, Users, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SignOutButton } from "@/components/sign-out-button";
 
@@ -10,7 +10,18 @@ const NAV = [
   { href: "/dashboard", label: "Overview", icon: BarChart3 },
   { href: "/clients", label: "Clients", icon: Users },
   { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/settings/usage", label: "Usage", icon: Wallet },
 ] as const;
+
+/**
+ * Подсвечивается самый длинный подходящий пункт: иначе на /settings/usage
+ * текущими оказались бы сразу два, и «где я» перестало бы читаться.
+ */
+function activeHref(pathname: string): string | undefined {
+  return NAV.map((item) => item.href)
+    .filter((href) => pathname === href || pathname.startsWith(`${href}/`))
+    .sort((a, b) => b.length - a.length)[0];
+}
 
 export function AppShell({
   agencyName,
@@ -22,6 +33,7 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const current = activeHref(pathname);
 
   return (
     <div className="flex min-h-screen">
@@ -37,7 +49,7 @@ export function AppShell({
 
         <nav className="flex flex-col gap-0.5">
           {NAV.map(({ href, label, icon: Icon }) => {
-            const active = pathname === href || pathname.startsWith(`${href}/`);
+            const active = href === current;
             return (
               <Link
                 key={href}
