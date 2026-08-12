@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -21,7 +22,7 @@ afterEach(() => {
 });
 
 describe("error reporting wiring", () => {
-  it("без DSN цель — лог, а не молчание", async () => {
+  it("цель серверных ошибок — структурный лог", async () => {
     const { errorReportingTarget } = await import("./observability");
     expect(errorReportingTarget).toBe("log");
   });
@@ -76,33 +77,25 @@ describe("error reporting wiring", () => {
     });
   });
 
-  it("с DSN ошибка уходит и в Sentry, и в лог", async () => {
-    // SDK подменён: проверяется проводка, а не доставка до сервиса —
-    // сеть в тестах запрещена (CLAUDE.md).
-    const captureException = vi.fn();
-    const init = vi.fn();
-    vi.doMock("@sentry/node", () => ({ init, captureException }));
-    vi.resetModules();
-    process.env.SENTRY_DSN = "https://public@o0.ingest.example.com/1";
+  it("серверная часть не тянет SDK Sentry", async () => {
+    // Node-SDK Sentry ронял dev-сервер целиком: сборщик Next пытается
+    // забандлить инструментацию загрузки модулей и падает на резолве `path`.
+    // Тест держит границу: канал сервера — лог, браузерный SDK живёт отдельно.
+    //
+    // Проверяется импорт, а не вхождение строки: имя пакета есть в этом самом
+    // комментарии, и проверка на подстроку падала бы на собственном объяснении.
+    const sdk = "@sentry/" + "node";
+    const source = await readFile(new URL("./observability.ts", import.meta.url), "utf8");
+    const imports = [...source.matchAll(/(?:from|import\()\s*["']([^"']+)["']/g)].map(
+      (match) => match[1],
+    );
+    expect(imports).not.toContain(sdk);
 
-    try {
-      const { errorReporter, errorReportingTarget } = await import("./observability");
-      const { lines, restore } = captureStderr();
-
-      errorReporter.captureError(new Error("prod exception"), { scope: "web.request" });
-      restore();
-
-      expect(errorReportingTarget).toBe("sentry+log");
-      expect(init).toHaveBeenCalledOnce();
-      expect(captureException).toHaveBeenCalledOnce();
-      expect(captureException.mock.calls[0]?.[1]).toMatchObject({ tags: { scope: "web.request" } });
-      // Лог остаётся вторым каналом: локально ошибку всё равно видно.
-      expect(JSON.parse(lines[0]!)).toMatchObject({ message: "prod exception" });
-    } finally {
-      delete process.env.SENTRY_DSN;
-      vi.doUnmock("@sentry/node");
-      vi.resetModules();
-    }
+    const manifest = JSON.parse(
+      await readFile(new URL("../../package.json", import.meta.url), "utf8"),
+    ) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
+    expect(Object.keys(manifest.dependencies ?? {})).not.toContain(sdk);
+    expect(Object.keys(manifest.devDependencies ?? {})).not.toContain(sdk);
   });
 
   it("на брошенном не-Error транспорт не падает сам", async () => {
