@@ -16,6 +16,27 @@ const ENDPOINT = "https://api.openai.com/v1/responses";
 /** Модель по умолчанию — самая дешёвая из линейки: нам нужен не стиль, а факт. */
 export const DEFAULT_OPENAI_MODEL = "gpt-5.6-luna";
 
+export type ReasoningEffort = "none" | "low" | "medium" | "high" | "xhigh" | "max";
+
+/**
+ * Уровень рассуждений задаётся явно, а не оставляется на умолчание провайдера.
+ *
+ * Причина не в деньгах, а в сравнимости: умолчание однажды сдвинется, ответы
+ * станут устроены иначе, и мы увидим «изменение видимости» у клиента, у
+ * которого ничего не менялось (инвариант 6).
+ *
+ * Замер 2026-08-12 на одном промпте, по одному вызову на уровень:
+ *   none   — 1 поиск, 2 цитаты, $0.0133
+ *   low    — 1 поиск, 1 цитата, $0.0132
+ *   medium — 2 поиска, 5 цитат, $0.0242
+ *   high   — 3 поиска, 7 цитат, $0.0377
+ * Уровень управляет числом обращений к поиску, а значит и стоимостью, и тем,
+ * сколько источников вообще попадёт в диагностику. На `low` источников почти
+ * нет — граф источников, ради которого продукт и существует, остаётся пустым.
+ * Поэтому `medium`: вдвое дешевле `high` и не лишает диагностику данных.
+ */
+export const DEFAULT_REASONING_EFFORT: ReasoningEffort = "medium";
+
 /**
  * Прайс на 1M токенов и на 1000 вызовов поиска.
  *
@@ -135,6 +156,7 @@ export function extractCitations(payload: ResponsePayload): Citation[] {
 export interface OpenAiAdapterConfig {
   apiKey: string;
   model?: string;
+  reasoningEffort?: ReasoningEffort;
   pricing?: OpenAiPricing;
   /** Подменяется в тестах: сеть в них не используется никогда. */
   fetchImpl?: typeof fetch;
@@ -154,6 +176,7 @@ export class OpenAiAdapter implements PlatformAdapter {
   readonly platform = "chatgpt" as const;
 
   private readonly model: string;
+  private readonly reasoningEffort: ReasoningEffort;
   private readonly pricing: OpenAiPricing;
   private readonly fetchImpl: typeof fetch;
   private readonly maxAttempts: number;
@@ -166,6 +189,7 @@ export class OpenAiAdapter implements PlatformAdapter {
     }
 
     this.model = config.model ?? DEFAULT_OPENAI_MODEL;
+    this.reasoningEffort = config.reasoningEffort ?? DEFAULT_REASONING_EFFORT;
     const pricing = config.pricing ?? OPENAI_PRICING[this.model];
     if (!pricing) {
       throw new Error(
@@ -197,8 +221,10 @@ export class OpenAiAdapter implements PlatformAdapter {
       citations: extractCitations(payload),
       // Версия берётся из ответа, а не из конфига: провайдер вправе увести
       // алиас на другую сборку, и сравнивать измерения между собой можно
-      // только зная, чем они получены (инвариант 6).
-      modelVersion: payload.model ?? this.model,
+      // только зная, чем они получены (инвариант 6). Уровень рассуждений
+      // входит в стемп по той же причине: он меняет и число источников,
+      // и состав ответа, то есть ровно то, что мы измеряем.
+      modelVersion: `${payload.model ?? this.model} (reasoning: ${this.reasoningEffort})`,
       costUsd: openAiCostUsd(usage, searchCalls, this.pricing),
       latencyMs: Date.now() - startedAt,
     });
@@ -209,6 +235,7 @@ export class OpenAiAdapter implements PlatformAdapter {
       model: this.model,
       tools: [{ type: "web_search" }],
       input: prompt,
+      reasoning: { effort: this.reasoningEffort },
       ...(opts?.lang || opts?.geo
         ? {
             instructions: [

@@ -166,12 +166,39 @@ describe("OpenAiAdapter", () => {
     expect(result.latencyMs).toBeGreaterThanOrEqual(0);
   });
 
-  it("версия модели берётся из ответа, а не из конфига", async () => {
+  it("версия модели берётся из ответа и несёт уровень рассуждений", async () => {
     const fetchImpl = fetchReturning(apiResponse());
     const result = await adapter(fetchImpl as unknown as typeof fetch).execute("prompt");
 
-    // Алиас «gpt-5.6-luna» провайдер вправе увести на другую сборку.
-    expect(result.modelVersion).toBe("gpt-5.6-luna-2026-07-01");
+    // Алиас «gpt-5.6-luna» провайдер вправе увести на другую сборку, а уровень
+    // рассуждений меняет число источников — измерения сравнимы только внутри
+    // одной пары «сборка + уровень».
+    expect(result.modelVersion).toBe("gpt-5.6-luna-2026-07-01 (reasoning: medium)");
+  });
+
+  it("уровень рассуждений задаётся явно, а не оставляется провайдеру", async () => {
+    const fetchImpl = fetchReturning(apiResponse());
+    await adapter(fetchImpl as unknown as typeof fetch).execute("prompt");
+
+    const body = JSON.parse((fetchImpl.mock.calls[0]?.[1] as RequestInit).body as string) as {
+      reasoning: { effort: string };
+    };
+
+    expect(body.reasoning).toEqual({ effort: "medium" });
+  });
+
+  it("выбранный уровень доезжает и до запроса, и до стемпа", async () => {
+    const fetchImpl = fetchReturning(apiResponse());
+    const result = await adapter(fetchImpl as unknown as typeof fetch, {
+      reasoningEffort: "low",
+    }).execute("prompt");
+
+    const body = JSON.parse((fetchImpl.mock.calls[0]?.[1] as RequestInit).body as string) as {
+      reasoning: { effort: string };
+    };
+
+    expect(body.reasoning.effort).toBe("low");
+    expect(result.modelVersion).toContain("(reasoning: low)");
   });
 
   it("веб-поиск включён в запросе — без него измерять нечего", async () => {

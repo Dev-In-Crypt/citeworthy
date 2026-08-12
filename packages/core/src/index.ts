@@ -10,11 +10,12 @@ export * from "./adapters/types";
 export { MockAdapter, stableHash } from "./adapters/mock";
 export {
   DEFAULT_OPENAI_MODEL,
+  DEFAULT_REASONING_EFFORT,
   OpenAiAdapter,
   OPENAI_PRICING,
   openAiCostUsd,
 } from "./adapters/openai";
-export type { OpenAiAdapterConfig, OpenAiPricing } from "./adapters/openai";
+export type { OpenAiAdapterConfig, OpenAiPricing, ReasoningEffort } from "./adapters/openai";
 export { registerLiveAdapters } from "./adapters/live";
 export {
   getAdapter,

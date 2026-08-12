@@ -1,5 +1,6 @@
 import { registerLiveAdapter } from "./registry";
 import { OpenAiAdapter } from "./openai";
+import type { ReasoningEffort } from "./openai";
 
 /**
  * Подключение живых адаптеров.
@@ -15,9 +16,15 @@ export function registerLiveAdapters(env: NodeJS.ProcessEnv = process.env): stri
   const openAiKey = env["OPENAI_API_KEY"]?.trim();
   if (openAiKey) {
     const model = env["OPENAI_MODEL"]?.trim();
+    const effort = env["OPENAI_REASONING_EFFORT"]?.trim() as ReasoningEffort | undefined;
     registerLiveAdapter(
       "chatgpt",
-      () => new OpenAiAdapter({ apiKey: openAiKey, ...(model ? { model } : {}) }),
+      () =>
+        new OpenAiAdapter({
+          apiKey: openAiKey,
+          ...(model ? { model } : {}),
+          ...(effort ? { reasoningEffort: effort } : {}),
+        }),
     );
     registered.push("chatgpt");
   }
