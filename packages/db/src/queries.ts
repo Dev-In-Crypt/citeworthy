@@ -8,6 +8,8 @@ import { citationSources, sourcePresence, sources } from "./schema/sources";
 import { actions } from "./schema/actions";
 import { activityLog } from "./schema/activity";
 import { experimentEvents, experiments } from "./schema/experiments";
+import { reportShares, reports } from "./schema/reports";
+import type { NewReport, Report, ReportShare } from "./schema/reports";
 import type { Experiment, ExperimentEvent, NewExperiment, NewExperimentEvent } from "./schema/experiments";
 import type { ActivityEntry, NewActivityEntry } from "./schema/activity";
 import type { Action, NewAction } from "./schema/actions";
@@ -726,6 +728,163 @@ export async function hasExperimentEvent(
     .where(and(eq(experimentEvents.experimentId, experimentId), eq(experimentEvents.type, type)))
     .limit(1);
   return rows.length > 0;
+}
+
+export async function createReport(db: Database, values: NewReport): Promise<Report> {
+  const rows = await db.insert(reports).values(values).returning();
+  const created = rows[0];
+  if (!created) {
+    throw new Error("Failed to create report");
+  }
+  return created;
+}
+
+export async function getReportById(db: Database, reportId: string): Promise<Report | undefined> {
+  const rows = await db.select().from(reports).where(eq(reports.id, reportId)).limit(1);
+  return rows[0];
+}
+
+export async function listReports(db: Database, clientId: string): Promise<Report[]> {
+  return db
+    .select()
+    .from(reports)
+    .where(eq(reports.clientId, clientId))
+    .orderBy(desc(reports.createdAt));
+}
+
+export async function setReportStatus(
+  db: Database,
+  reportId: string,
+  status: Report["status"],
+): Promise<void> {
+  await db.update(reports).set({ status }).where(eq(reports.id, reportId));
+}
+
+export async function setReportPdfKey(
+  db: Database,
+  reportId: string,
+  pdfStorageKey: string,
+): Promise<void> {
+  await db.update(reports).set({ pdfStorageKey }).where(eq(reports.id, reportId));
+}
+
+export async function createReportShare(
+  db: Database,
+  values: { reportId: string; token: string; expiresAt?: Date | null },
+): Promise<ReportShare> {
+  const rows = await db
+    .insert(reportShares)
+    .values({ reportId: values.reportId, token: values.token, expiresAt: values.expiresAt ?? null })
+    .returning();
+  const created = rows[0];
+  if (!created) {
+    throw new Error("Failed to create report share");
+  }
+  return created;
+}
+
+export async function getShareByToken(
+  db: Database,
+  token: string,
+): Promise<ReportShare | undefined> {
+  const rows = await db.select().from(reportShares).where(eq(reportShares.token, token)).limit(1);
+  return rows[0];
+}
+
+export async function getShareForReport(
+  db: Database,
+  reportId: string,
+): Promise<ReportShare | undefined> {
+  const rows = await db
+    .select()
+    .from(reportShares)
+    .where(eq(reportShares.reportId, reportId))
+    .limit(1);
+  return rows[0];
+}
+
+export async function approveShare(
+  db: Database,
+  token: string,
+  approvedByName: string,
+): Promise<void> {
+  await db
+    .update(reportShares)
+    .set({ approvedAt: new Date(), approvedByName })
+    .where(eq(reportShares.token, token));
+}
+
+/** Действия, завершённые в периоде — материал для раздела «что сделано». */
+export async function listActionsCompletedBetween(
+  db: Database,
+  clientId: string,
+  from: Date,
+  to: Date,
+): Promise<Action[]> {
+  return db
+    .select()
+    .from(actions)
+    .where(
+      and(
+        eq(actions.clientId, clientId),
+        eq(actions.status, "done"),
+        isNotNull(actions.completedAt),
+        gte(actions.completedAt, from),
+        lte(actions.completedAt, to),
+      ),
+    );
+}
+
+/** Домены, впервые процитированные в периоде: «новые источники» в отчёте. */
+export async function countNewCitedDomains(
+  db: Database,
+  clientId: string,
+  from: Date,
+  to: Date,
+): Promise<number> {
+  const rows = await db
+    .select({ domain: citations.domain, observedAt: responses.createdAt })
+    .from(citations)
+    .innerJoin(responses, eq(citations.responseId, responses.id))
+    .innerJoin(runs, eq(responses.runId, runs.id))
+    .where(eq(runs.clientId, clientId));
+
+  const before = new Set<string>();
+  const during = new Set<string>();
+
+  for (const row of rows) {
+    if (row.observedAt < from) {
+      before.add(row.domain);
+    } else if (row.observedAt <= to) {
+      during.add(row.domain);
+    }
+  }
+
+  return [...during].filter((domain) => !before.has(domain)).length;
+}
+
+/** Упоминания клиента в периоде — «новые упоминания бренда» в отчёте. */
+export async function countClientMentionsBetween(
+  db: Database,
+  clientId: string,
+  from: Date,
+  to: Date,
+): Promise<number> {
+  const rows = await db
+    .select({ id: mentions.id })
+    .from(mentions)
+    .innerJoin(responses, eq(mentions.responseId, responses.id))
+    .innerJoin(runs, eq(responses.runId, runs.id))
+    .where(
+      and(
+        eq(runs.clientId, clientId),
+        eq(mentions.isClient, true),
+        gte(responses.createdAt, from),
+        lte(responses.createdAt, to),
+      ),
+    );
+
+  return rows.length;
 }
 
 export async function createExperiment(
