@@ -13,6 +13,13 @@ import { ApproveForm } from "./approve-form";
 export const metadata: Metadata = {
   // Заголовок вкладки тоже без брендинга продукта (инвариант 3).
   title: "AI Search report",
+  /**
+   * Описание задаётся явно, чтобы не унаследовать маркетинговую строку из
+   * корневого layout: она попадает в исходник страницы, которую агентство
+   * отправляет своему клиенту, и это ровно тот брендинг, которого тут быть
+   * не должно.
+   */
+  description: "Client report on visibility in AI answers.",
   robots: { index: false, follow: false },
 };
 
