@@ -2,6 +2,7 @@ import { registerLiveAdapter } from "./registry";
 import { OpenAiAdapter } from "./openai";
 import type { ReasoningEffort } from "./openai";
 import { PerplexityAdapter } from "./perplexity";
+import { GeminiAdapter } from "./gemini";
 
 /**
  * Подключение живых адаптеров.
@@ -46,7 +47,21 @@ export function registerLiveAdapters(env: NodeJS.ProcessEnv = process.env): stri
     registered.push("perplexity");
   }
 
-  // gemini подключится здесь же — T15.
+  const geminiKey = env["GEMINI_API_KEY"]?.trim();
+  if (geminiKey) {
+    const model = env["GEMINI_MODEL"]?.trim();
+    const endpoint = env["GEMINI_ENDPOINT"]?.trim();
+    registerLiveAdapter(
+      "gemini",
+      () =>
+        new GeminiAdapter({
+          apiKey: geminiKey,
+          ...(model ? { model } : {}),
+          ...(endpoint ? { endpoint } : {}),
+        }),
+    );
+    registered.push("gemini");
+  }
 
   return registered;
 }

@@ -24,6 +24,14 @@ export {
   perplexityCostUsd,
 } from "./adapters/perplexity";
 export type { PerplexityAdapterConfig, PerplexityPricing } from "./adapters/perplexity";
+export {
+  DEFAULT_GEMINI_ENDPOINT,
+  DEFAULT_GEMINI_MODEL,
+  GeminiAdapter,
+  GEMINI_PRICING,
+  geminiCostUsd,
+} from "./adapters/gemini";
+export type { GeminiAdapterConfig, GeminiPricing } from "./adapters/gemini";
 export { registerLiveAdapters } from "./adapters/live";
 export {
   getAdapter,
