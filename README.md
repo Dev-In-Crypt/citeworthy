@@ -53,10 +53,15 @@ pnpm lint && pnpm typecheck
 pnpm db:migrate | db:seed | db:studio
 ```
 
-## Documentation
+## Conventions worth knowing
 
-- [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) — architecture, schema, screens, design system
-- [TASKS.md](TASKS.md) — the task queue with verify criteria and a log of what was decided and why
-- [CLAUDE.md](CLAUDE.md) — invariants that must not be broken
+- Every data query goes through `protectedProcedure` + `assertTenant`. A resource belonging to
+  another agency returns NOT_FOUND, never FORBIDDEN — the API must not confirm that it exists.
+- Visibility is only ever computed from aggregates: at least three samples per prompt per platform,
+  weekly windows. Raw responses are always kept, so a parser change can be replayed.
+- Wording that claims proven causation is banned in the UI and in reports; approved phrasings live
+  in `packages/core/src/copy.ts` and a test greps for violations.
+- Reports and PDFs carry the agency's brand only. A test asserts the product leaves no trace there.
+- Nothing is ever published to an external system on the client's behalf.
 
-The product spec lives outside this repository.
+Planning documents and the product spec are kept outside this repository.

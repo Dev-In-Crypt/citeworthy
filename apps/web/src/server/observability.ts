@@ -1,9 +1,6 @@
-import * as Sentry from "@sentry/node";
 import {
-  combineErrorReporters,
   createLogger,
   createLoggingErrorReporter,
-  describeError,
   type ErrorReporter,
   type Logger,
 } from "@repo/core";
@@ -11,12 +8,19 @@ import {
 /**
  * Логи и ошибки серверной части web.
  *
- * Инициализация ленивая: модуль подключается из instrumentation.ts, который
- * Next выполняет один раз на процесс, но тот же модуль импортируют роуты.
- * Второй `Sentry.init` был бы тихой заменой клиента, поэтому его нет.
+ * Здесь намеренно нет SDK Sentry. `@sentry/node` инструментирует загрузку
+ * модулей через import-in-the-middle; сборщик Next пытается его забандлить и
+ * падает на резолве встроенного `path`, а `serverExternalPackages` не
+ * распространяется на слой instrumentation — динамический импорт не спасает.
+ * Прод-сборка это переживала, dev-сервер отдавал 500 на каждой странице.
+ *
+ * Серверные ошибки уходят структурной строкой в stderr: в проде это тот же
+ * канал, который собирает хостинг. Ошибки браузера идут в Sentry через
+ * `@sentry/browser` (см. components/client-error-reporting.tsx) — там сборка
+ * ему не мешает. Полноценный серверный канал вернётся через `@sentry/nextjs`,
+ * который для этого и существует.
  */
 
-const DSN = process.env.SENTRY_DSN?.trim() || undefined;
 const ENVIRONMENT = process.env.NODE_ENV ?? "development";
 
 export const logger: Logger = createLogger({
@@ -28,30 +32,6 @@ export const logger: Logger = createLogger({
   minLevel: ENVIRONMENT === "production" ? "info" : "debug",
 });
 
-let initialised = false;
+export const errorReporter: ErrorReporter = createLoggingErrorReporter(logger);
 
-function sentryReporter(dsn: string): ErrorReporter {
-  if (!initialised) {
-    Sentry.init({ dsn, environment: ENVIRONMENT, tracesSampleRate: 0 });
-    initialised = true;
-  }
-
-  return {
-    captureError(error, context) {
-      Sentry.captureException(
-        error instanceof Error ? error : new Error(describeError(error).message),
-        { tags: { scope: context.scope }, extra: { ...context } },
-      );
-    },
-  };
-}
-
-/**
- * Ошибка всегда попадает в лог; Sentry добавляется, если задан DSN.
- * Без DSN приложение работает — это dev-режим, а не сломанная конфигурация.
- */
-export const errorReporter: ErrorReporter = DSN
-  ? combineErrorReporters(sentryReporter(DSN), createLoggingErrorReporter(logger))
-  : createLoggingErrorReporter(logger);
-
-export const errorReportingTarget = DSN ? "sentry+log" : "log";
+export const errorReportingTarget = "log";
