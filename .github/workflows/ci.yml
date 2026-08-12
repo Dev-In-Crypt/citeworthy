@@ -49,9 +49,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Версия pnpm берётся из "packageManager" в package.json. Указывать её
+      # ещё и здесь нельзя: action падает на двух источниках правды, и они
+      # разъедутся при первом же обновлении pnpm.
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - uses: actions/setup-node@v4
         with:
@@ -97,9 +98,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Версия pnpm берётся из "packageManager" в package.json. Указывать её
+      # ещё и здесь нельзя: action падает на двух источниках правды, и они
+      # разъедутся при первом же обновлении pnpm.
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - uses: actions/setup-node@v4
         with:
