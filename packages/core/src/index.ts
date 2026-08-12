@@ -9,6 +9,14 @@ export const CORE_PACKAGE_NAME = "@repo/core";
 export * from "./adapters/types";
 export { MockAdapter, stableHash } from "./adapters/mock";
 export {
+  DEFAULT_OPENAI_MODEL,
+  OpenAiAdapter,
+  OPENAI_PRICING,
+  openAiCostUsd,
+} from "./adapters/openai";
+export type { OpenAiAdapterConfig, OpenAiPricing } from "./adapters/openai";
+export { registerLiveAdapters } from "./adapters/live";
+export {
   getAdapter,
   getAdapters,
   isPlatform,

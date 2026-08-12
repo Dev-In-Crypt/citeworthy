@@ -1,6 +1,6 @@
 import { Queue, Worker } from "bullmq";
 import { createDb } from "@repo/db";
-import { PLATFORMS, parseAdaptersMode } from "@repo/core";
+import { PLATFORMS, parseAdaptersMode, registerLiveAdapters } from "@repo/core";
 import { ADAPTERS_MODE_RAW } from "./env";
 import {
   createConnection,
@@ -19,6 +19,11 @@ const TICK_EVERY_MS = 5 * 60 * 1000;
 
 async function main(): Promise<void> {
   const mode = parseAdaptersMode(ADAPTERS_MODE_RAW);
+
+  if (mode === "live") {
+    const platforms = registerLiveAdapters();
+    logger.info("adapters.live_registered", { platforms });
+  }
   const connection = createConnection();
   const { db, close: closeDb } = createDb();
   const queues = createQueues(connection);
