@@ -39,6 +39,41 @@ export const reportPayloadSchema = z.object({
     })
     .nullable(),
   nextSprint: z.array(z.string().min(1)),
+  /**
+   * Раздел бесплатного аудита. Есть только в отчёте по проспекту: у платящего
+   * клиента отчёт показывает сделанное, а не предложение.
+   */
+  opportunity: z
+    .object({
+      currentVisibilityPct: z.number().min(0).max(100),
+      competitorAverageVisibilityPct: z.number().min(0).max(100),
+      /** Отрицательное значение = клиент отстаёт от средней по конкурентам. */
+      gapPp: z.number(),
+      rankedActions: z
+        .array(
+          z.object({
+            title: z.string().min(1),
+            /** Инвариант 7: рекомендация без причины не собирается. */
+            reason: z.string().min(1),
+            estimatedImpact: z.enum(["low", "medium", "high"]),
+            effort: z.enum(["low", "medium", "high"]),
+          }),
+        )
+        .max(20),
+      scopeDays: z.number().int().positive(),
+      suggestedRetainerUsd: z.number().int().positive(),
+      estimatedEffortHours: z.object({
+        min: z.number().positive(),
+        max: z.number().positive(),
+      }),
+      /** Диапазон, а не точка: маржа зависит от часов, которые ещё не потрачены. */
+      estimatedMarginPct: z.object({
+        min: z.number(),
+        max: z.number(),
+      }),
+    })
+    .nullable()
+    .default(null),
   /** Оговорки, которые обязаны дойти до клиента вместе с цифрами. */
   caveats: z.array(z.string().min(1)),
 });

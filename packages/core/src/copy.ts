@@ -52,6 +52,12 @@ export const REPORT_COPY = {
   /** Ставится при коротком периоде наблюдения. */
   shortPeriod:
     "Models typically take weeks to re-crawl and shift citations, so a short period shows early signal rather than settled results.",
+  /** Идёт в каждый аудит: снимок «как сейчас», а не прогноз. */
+  opportunityBasis:
+    "This audit is a single measurement of how assistants answer today. The ranked work is what the current sources suggest, with expected effort — not a forecast of results.",
+  /** Оговорка к предложенному объёму работ и деньгам. */
+  scopeEstimate:
+    "Retainer and effort are the agency's own estimates for the scope below, shown so the numbers behind the proposal are visible.",
 } as const;
 
 export const EXPERIMENT_COPY = {

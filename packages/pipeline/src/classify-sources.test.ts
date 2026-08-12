@@ -85,11 +85,16 @@ describe("classifyRunSources", () => {
     expect(g2?.classifiedBy).toBe("rule");
   });
 
-  it("домен клиента становится owned", async () => {
+  it("домен клиента не записывается owned в общую таблицу", async () => {
     await classifyRunSources(db, runId);
 
+    // Владение — свойство пары (клиент, домен), а `sources` общая на все
+    // агентства: запись «owned» сделала бы этот домен собственным и для
+    // чужого клиента, который его процитировал. Признак ставится при чтении
+    // (см. listCitationFacts и owned-domain.test.ts).
     const own = await getSourceByDomain(db, "acmecrm.test");
-    expect(own?.sourceType).toBe("owned");
+    expect(own).toBeDefined();
+    expect(own?.sourceType).not.toBe("owned");
   });
 
   it("домен вне словаря классифицируется моделью", async () => {

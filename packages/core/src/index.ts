@@ -38,5 +38,6 @@ export * from "./experiments/events";
 export * from "./experiments/math";
 export * from "./reports/schema";
 export * from "./reports/build";
+export * from "./reports/opportunity";
 export * from "./observability/logger";
 export * from "./observability/errors";

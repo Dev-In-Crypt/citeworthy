@@ -30,6 +30,8 @@ export interface ReportInputs {
   nextSprint: string[];
   /** Слабые места, которые нельзя прятать от клиента. */
   caveats: string[];
+  /** Раздел бесплатного аудита; у платящего клиента его нет. */
+  opportunity?: NonNullable<ReportPayload["opportunity"]> | null;
 }
 
 function round1(value: number): number {
@@ -106,6 +108,7 @@ export function buildReportPayload(inputs: ReportInputs): ReportPayload {
     },
     highestImpactAction: null,
     nextSprint: inputs.nextSprint,
+    opportunity: inputs.opportunity ?? null,
     // Пояснение о природе измерения идёт в каждом отчёте, а не по желанию.
     caveats: [REPORT_COPY.measurementBasis, ...inputs.caveats],
   };
