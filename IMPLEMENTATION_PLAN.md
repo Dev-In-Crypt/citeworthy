@@ -1,8 +1,8 @@
 # Citeworthy — Implementation Plan
 
-> План имплементации MVP на основе [startup-spec.md](docs/startup-spec.md), [AI Search Delivery OS for Agencies.md](docs/AI%20Search%20Delivery%20OS%20for%20Agencies.md) и [ai-visibility-project.md](docs/ai-visibility-project.md).
+> План имплементации MVP на основе продуктовых спеков в `docs/` (лежат локально, в публичный репозиторий не входят).
 >
-> Цель MVP: проверить, платят ли агентства за **delivery + proof**, а не только за monitoring. Строим end-to-end skeleton минимальной глубины, а не полированный measurement-слой.
+> Цель MVP: проверить, платят ли агентства за **delivery + evidence**, а не только за monitoring. Строим end-to-end skeleton минимальной глубины, а не полированный measurement-слой.
 
 ---
 
