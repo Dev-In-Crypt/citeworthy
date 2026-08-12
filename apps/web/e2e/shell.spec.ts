@@ -5,7 +5,7 @@ import { expect, test, type ConsoleMessage } from "@playwright/test";
  * в консоли нет ошибок. Регистрация в каждом прогоне даёт свежее агентство.
  */
 
-const ROUTES = ["/dashboard", "/clients", "/settings"] as const;
+const ROUTES = ["/dashboard", "/clients", "/settings", "/settings/usage"] as const;
 
 test("app shell renders every route without console errors", async ({ page }) => {
   const consoleErrors: string[] = [];

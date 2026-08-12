@@ -11,6 +11,7 @@ import {
 } from "./queues";
 import { tickSchedules } from "./scheduler";
 import { executeRunJob } from "@repo/pipeline";
+import { errorReporter, logger } from "./observability";
 
 const TICK_QUEUE = "scheduler-tick";
 const TICK_JOB = "find-due-schedules";
@@ -30,7 +31,10 @@ async function main(): Promise<void> {
     async () => {
       const started = await tickSchedules(db);
       if (started.length > 0) {
-        console.log(`[worker] scheduler tick started ${started.length} run(s)`);
+        logger.info("scheduler.tick", {
+          startedRuns: started.length,
+          runIds: started.map((result) => result.runId),
+        });
       }
       return { started: started.length };
     },
@@ -43,7 +47,16 @@ async function main(): Promise<void> {
       new Worker<RunJobData>(
         runsQueueName(platform),
         async (job) => {
+          const startedAt = Date.now();
           const responseId = await executeRunJob(db, job.data, mode);
+          logger.info("run.job_completed", {
+            platform,
+            runId: job.data.runId,
+            promptId: job.data.promptId,
+            sampleIndex: job.data.sampleIndex,
+            responseId,
+            durationMs: Date.now() - startedAt,
+          });
           return { responseId };
         },
         { connection, limiter: PLATFORM_RATE_LIMITS[platform], concurrency: 4 },
@@ -52,19 +65,29 @@ async function main(): Promise<void> {
 
   for (const worker of [tickWorker, ...runWorkers]) {
     worker.on("failed", (job, error) => {
-      console.error(`[worker] job ${job?.id ?? "?"} failed:`, error.message);
+      // Упавшая задача — единственное место, где теряются измерения:
+      // она должна доехать до Sentry, а не остаться строкой в консоли.
+      errorReporter.captureError(error, {
+        scope: "worker.job",
+        queue: worker.name,
+        jobId: job?.id,
+        attemptsMade: job?.attemptsMade,
+        data: job?.data,
+      });
     });
   }
 
-  console.log(
-    `[worker] started · adapters=${mode} · tick every ${TICK_EVERY_MS / 1000}s · run queues: ${PLATFORMS.join(", ")}`,
-  );
+  logger.info("worker.started", {
+    adapters: mode,
+    tickEverySec: TICK_EVERY_MS / 1000,
+    runQueues: PLATFORMS,
+  });
 
   let shuttingDown = false;
   async function shutdown(signal: string): Promise<void> {
     if (shuttingDown) return;
     shuttingDown = true;
-    console.log(`[worker] received ${signal}, shutting down`);
+    logger.info("worker.shutdown", { signal });
 
     await Promise.all([tickWorker.close(), ...runWorkers.map((w) => w.close())]);
     await Promise.all([
@@ -83,6 +106,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  console.error("[worker] fatal:", error);
+  errorReporter.captureError(error, { scope: "worker.startup" });
   process.exit(1);
 });
