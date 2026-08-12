@@ -33,9 +33,24 @@ export default function ClientOverviewPage({ params }: { params: Promise<{ id: s
         description={client.data.domain}
         action={
           <div className="flex gap-2">
+            {/* У проспекта аудит — первое действие, у платящего клиента его нет:
+                у него измерение идёт по расписанию. */}
+            {client.data.status === "prospect" && (
+              <Link
+                href={`/clients/${id}/audit`}
+                data-testid="audit-link"
+                className="h-10 rounded-md bg-primary px-4 text-sm font-medium leading-10 text-primary-foreground"
+              >
+                Run audit
+              </Link>
+            )}
             <Link
               href={`/clients/${id}/measure`}
-              className="h-10 rounded-md bg-primary px-4 text-sm font-medium leading-10 text-primary-foreground"
+              className={
+                client.data.status === "prospect"
+                  ? "h-10 rounded-md border border-input px-4 text-sm font-medium leading-10 hover:bg-accent"
+                  : "h-10 rounded-md bg-primary px-4 text-sm font-medium leading-10 text-primary-foreground"
+              }
             >
               Measure
             </Link>

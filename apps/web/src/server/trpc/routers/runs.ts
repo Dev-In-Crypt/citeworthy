@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { parseAdaptersMode } from "@repo/core";
-import { aggregateClient, orchestrateRun, parseRun } from "@repo/pipeline";
+import { completeRun } from "@repo/pipeline";
 import {
   createRun,
   getClientById,
@@ -12,6 +12,7 @@ import {
   listActivePromptsForClient,
   listResponsesForPrompt,
   listRecentRuns,
+  logActivity,
   upsertRunSchedule,
 } from "@repo/db";
 import { assertTenant, protectedProcedure, roleProcedure, router } from "../trpc";
@@ -120,14 +121,58 @@ export const runsRouter = router({
       if (mode === "mock") {
         // В mock-режиме прогон занимает миллисекунды, поэтому выполняется здесь же:
         // так ручной запуск работает без поднятого воркера.
-        await orchestrateRun(ctx.db, run.id, mode);
-        await parseRun(ctx.db, run.id);
-        await aggregateClient(ctx.db, input.clientId);
+        await completeRun(ctx.db, run.id, input.clientId, mode);
       }
       // В live-режиме прогон уходит воркеру: сотни вызовов к платформам
       // не помещаются в один HTTP-запрос. Постановка в очередь — T22 follow-up,
       // пока живые адаптеры не подключены (T13–T15).
 
       return { runId: run.id, executedInline: mode === "mock" };
+    }),
+
+  /**
+   * Разовый аудит: один прогон по всем платформам и вся цепочка до диагностики
+   * без ручных шагов.
+   *
+   * Расписание аудиту не назначается намеренно — прогон одноразовый, и
+   * без `scheduleId` оркестратор берёт полный набор платформ, а не срез,
+   * настроенный для платящего клиента.
+   */
+  startAudit: roleProcedure("member")
+    .input(z.object({ clientId: z.uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const client = await getClientById(ctx.db, input.clientId);
+      assertTenant(client, ctx.user.agencyId);
+
+      const prompts = await listActivePromptsForClient(ctx.db, input.clientId);
+      if (prompts.length === 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Generate or import prompts before running an audit.",
+        });
+      }
+
+      const run = await createRun(ctx.db, {
+        clientId: input.clientId,
+        scheduleId: null,
+        trigger: "manual",
+      });
+
+      const mode = parseAdaptersMode(process.env.ADAPTERS_MODE);
+      const outcome = mode === "mock"
+        ? await completeRun(ctx.db, run.id, input.clientId, mode)
+        : null;
+
+      if (outcome) {
+        await logActivity(ctx.db, {
+          agencyId: ctx.user.agencyId,
+          clientId: input.clientId,
+          actorUserId: ctx.user.id,
+          eventType: "run_finished",
+          payload: { runId: run.id, audit: true, responses: outcome.responses },
+        });
+      }
+
+      return { runId: run.id, executedInline: mode === "mock", outcome };
     }),
 });
