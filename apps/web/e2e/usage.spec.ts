@@ -40,16 +40,15 @@ test("usage page shows cost from the answers that were measured", async ({ page 
   await page.getByRole("button", { name: "Run now" }).click();
   await expect(page.getByTestId("run-status")).toContainText("done", { timeout: 30_000 });
 
-  // Число ответов на странице совпадает с сохранёнными ответами прогона.
   await page.getByRole("link", { name: "best CRM for startups" }).click();
   const answers = page.getByTestId("responses-list").locator("> li");
   await expect(answers).toHaveCount(9); // 3 платформы × 3 сэмпла
   const answerCount = await answers.count();
 
+  // Прогон шёл на фикстурах: денег он не стоил, и страница расходов не должна
+  // выдавать его за трату. Ответы посчитаны отдельной строкой, в счёт не идут.
   await page.goto("/settings/usage");
-  await expect(page.getByTestId("usage-responses")).toHaveText(String(answerCount));
-  await expect(page.getByTestId(`usage-client-${clientId}`)).toBeVisible();
-  await expect(page.getByTestId("usage-by-platform")).toContainText("AcmeCRM");
-  // Сумма показана деньгами, а не пустой строкой.
-  await expect(page.getByTestId("usage-total")).toHaveText(/^\$\d/);
+  await expect(page.getByTestId("usage-fixtures")).toContainText(String(answerCount));
+  await expect(page.getByText("No measurement cost in this period")).toBeVisible();
+  await expect(page.getByTestId("usage-total")).toHaveCount(0);
 });

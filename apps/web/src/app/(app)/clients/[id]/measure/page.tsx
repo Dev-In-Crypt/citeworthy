@@ -1,7 +1,6 @@
 "use client";
 
 import { use } from "react";
-import Link from "next/link";
 import { api } from "@/trpc/react";
 import { PageHeader } from "@/components/page-header";
 import { MeasureView } from "./measure-view";
@@ -22,14 +21,6 @@ export default function MeasurePage({ params }: { params: Promise<{ id: string }
           client.data
             ? `Buyer questions tracked for ${client.data.name}, grouped into clusters.`
             : "Buyer questions tracked for this client."
-        }
-        action={
-          <Link
-            href={`/clients/${id}`}
-            className="h-10 rounded-md border border-input px-4 text-sm font-medium leading-10 hover:bg-accent"
-          >
-            Client settings
-          </Link>
         }
       />
       <MeasureView clientId={id} />

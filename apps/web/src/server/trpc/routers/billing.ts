@@ -8,6 +8,7 @@ import {
 } from "@repo/core";
 import {
   countClientsByAgency,
+  countFixtureAnswers,
   getAgencyById,
   getUsageCounter,
   listCostsByClientAndPlatform,
@@ -53,7 +54,10 @@ export const billingRouter = router({
       const period = input?.period ?? billingPeriod();
       const { start, end } = billingPeriodBounds(period);
 
-      const rows = await listCostsByClientAndPlatform(ctx.db, ctx.user.agencyId, start, end);
+      const [rows, fixtureAnswers] = await Promise.all([
+        listCostsByClientAndPlatform(ctx.db, ctx.user.agencyId, start, end),
+        countFixtureAnswers(ctx.db, ctx.user.agencyId, start, end),
+      ]);
 
       const byClient = new Map<string, { clientId: string; clientName: string; costs: string[]; responses: number }>();
       for (const row of rows) {
@@ -81,6 +85,8 @@ export const billingRouter = router({
         })),
         totalCostUsd: sumCostUsd(rows.map((row) => row.costUsd)),
         totalResponses: rows.reduce((total, row) => total + row.responses, 0),
+        /** Ответы на фикстурах: в счёт не входят, но о них надо сказать. */
+        fixtureAnswers,
       };
     }),
 });

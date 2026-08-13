@@ -46,10 +46,20 @@ export function UsageView() {
         </select>
       </div>
 
+      {data && data.fixtureAnswers > 0 && (
+        <p data-testid="usage-fixtures" className="text-sm text-muted-foreground">
+          {/* Прогоны на фикстурах ничего не стоят: показывать их в счёте
+              значило бы называть расходом то, чего не было. */}
+          <span className="metric">{data.fixtureAnswers}</span> answers in this period came from
+          fixtures — no assistant was asked and nothing was charged, so they are not in the totals
+          below.
+        </p>
+      )}
+
       {data && data.rows.length === 0 ? (
         <EmptyState
           title="No measurement cost in this period"
-          description="Cost appears once checks have run. Every answer stores what it cost, so this page always matches the raw responses."
+          description="Cost appears once checks have run against the live assistants. Every answer stores what it cost, so this page always matches the raw responses."
         />
       ) : (
         <>

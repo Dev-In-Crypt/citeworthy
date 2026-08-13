@@ -52,6 +52,42 @@ test("create a client with brand aliases and competitors, then edit it", async (
   await expect(page.getByTestId("clients-list")).toContainText("AcmeCRM Renamed");
 });
 
+test("client screens are tabs: the current one is marked and the way back is there", async ({
+  page,
+}) => {
+  await signUpFreshAgency(page);
+
+  await page.goto("/clients/new");
+  await page.getByLabel("Client name").fill("Tabbed Co");
+  await page.getByLabel("Domain").fill("tabbed.test");
+  await page.getByRole("button", { name: "Create client" }).click();
+  await page.getByRole("link", { name: /Tabbed Co/ }).click();
+  await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}$/);
+
+  const tabs = page.getByTestId("client-tabs");
+  await expect(tabs.getByRole("link", { name: "Overview" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+
+  // Уход на другой экран клиента переносит подсветку, а не теряет вкладки.
+  await tabs.getByRole("link", { name: "Diagnose" }).click();
+  await expect(page).toHaveURL(/\/diagnose$/);
+  await expect(tabs.getByRole("link", { name: "Diagnose" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+  await expect(tabs.getByRole("link", { name: "Overview" })).not.toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+
+  // Имя клиента видно с любого экрана, и путь обратно к списку тоже.
+  await expect(page.getByRole("heading", { name: "Tabbed Co" })).toBeVisible();
+  await page.getByRole("link", { name: "All clients" }).click();
+  await expect(page).toHaveURL(/\/clients$/);
+});
+
 test("a client from another agency is not reachable", async ({ page, browser }) => {
   // Первое агентство создаёт клиента и запоминает его id.
   await signUpFreshAgency(page);

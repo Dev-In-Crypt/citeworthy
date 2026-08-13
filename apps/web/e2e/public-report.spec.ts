@@ -55,6 +55,9 @@ async function setUpAgencyWithReport(page: Page): Promise<{ clientId: string; to
     mimeType: "text/csv",
     buffer: Buffer.from(CSV, "utf8"),
   });
+  // Импорт асинхронный: без этого ожидания «Run now» иногда жмётся раньше,
+  // чем промпт доехал до списка, и прогон отказывается стартовать.
+  await expect(page.getByText(/Imported 1 prompts/)).toBeVisible();
   await page.getByRole("button", { name: "Run now" }).click();
   await expect(page.getByTestId("run-status")).toContainText("done", { timeout: 30_000 });
 
@@ -83,6 +86,13 @@ test("client report opens without login and carries only the agency brand", asyn
 
   // Брендинг агентства присутствует.
   await expect(anonPage.getByTestId("agency-name")).toHaveText("Northwind Studio");
+
+  // Выбранный цвет действительно закрашивает страницу, а не лежит в базе:
+  // #0ea5e9 — то, что агентство сохранило в настройках.
+  await expect(anonPage.getByTestId("brand-bar")).toHaveCSS(
+    "background-color",
+    "rgb(14, 165, 233)",
+  );
 
   // Главная проверка инварианта 3: ни следа продукта в разметке страницы.
   const html = await anonPage.content();

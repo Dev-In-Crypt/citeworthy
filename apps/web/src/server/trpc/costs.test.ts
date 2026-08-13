@@ -53,13 +53,19 @@ describe("billing.costs", () => {
     costUsd: string,
     createdAt: Date,
     sampleIndex = 0,
+    adaptersMode: "live" | "mock" = "live",
   ) {
     const cluster = await createPromptCluster(db, { clientId, name: `Cluster ${crypto.randomUUID()}` });
     const prompt = await createPrompt(db, {
       clusterId: cluster.id,
       text: "best CRM for startups",
     });
-    const run = await createRun(db, { clientId, status: "done", trigger: "manual" });
+    const run = await createRun(db, {
+      clientId,
+      status: "done",
+      trigger: "manual",
+      adaptersMode,
+    });
 
     return createResponse(db, {
       runId: run.id,
@@ -148,6 +154,19 @@ describe("billing.costs", () => {
 
     expect(result.totalCostUsd).toBe("0.001000");
     expect(result.clients.map((row) => row.clientName)).toEqual(["AcmeCRM"]);
+  });
+
+  it("прогоны на фикстурах в расход не идут, но их видно отдельно", async () => {
+    await addResponse(acmeId, "chatgpt", "0.004500", IN_PERIOD);
+    // Фикстурный ответ несёт цену модели, но никто её не платил: показать её
+    // в расходе значило бы назвать тратой то, чего не было.
+    await addResponse(acmeId, "chatgpt", "5.000000", IN_PERIOD, 1, "mock");
+
+    const result = await caller(agencyId).billing.costs({ period: PERIOD });
+
+    expect(result.totalCostUsd).toBe("0.004500");
+    expect(result.totalResponses).toBe(1);
+    expect(result.fixtureAnswers).toBe(1);
   });
 
   it("member до финансов агентства не допускается", async () => {

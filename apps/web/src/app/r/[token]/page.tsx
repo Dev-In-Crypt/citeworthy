@@ -61,7 +61,9 @@ export default async function PublicReportPage({
     const payload = reportPayloadSchema.parse(report.payload);
 
     return (
-      <main>
+      // Цвет агентства задан на всей странице, а не только внутри отчёта:
+      // кнопка approve живёт снаружи и тоже должна быть в его бренде.
+      <main style={{ ["--primary" as string]: agency.brandColor }}>
         <ReportView
           payload={payload}
           agency={{

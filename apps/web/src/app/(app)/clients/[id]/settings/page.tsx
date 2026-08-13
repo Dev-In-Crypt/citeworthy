@@ -48,8 +48,8 @@ export default function EditClientPage({ params }: { params: Promise<{ id: strin
   return (
     <>
       <PageHeader
-        title={client.data.name}
-        description={client.data.domain}
+        title="Settings"
+        description="Name, domain, brand names and competitors — everything measurement matches against."
         action={
           <button
             type="button"

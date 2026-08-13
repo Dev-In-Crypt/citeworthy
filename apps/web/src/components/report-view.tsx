@@ -45,10 +45,16 @@ export function ReportView({
 }) {
   return (
     // Цвет агентства подставляется в accent: на этой странице бренд — его.
+    // Переопределяется именно `--primary`: тема собрана как `@theme inline`,
+    // и утилиты подставляют этот токен напрямую, минуя `--color-primary`.
     <div
       className="mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-8 px-6 py-10"
-      style={{ ["--color-primary" as string]: agency.brandColor }}
+      style={{ ["--primary" as string]: agency.brandColor }}
     >
+      {/* Полоса цветом агентства: единственное, что на странице читается как
+          бренд, когда логотип ещё не загружен. */}
+      <div data-testid="brand-bar" className="h-1.5 w-full rounded-full bg-primary" />
+
       <header className="flex items-center justify-between gap-4 border-b pb-6">
         <div className="flex items-center gap-3">
           {agency.logoUrl ? (
@@ -61,7 +67,7 @@ export function ReportView({
               className="h-10 w-auto object-contain"
             />
           ) : (
-            <span data-testid="agency-name" className="text-lg font-semibold">
+            <span data-testid="agency-name" className="text-lg font-semibold text-primary">
               {agency.name}
             </span>
           )}
@@ -132,7 +138,7 @@ export function ReportView({
       </section>
 
       {payload.highestImpactAction && (
-        <section className="flex flex-col gap-2 rounded-lg border p-5">
+        <section className="flex flex-col gap-2 rounded-lg border border-l-4 border-l-primary p-5">
           <h2 className="text-lg font-medium">Highest-impact action</h2>
           <p className="font-medium">{payload.highestImpactAction.title}</p>
           <p className="metric text-sm text-muted-foreground">
@@ -183,7 +189,7 @@ export function ReportView({
             </ol>
           </div>
 
-          <div className="flex flex-col gap-1 rounded-lg border p-5 text-sm">
+          <div className="flex flex-col gap-1 rounded-lg border border-l-4 border-l-primary p-5 text-sm">
             <span className="text-muted-foreground">Proposed engagement</span>
             <span data-testid="opportunity-retainer" className="metric text-lg font-semibold">
               ${payload.opportunity.suggestedRetainerUsd.toLocaleString("en-US")} / month

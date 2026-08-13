@@ -469,6 +469,10 @@ export async function listCostsByClientAndPlatform(
     .where(
       and(
         eq(clients.agencyId, agencyId),
+        // Прогоны на фикстурах денег не стоят: их стоимость записана в
+        // ответах, но никто её не платил. Смешивать её с настоящим счётом —
+        // значит показывать агентству расход, которого не было.
+        eq(runs.adaptersMode, "live"),
         gte(responses.createdAt, from),
         lte(responses.createdAt, to),
       ),
@@ -483,6 +487,35 @@ export async function listCostsByClientAndPlatform(
     responses: Number(row.responses),
     costUsd: String(row.costUsd),
   }));
+}
+
+/**
+ * Сколько ответов за период получено на фикстурах.
+ *
+ * Их нет в счёте, но сказать о них надо: иначе агентство видит на странице
+ * измерения, которых «не было», и не понимает, почему числа не сходятся.
+ */
+export async function countFixtureAnswers(
+  db: Database,
+  agencyId: string,
+  from: Date,
+  to: Date,
+): Promise<number> {
+  const rows = await db
+    .select({ total: sql<string>`count(*)` })
+    .from(responses)
+    .innerJoin(runs, eq(runs.id, responses.runId))
+    .innerJoin(clients, eq(clients.id, runs.clientId))
+    .where(
+      and(
+        eq(clients.agencyId, agencyId),
+        eq(runs.adaptersMode, "mock"),
+        gte(responses.createdAt, from),
+        lte(responses.createdAt, to),
+      ),
+    );
+
+  return Number(rows[0]?.total ?? 0);
 }
 
 export async function getUsageCounter(
