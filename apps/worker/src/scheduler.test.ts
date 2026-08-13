@@ -25,6 +25,10 @@ describe("nextRunAfter", () => {
   it("daily сдвигает на сутки", () => {
     expect(nextRunAfter("daily", from).toISOString()).toBe("2026-08-12T10:00:00.000Z");
   });
+
+  it("biweekly сдвигает на две недели", () => {
+    expect(nextRunAfter("biweekly", from).toISOString()).toBe("2026-08-25T10:00:00.000Z");
+  });
 });
 
 describe("tickSchedules", () => {

@@ -6,6 +6,8 @@ import { api } from "@/trpc/react";
 const PLATFORMS = ["chatgpt", "perplexity", "gemini"] as const;
 type Platform = (typeof PLATFORMS)[number];
 
+type Cadence = "daily" | "weekly" | "biweekly";
+
 const PLATFORM_LABELS: Record<Platform, string> = {
   chatgpt: "ChatGPT",
   perplexity: "Perplexity",
@@ -35,7 +37,12 @@ export function SchedulePanel({ clientId }: { clientId: string }) {
     },
   );
 
-  const [cadence, setCadence] = useState<"daily" | "weekly">("weekly");
+  /**
+   * По умолчанию раз в две недели: ассистенты меняют ответы неделями, а
+   * заметный сдвиг занимает 60–90 дней. Недельная частота нужна там, где идёт
+   * эксперимент и важно точнее знать дату сдвига, — и стоит вдвое дороже.
+   */
+  const [cadence, setCadence] = useState<Cadence>("biweekly");
   const [platforms, setPlatforms] = useState<Platform[]>(["chatgpt", "perplexity", "gemini"]);
   const [samples, setSamples] = useState(3);
   const [error, setError] = useState<string | null>(null);
@@ -79,9 +86,10 @@ export function SchedulePanel({ clientId }: { clientId: string }) {
           <span className="text-sm font-medium">Cadence</span>
           <select
             value={cadence}
-            onChange={(e) => setCadence(e.target.value as "daily" | "weekly")}
+            onChange={(e) => setCadence(e.target.value as Cadence)}
             className={inputClass}
           >
+            <option value="biweekly">Every two weeks</option>
             <option value="weekly">Weekly</option>
             <option value="daily">Daily</option>
           </select>

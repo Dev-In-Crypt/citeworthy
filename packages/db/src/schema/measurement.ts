@@ -23,7 +23,15 @@ export const promptIntentEnum = pgEnum("prompt_intent", [
 ]);
 
 export const platformEnum = pgEnum("platform", ["chatgpt", "perplexity", "gemini"]);
-export const cadenceEnum = pgEnum("cadence", ["daily", "weekly"]);
+/**
+ * Частота прогонов.
+ *
+ * По умолчанию раз в две недели: ассистенты переобходят сайты неделями, а
+ * заметный сдвиг занимает 60–90 дней — измерять чаще, чем меняется предмет
+ * измерения, значит платить вдвое за ту же кривую. Недельная частота нужна
+ * там, где идёт эксперимент и важно знать дату сдвига точнее.
+ */
+export const cadenceEnum = pgEnum("cadence", ["daily", "weekly", "biweekly"]);
 export const runStatusEnum = pgEnum("run_status", ["pending", "running", "done", "failed"]);
 export const runTriggerEnum = pgEnum("run_trigger", ["scheduled", "manual"]);
 export const sentimentEnum = pgEnum("sentiment", ["positive", "neutral", "negative"]);
@@ -68,7 +76,7 @@ export const runSchedules = pgTable(
     clientId: uuid("client_id")
       .notNull()
       .references(() => clients.id, { onDelete: "cascade" }),
-    cadence: cadenceEnum("cadence").notNull().default("weekly"),
+    cadence: cadenceEnum("cadence").notNull().default("biweekly"),
     platforms: platformEnum("platforms").array().notNull().default(["chatgpt"]),
     /**
      * Повторные прогоны одного промпта: ответы моделей стохастичны,

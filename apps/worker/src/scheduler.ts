@@ -1,10 +1,13 @@
 import { createRun, listDueSchedules, setScheduleNextRun } from "@repo/db";
 import type { Database } from "@repo/db";
 
+export type Cadence = "daily" | "weekly" | "biweekly";
+
+const CADENCE_DAYS: Record<Cadence, number> = { daily: 1, weekly: 7, biweekly: 14 };
+
 /** Чистый расчёт следующего запуска — тестируется без БД. */
-export function nextRunAfter(cadence: "daily" | "weekly", from: Date): Date {
-  const days = cadence === "daily" ? 1 : 7;
-  return new Date(from.getTime() + days * 24 * 60 * 60 * 1000);
+export function nextRunAfter(cadence: Cadence, from: Date): Date {
+  return new Date(from.getTime() + CADENCE_DAYS[cadence] * 24 * 60 * 60 * 1000);
 }
 
 export interface TickResult {

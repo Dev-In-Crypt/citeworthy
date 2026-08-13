@@ -34,7 +34,7 @@ export const runsRouter = router({
     .input(
       z.object({
         clientId: z.uuid(),
-        cadence: z.enum(["daily", "weekly"]),
+        cadence: z.enum(["daily", "weekly", "biweekly"]),
         platforms: z.array(platformEnum).min(1),
         samplesPerPrompt: z.number().int().min(1).max(10),
         active: z.boolean().default(true),
