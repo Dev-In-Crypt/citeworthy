@@ -1,5 +1,8 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
+// Побочный импорт: он же загружает корневой .env — dotenv лежит в @repo/db.
+import "../../packages/db/src/env";
+import { testDatabaseUrl } from "../../packages/db/src/test-database";
 
 export default defineConfig({
   resolve: {
@@ -19,5 +22,10 @@ export default defineConfig({
      * в коде, хотя проблема в изоляции тестов (та же причина, что в @repo/pipeline).
      */
     fileParallelism: false,
+    // База отдельная от рабочей: тесты стирают глобальные таблицы.
+    globalSetup: ["./vitest.global-setup.ts"],
+    env: {
+      DATABASE_URL: testDatabaseUrl(process.env["DATABASE_URL"] ?? ""),
+    },
   },
 });
