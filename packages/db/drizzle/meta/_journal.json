@@ -78,13 +78,6 @@
       "when": 1786619156134,
       "tag": "0010_windy_mandarin",
       "breakpoints": true
-    },
-    {
-      "idx": 11,
-      "version": "7",
-      "when": 1786619157134,
-      "tag": "0011_biweekly_default",
-      "breakpoints": true
     }
   ]
 }
