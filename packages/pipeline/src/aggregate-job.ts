@@ -1,6 +1,10 @@
 import { computeVisibilitySnapshots } from "@repo/core";
 import type { Platform, ResponseRecord } from "@repo/core";
-import { listResponseFactsForClient, upsertVisibilitySnapshot } from "@repo/db";
+import {
+  deleteSnapshotsNotIn,
+  listResponseFactsForClient,
+  upsertVisibilitySnapshot,
+} from "@repo/db";
 import type { Database } from "@repo/db";
 import { detectExperimentEvents } from "./experiment-events";
 
@@ -53,6 +57,18 @@ export async function aggregateClient(db: Database, clientId: string): Promise<n
       sufficient: snapshot.sufficient,
     });
   }
+
+  // Ячейки, которых в пересчёте больше нет, удаляются: иначе срез по платформе,
+  // которую перестали учитывать, продолжит утверждать, что её измеряли.
+  await deleteSnapshotsNotIn(
+    db,
+    clientId,
+    snapshots.map((snapshot) => ({
+      clusterId: snapshot.clusterId,
+      platform: snapshot.platform,
+      periodStart: snapshot.periodStart,
+    })),
+  );
 
   // Свежие срезы посчитаны — можно дописать события на таймлайны экспериментов.
   await detectExperimentEvents(db, clientId);

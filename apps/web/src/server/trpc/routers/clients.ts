@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
+import { normalizeDomain } from "@repo/core";
 import {
   countClientsByAgency,
   createClient,
@@ -13,7 +14,18 @@ import { assertTenant, protectedProcedure, roleProcedure, router } from "../trpc
 
 const clientInput = z.object({
   name: z.string().min(1).max(200),
-  domain: z.string().min(1).max(255),
+  /**
+   * Домен приводится к голому хосту прямо на входе: агентство вставляет его
+   * копипастом из адресной строки, а сравнивается он с доменами из цитат.
+   * «https://acme.com/» не совпало бы ни с чем, и страницы клиента перестали
+   * бы опознаваться как его собственные — диагностика молча соврала бы.
+   */
+  domain: z
+    .string()
+    .min(1)
+    .max(255)
+    .transform(normalizeDomain)
+    .refine((value) => value.includes("."), "Enter a domain, for example acme.com"),
   industry: z.string().max(200).optional(),
   brandNames: z.array(z.string().min(1)).default([]),
   competitorNames: z.array(z.string().min(1)).default([]),

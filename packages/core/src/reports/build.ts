@@ -1,4 +1,4 @@
-import { REPORT_COPY } from "../copy";
+import { measurementBasisFor } from "../copy";
 import { competitorGapPp } from "../metrics/visibility";
 import type { VisibilitySnapshot } from "../metrics/visibility";
 import { reportPayloadSchema } from "./schema";
@@ -30,6 +30,11 @@ export interface ReportInputs {
   nextSprint: string[];
   /** Слабые места, которые нельзя прятать от клиента. */
   caveats: string[];
+  /**
+   * Платформы, по которым реально есть измерения. От них зависит формулировка
+   * оговорки: отчёт по одной платформе не вправе говорить «several platforms».
+   */
+  measuredPlatforms?: readonly string[];
   /** Раздел бесплатного аудита; у платящего клиента его нет. */
   opportunity?: NonNullable<ReportPayload["opportunity"]> | null;
 }
@@ -109,8 +114,9 @@ export function buildReportPayload(inputs: ReportInputs): ReportPayload {
     highestImpactAction: null,
     nextSprint: inputs.nextSprint,
     opportunity: inputs.opportunity ?? null,
-    // Пояснение о природе измерения идёт в каждом отчёте, а не по желанию.
-    caveats: [REPORT_COPY.measurementBasis, ...inputs.caveats],
+    // Пояснение о природе измерения идёт в каждом отчёте, а не по желанию,
+    // и описывает то, что измерялось на самом деле.
+    caveats: [measurementBasisFor(inputs.measuredPlatforms ?? []), ...inputs.caveats],
   };
 
   const contribution = inputs.highestImpact

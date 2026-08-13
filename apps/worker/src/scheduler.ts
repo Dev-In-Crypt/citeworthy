@@ -21,7 +21,11 @@ export interface TickResult {
  * и сдвигает next_run_at. Сдвиг выполняется сразу после создания прогона,
  * иначе следующий тик подхватил бы то же расписание повторно.
  */
-export async function tickSchedules(db: Database, now: Date = new Date()): Promise<TickResult[]> {
+export async function tickSchedules(
+  db: Database,
+  now: Date = new Date(),
+  adaptersMode: "mock" | "live" = "mock",
+): Promise<TickResult[]> {
   const due = await listDueSchedules(db, now);
   const results: TickResult[] = [];
 
@@ -31,6 +35,9 @@ export async function tickSchedules(db: Database, now: Date = new Date()): Promi
       clientId: schedule.clientId,
       status: "pending",
       trigger: "scheduled",
+      // Режим фиксируется в момент создания прогона: по нему потом решается,
+      // складывать ли эти ответы с остальными измерениями клиента.
+      adaptersMode,
     });
 
     await setScheduleNextRun(db, schedule.id, nextRunAfter(schedule.cadence, now));

@@ -13,6 +13,12 @@ describe("normalizeDomain", () => {
     ["www.g2.com", "g2.com"],
     ["  WWW.Reddit.com  ", "reddit.com"],
     ["example.com.", "example.com"],
+    // Агентство вставляет домен клиента копипастом из адресной строки.
+    ["https://agenciapisto.com/", "agenciapisto.com"],
+    ["http://www.acme.com", "acme.com"],
+    ["https://acme.com/es/servicios?utm_source=x", "acme.com"],
+    ["acme.com:3000", "acme.com"],
+    ["HTTPS://WWW.Acme.COM/", "acme.com"],
   ];
 
   it.each(cases)("%s -> %s", (input, expected) => {

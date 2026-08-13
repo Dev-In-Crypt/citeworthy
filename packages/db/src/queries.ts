@@ -291,7 +291,30 @@ export async function listCitationsByResponse(
 }
 
 /** Ответы клиента с признаками упоминаний — вход агрегации (контракт C3). */
+/**
+ * Режим, в котором клиент считается измеренным.
+ *
+ * Живой, если по нему был хотя бы один живой прогон: с этого момента фикстуры
+ * в метрики не попадают, даже если кто-то нажал «Run» на стенде в mock-режиме.
+ * Клиент, которого меряли только фикстурами (разработка, e2e), продолжает
+ * считаться как раньше — иначе на стенде не осталось бы вообще никаких чисел.
+ */
+export async function effectiveAdaptersMode(
+  db: Database,
+  clientId: string,
+): Promise<"mock" | "live"> {
+  const rows = await db
+    .select({ id: runs.id })
+    .from(runs)
+    .where(and(eq(runs.clientId, clientId), eq(runs.adaptersMode, "live")))
+    .limit(1);
+
+  return rows.length > 0 ? "live" : "mock";
+}
+
 export async function listResponseFactsForClient(db: Database, clientId: string) {
+  const mode = await effectiveAdaptersMode(db, clientId);
+
   const rows = await db
     .select({
       responseId: responses.id,
@@ -306,7 +329,7 @@ export async function listResponseFactsForClient(db: Database, clientId: string)
     .innerJoin(runs, eq(responses.runId, runs.id))
     .innerJoin(prompts, eq(responses.promptId, prompts.id))
     .leftJoin(mentions, eq(mentions.responseId, responses.id))
-    .where(eq(runs.clientId, clientId));
+    .where(and(eq(runs.clientId, clientId), eq(runs.adaptersMode, mode)));
 
   return rows;
 }
@@ -668,7 +691,11 @@ export async function listCitationFacts(
   clientId: string,
   clusterId?: string | null,
 ) {
-  const conditions = [eq(runs.clientId, clientId)];
+  // Фикстуры не смешиваются с живыми измерениями (см. effectiveAdaptersMode).
+  const conditions = [
+    eq(runs.clientId, clientId),
+    eq(runs.adaptersMode, await effectiveAdaptersMode(db, clientId)),
+  ];
   if (clusterId) {
     conditions.push(eq(prompts.clusterId, clusterId));
   }
@@ -911,7 +938,12 @@ export async function countNewCitedDomains(
     .from(citations)
     .innerJoin(responses, eq(citations.responseId, responses.id))
     .innerJoin(runs, eq(responses.runId, runs.id))
-    .where(eq(runs.clientId, clientId));
+    .where(
+      and(
+        eq(runs.clientId, clientId),
+        eq(runs.adaptersMode, await effectiveAdaptersMode(db, clientId)),
+      ),
+    );
 
   const before = new Set<string>();
   const during = new Set<string>();
@@ -942,6 +974,7 @@ export async function countClientMentionsBetween(
     .where(
       and(
         eq(runs.clientId, clientId),
+        eq(runs.adaptersMode, await effectiveAdaptersMode(db, clientId)),
         eq(mentions.isClient, true),
         gte(responses.createdAt, from),
         lte(responses.createdAt, to),
@@ -1010,6 +1043,40 @@ export async function listExperimentEvents(
 }
 
 /** Все срезы клиента: вход для расчёта baseline (контракт C5). */
+/**
+ * Удаляет срезы клиента, которых нет в свежем пересчёте.
+ *
+ * Без этого в таблице остаются осиротевшие ячейки: например, срезы по Gemini
+ * от прогона на фикстурах, который перестал учитываться после первого живого
+ * измерения. Свёртка при этом верна, а строки по платформам продолжают
+ * утверждать, что платформа измерялась. Отчёт, собранный по ним, соврёт.
+ */
+export async function deleteSnapshotsNotIn(
+  db: Database,
+  clientId: string,
+  keep: { clusterId: string | null; platform: string | null; periodStart: Date }[],
+): Promise<number> {
+  const existing = await db
+    .select()
+    .from(visibilitySnapshots)
+    .where(eq(visibilitySnapshots.clientId, clientId));
+
+  const keys = new Set(
+    keep.map((cell) => `${cell.clusterId ?? ""}|${cell.platform ?? ""}|${cell.periodStart.getTime()}`),
+  );
+
+  const stale = existing.filter(
+    (row) =>
+      !keys.has(`${row.clusterId ?? ""}|${row.platform ?? ""}|${row.periodStart.getTime()}`),
+  );
+
+  for (const row of stale) {
+    await db.delete(visibilitySnapshots).where(eq(visibilitySnapshots.id, row.id));
+  }
+
+  return stale.length;
+}
+
 export async function listAllSnapshots(
   db: Database,
   clientId: string,

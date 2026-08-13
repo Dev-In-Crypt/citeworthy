@@ -152,11 +152,22 @@ export const reportsRouter = router({
         caveats.push(REPORT_COPY.shortPeriod);
       }
 
+      // Платформы берутся из срезов по платформам, а не из расписания:
+      // важно, что реально измерено, а не что было настроено.
+      const measuredPlatforms = [
+        ...new Set(
+          snapshotRows
+            .filter((row) => row.platform !== null && row.periodStart >= periodStart)
+            .map((row) => row.platform as string),
+        ),
+      ];
+
       const payload = buildReportPayload({
         clientName: client.name,
         periodStart,
         periodEnd,
         snapshots,
+        measuredPlatforms,
         completedActions: completedActions.map((action) => ({
           title: action.title,
           actionType: action.actionType,
@@ -275,6 +286,13 @@ export const reportsRouter = router({
         periodStart,
         periodEnd,
         snapshots,
+        measuredPlatforms: [
+          ...new Set(
+            snapshotRows
+              .filter((row) => row.platform !== null)
+              .map((row) => row.platform as string),
+          ),
+        ],
         completedActions: [],
         newCitedUrls: 0,
         newBrandMentions: 0,

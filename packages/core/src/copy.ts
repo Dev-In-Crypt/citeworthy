@@ -43,9 +43,20 @@ export const DIAGNOSIS_COPY = {
 } as const;
 
 export const REPORT_COPY = {
-  /** Идёт в каждый отчёт: клиент должен понимать, что именно измерено. */
+  /**
+   * Идёт в каждый отчёт: клиент должен понимать, что именно измерено.
+   *
+   * Формулировка на несколько платформ — только для случая, когда их
+   * действительно было несколько. Собирать её надо через
+   * `measurementBasisFor`, а не брать константу наугад: отчёт по одной
+   * платформе, утверждающий «several platforms», — ровно то ложное
+   * утверждение, ради запрета которого существует инвариант 2.
+   */
   measurementBasis:
     "Visibility is the share of AI answers mentioning the brand, measured across repeated samples on several platforms over weekly windows.",
+  /** Тот же смысл, но для одной платформы; %PLATFORM% подставляется. */
+  measurementBasisSinglePlatform:
+    "Visibility is the share of %PLATFORM% answers mentioning the brand, measured across repeated samples over weekly windows. Other assistants were not measured for this report.",
   /** Ставится, когда движение нельзя отделить от общего дрейфа платформ. */
   noComparisonGroup:
     "There were no untouched topics to compare against in this period, so movement cannot be separated from platform-wide changes.",
@@ -59,6 +70,31 @@ export const REPORT_COPY = {
   scopeEstimate:
     "Retainer and effort are the agency's own estimates for the scope below, shown so the numbers behind the proposal are visible.",
 } as const;
+
+const PLATFORM_LABELS: Record<string, string> = {
+  chatgpt: "ChatGPT",
+  perplexity: "Perplexity",
+  gemini: "Gemini",
+};
+
+/**
+ * Оговорка о природе измерения, собранная по факту.
+ *
+ * Пустой список платформ — тоже случай «нескольких»: он означает, что срезов
+ * ещё нет, и обещать конкретную платформу не на чем.
+ */
+export function measurementBasisFor(platforms: readonly string[]): string {
+  const unique = [...new Set(platforms)];
+  if (unique.length !== 1) {
+    return REPORT_COPY.measurementBasis;
+  }
+
+  const platform = unique[0] as string;
+  return REPORT_COPY.measurementBasisSinglePlatform.replace(
+    "%PLATFORM%",
+    PLATFORM_LABELS[platform] ?? platform,
+  );
+}
 
 export const EXPERIMENT_COPY = {
   /** Заголовок оценки эффекта: всегда «estimated» — см. инвариант 2. */

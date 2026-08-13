@@ -104,6 +104,12 @@ export function normalizeDomain(domain: string): string {
   return domain
     .trim()
     .toLowerCase()
+    // Схема, путь, порт и параметры: агентство вставляет домен клиента копипастом
+    // из адресной строки, и «https://acme.com/» никогда не совпало бы с «acme.com»
+    // из цитаты — свои страницы клиента перестали бы опознаваться как свои.
+    .replace(/^[a-z][a-z0-9+.-]*:\/\//, "")
+    .replace(/[/?#].*$/, "")
+    .replace(/:\d+$/, "")
     .replace(/^www\./, "")
     .replace(/\.$/, "");
 }

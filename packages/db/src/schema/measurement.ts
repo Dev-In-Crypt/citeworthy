@@ -33,6 +33,9 @@ export const platformEnum = pgEnum("platform", ["chatgpt", "perplexity", "gemini
  */
 export const cadenceEnum = pgEnum("cadence", ["daily", "weekly", "biweekly"]);
 export const runStatusEnum = pgEnum("run_status", ["pending", "running", "done", "failed"]);
+
+/** Совпадает с ADAPTERS_MODE: чем именно получены ответы прогона. */
+export const adaptersModeEnum = pgEnum("adapters_mode", ["mock", "live"]);
 export const runTriggerEnum = pgEnum("run_trigger", ["scheduled", "manual"]);
 export const sentimentEnum = pgEnum("sentiment", ["positive", "neutral", "negative"]);
 export const entityTypeEnum = pgEnum("entity_type", ["client", "competitor", "other"]);
@@ -100,6 +103,13 @@ export const runs = pgTable(
       .references(() => clients.id, { onDelete: "cascade" }),
     status: runStatusEnum("status").notNull().default("pending"),
     trigger: runTriggerEnum("trigger").notNull().default("scheduled"),
+    /**
+     * Чем получены ответы этого прогона. Без этого признака фикстуры и живые
+     * измерения складываются в одну цифру: достаточно один раз нажать «Run»
+     * на стенде с ADAPTERS_MODE=mock, и в графике клиента появятся ответы про
+     * чужую выдуманную компанию. Метрика, которая так делает, не измерение.
+     */
+    adaptersMode: adaptersModeEnum("adapters_mode").notNull().default("mock"),
     startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
     finishedAt: timestamp("finished_at", { withTimezone: true }),
   },

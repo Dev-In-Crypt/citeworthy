@@ -110,13 +110,14 @@ export const runsRouter = router({
       }
 
       const schedule = await getScheduleForClient(ctx.db, input.clientId);
+      const mode = parseAdaptersMode(process.env.ADAPTERS_MODE);
+
       const run = await createRun(ctx.db, {
         clientId: input.clientId,
         scheduleId: schedule?.id ?? null,
         trigger: "manual",
+        adaptersMode: mode,
       });
-
-      const mode = parseAdaptersMode(process.env.ADAPTERS_MODE);
 
       if (mode === "mock") {
         // В mock-режиме прогон занимает миллисекунды, поэтому выполняется здесь же:
@@ -152,13 +153,14 @@ export const runsRouter = router({
         });
       }
 
+      const mode = parseAdaptersMode(process.env.ADAPTERS_MODE);
       const run = await createRun(ctx.db, {
         clientId: input.clientId,
         scheduleId: null,
         trigger: "manual",
+        adaptersMode: mode,
       });
 
-      const mode = parseAdaptersMode(process.env.ADAPTERS_MODE);
       const outcome = mode === "mock"
         ? await completeRun(ctx.db, run.id, input.clientId, mode)
         : null;

@@ -34,7 +34,7 @@ async function main(): Promise<void> {
   const tickWorker = new Worker(
     TICK_QUEUE,
     async () => {
-      const started = await tickSchedules(db);
+      const started = await tickSchedules(db, new Date(), mode);
       if (started.length > 0) {
         logger.info("scheduler.tick", {
           startedRuns: started.length,
