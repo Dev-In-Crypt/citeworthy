@@ -1,5 +1,6 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { passwordResetEmail } from "@repo/core";
 import {
   accounts,
   agencies,
@@ -10,6 +11,7 @@ import {
   users,
   verifications,
 } from "@repo/db";
+import { getEmailSender } from "@/server/email";
 
 const { db } = createDb();
 
@@ -37,6 +39,14 @@ export const auth = betterAuth({
     enabled: true,
     // Верификация почты не входит в MVP: агентство заводит аккаунт и сразу работает.
     requireEmailVerification: false,
+    /**
+     * Сброс пароля обязателен даже без почтового транспорта: без него человек,
+     * забывший пароль, теряет доступ к агентству навсегда. В режиме без ключа
+     * ссылка уходит в лог — восстановить доступ всё равно можно.
+     */
+    sendResetPassword: async ({ user, url }) => {
+      await getEmailSender().send(passwordResetEmail({ to: user.email, resetUrl: url }));
+    },
   },
   user: {
     modelName: "users",

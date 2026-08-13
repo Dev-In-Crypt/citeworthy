@@ -140,11 +140,11 @@ function TeamSection() {
   const members = api.agency.members.useQuery();
   const invites = api.agency.invites.useQuery();
   const [email, setEmail] = useState("");
-  const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [invited, setInvited] = useState<{ link: string; delivered: boolean } | null>(null);
 
   const invite = api.agency.invite.useMutation({
     onSuccess: (data) => {
-      setInviteLink(`/invite/${data.token}`);
+      setInvited({ link: `/invite/${data.token}`, delivered: data.delivered });
       setEmail("");
       void invites.refetch();
     },
@@ -184,9 +184,12 @@ function TeamSection() {
         </button>
       </div>
 
-      {inviteLink && (
+      {invited && (
+        // Ссылка показывается всегда, даже когда письмо ушло: почта может
+        // задержаться или попасть в спам, а пригласить человека надо сейчас.
         <p data-testid="invite-link" className="text-sm text-muted-foreground">
-          Share this link: <code>{inviteLink}</code>
+          {invited.delivered ? "Invitation sent. Direct link: " : "Share this link: "}
+          <code>{invited.link}</code>
         </p>
       )}
 

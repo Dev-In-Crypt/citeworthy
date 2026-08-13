@@ -9,7 +9,9 @@ import {
   listUsersByAgency,
   updateAgency,
 } from "@repo/db";
+import { inviteEmail } from "@repo/core";
 import { protectedProcedure, roleProcedure, router, publicProcedure } from "../trpc";
+import { appUrl, getEmailSender } from "../../email";
 
 const INVITE_TTL_DAYS = 7;
 
@@ -56,10 +58,30 @@ export const agencyRouter = router({
         expiresAt,
       });
 
-      // Отправка письма появится вместе с транспортом; в dev ссылка пишется в лог.
-      console.log(`[invite] ${input.email} -> /invite/${token}`);
+      const agency = await getAgencyById(ctx.db, ctx.user.agencyId);
 
-      return { id: invitation.id, token, expiresAt };
+      /**
+       * Письмо — удобство, а не условие: без почтового ключа продукт обязан
+       * оставаться рабочим, поэтому ссылка возвращается всегда и показывается
+       * в интерфейсе. Отказ транспорта не отменяет уже созданное приглашение.
+       */
+      let delivered = false;
+      try {
+        await getEmailSender().send(
+          inviteEmail({
+            to: input.email,
+            agencyName: agency?.name ?? "your agency",
+            role: input.role,
+            inviteUrl: `${appUrl()}/invite/${token}`,
+            invitedByName: ctx.user.name,
+          }),
+        );
+        delivered = true;
+      } catch (error) {
+        console.error(`[invite] delivery failed for ${input.email}`, error);
+      }
+
+      return { id: invitation.id, token, expiresAt, delivered };
     }),
 
   /** Публичная проверка приглашения — нужна на /invite/[token] до регистрации. */
