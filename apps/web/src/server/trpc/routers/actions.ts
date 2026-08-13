@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { ACTION_TYPES, recommendationSchema } from "@repo/core";
+import {
+  ACTION_TYPES,
+  checkSourceOutcome,
+  recommendationEvidenceSchema,
+  recommendationSchema,
+  TemplateBriefWriter,
+} from "@repo/core";
 import {
   createAction,
   deleteAction,
@@ -9,6 +15,7 @@ import {
   getSourceByDomain,
   listActions,
   listActivity,
+  listDatedCitationFacts,
   logActivity,
   updateAction,
 } from "@repo/db";
@@ -32,6 +39,75 @@ export const actionsRouter = router({
       const client = await getClientById(ctx.db, input.clientId);
       assertTenant(client, ctx.user.agencyId);
       return listActions(ctx.db, input.clientId);
+    }),
+
+  /**
+   * Рабочее задание по действию.
+   *
+   * Собирается на лету и нигде не хранится: бриф детерминирован из действия
+   * и плейбука, а лишняя копия текста в базе однажды разойдётся с рецептом.
+   */
+  brief: protectedProcedure
+    .input(z.object({ actionId: z.uuid() }))
+    .query(async ({ ctx, input }) => {
+      const action = await getActionById(ctx.db, input.actionId);
+      if (!action) {
+        assertTenant(null, ctx.user.agencyId);
+        throw new Error("unreachable");
+      }
+
+      const client = await getClientById(ctx.db, action.clientId);
+      assertTenant(client, ctx.user.agencyId);
+
+      // Доказательства пришли из jsonb: перед использованием их надо разобрать,
+      // иначе форма поля зависела бы от того, что записали месяц назад.
+      const parsed = recommendationEvidenceSchema.safeParse(action.evidence ?? undefined);
+
+      return new TemplateBriefWriter().write({
+        actionType: action.actionType,
+        title: action.title,
+        reason: action.reason,
+        sourceDomain: action.sourceDomain,
+        evidence: parsed.success ? parsed.data : null,
+        affectedClusterCount: action.affectedClusterIds.length,
+      });
+    }),
+
+  /**
+   * Что изменилось после того, как действие закрыли.
+   *
+   * Только наблюдение: появился ли клиент в ответах, где цитируется этот
+   * источник. Причинность отсюда не следует, и оговорка идёт вместе с числом.
+   */
+  outcome: protectedProcedure
+    .input(z.object({ actionId: z.uuid() }))
+    .query(async ({ ctx, input }) => {
+      const action = await getActionById(ctx.db, input.actionId);
+      if (!action) {
+        assertTenant(null, ctx.user.agencyId);
+        throw new Error("unreachable");
+      }
+
+      const client = await getClientById(ctx.db, action.clientId);
+      assertTenant(client, ctx.user.agencyId);
+
+      // Пока работа не закрыта, «после» не с чем сравнивать.
+      if (!action.completedAt || !action.sourceDomain) {
+        return null;
+      }
+
+      const facts = await listDatedCitationFacts(ctx.db, action.clientId, action.sourceDomain);
+
+      return checkSourceOutcome({
+        facts: facts.map((fact) => ({
+          responseId: fact.responseId,
+          domain: fact.domain,
+          observedAt: fact.observedAt,
+          clientMentioned: fact.isClient === true,
+        })),
+        actionDate: action.completedAt,
+        sourceDomain: action.sourceDomain,
+      });
     }),
 
   create: roleProcedure("member")
@@ -98,6 +174,17 @@ export const actionsRouter = router({
         recommendation.sourceDomain ?? null,
       );
       if (existing) {
+        // Тот же источник, но другой кластер — это не дубль, а расширение
+        // охвата. Массив кластеров задаёт treatment-группу эксперимента:
+        // потеряв кластер здесь, мы измеряли бы потом не то, что делали.
+        const clusterId = recommendation.clusterId;
+        if (clusterId && !existing.affectedClusterIds.includes(clusterId)) {
+          const updated = await updateAction(ctx.db, existing.id, {
+            affectedClusterIds: [...existing.affectedClusterIds, clusterId],
+          });
+          return { action: updated ?? existing, created: false };
+        }
+
         return { action: existing, created: false };
       }
 
@@ -116,6 +203,7 @@ export const actionsRouter = router({
         sourceDomain: recommendation.sourceDomain ?? null,
         sourceId: source?.id ?? null,
         originRule: recommendation.rule,
+        evidence: recommendation.evidence ?? null,
       });
 
       await logActivity(ctx.db, {

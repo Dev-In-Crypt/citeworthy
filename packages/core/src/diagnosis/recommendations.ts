@@ -25,6 +25,28 @@ export const ACTION_TYPES = [
 
 export type ActionType = (typeof ACTION_TYPES)[number];
 
+/**
+ * Числа, на которых стоит рекомендация.
+ *
+ * До этого они существовали только внутри строки `reason`: прочитать их
+ * человек мог, а собрать из них рабочее задание или сверить результат —
+ * нет. Хранятся отдельно от текста, потому что текст меняется, а факт
+ * измерения остаётся фактом измерения.
+ */
+export const recommendationEvidenceSchema = z.object({
+  sourceType: z.string().optional(),
+  /** Сколько раз источник процитирован в измеренном периоде. */
+  citations: z.number().int().nonnegative().optional(),
+  /** Доля цитирований кластера, приходящаяся на источник. */
+  sharePct: z.number().nonnegative().optional(),
+  /** Конкуренты, присутствующие там, где клиента нет. */
+  competitorsPresent: z.array(z.string()).default([]),
+  /** Сколько влиятельных источников всего рассматривалось. */
+  influentialCount: z.number().int().nonnegative().optional(),
+});
+
+export type RecommendationEvidence = z.infer<typeof recommendationEvidenceSchema>;
+
 export const recommendationSchema = z.object({
   actionType: z.enum(ACTION_TYPES),
   title: z.string().min(1),
@@ -36,6 +58,7 @@ export const recommendationSchema = z.object({
   clusterId: z.string().optional(),
   /** Правило, которое породило рекомендацию — видно, откуда она взялась. */
   rule: z.string().min(1),
+  evidence: recommendationEvidenceSchema.optional(),
 });
 
 export type Recommendation = z.infer<typeof recommendationSchema>;
@@ -89,6 +112,13 @@ export function recommendMissingSources(
         sourceDomain: source.domain,
         rule: "missing-from-influential-source",
         ...(clusterId ? { clusterId } : {}),
+        // Те же числа, что и в тексте выше, но пригодные для работы.
+        evidence: {
+          ...(source.sourceType ? { sourceType: source.sourceType } : {}),
+          citations: source.citations,
+          sharePct: source.sharePct,
+          competitorsPresent: source.competitorsPresent,
+        },
       });
     });
 }
@@ -116,6 +146,10 @@ export function recommendOwnedPage(
       effort: "medium",
       rule: "no-owned-source-cited",
       ...(clusterId ? { clusterId } : {}),
+      evidence: {
+        competitorsPresent: [],
+        influentialCount: diagnosis.influential.length,
+      },
     }),
   ];
 }
@@ -141,6 +175,12 @@ export function recommendOwnedRefresh(
         sourceDomain: source.domain,
         rule: "owned-source-without-client-mention",
         ...(clusterId ? { clusterId } : {}),
+        evidence: {
+          sourceType: "owned",
+          citations: source.citations,
+          sharePct: source.sharePct,
+          competitorsPresent: source.competitorsPresent,
+        },
       }),
     );
 }

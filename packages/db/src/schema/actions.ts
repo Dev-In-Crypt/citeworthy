@@ -1,4 +1,4 @@
-import { index, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { index, jsonb, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { clients, users } from "./tenancy";
 import { sources } from "./sources";
 
@@ -53,6 +53,13 @@ export const actions = pgTable(
     status: actionStatusEnum("status").notNull().default("backlog"),
     /** Правило-источник рекомендации; null — действие заведено вручную. */
     originRule: text("origin_rule"),
+    /**
+     * Числа, на которых стояла рекомендация: доля цитирований источника,
+     * сколько раз он процитирован, кто из конкурентов там присутствует.
+     * Раньше они жили только внутри текста `reason` — прочитать можно,
+     * собрать из них рабочее задание или сверить результат нельзя.
+     */
+    evidence: jsonb("evidence").$type<Record<string, unknown>>(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     completedAt: timestamp("completed_at", { withTimezone: true }),
   },

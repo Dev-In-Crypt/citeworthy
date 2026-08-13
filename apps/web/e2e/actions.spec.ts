@@ -55,6 +55,16 @@ test("actions board moves cards and offers an experiment on completion", async (
   const drawer = page.getByTestId("action-drawer");
   await expect(drawer).toBeVisible();
   await expect(drawer.getByTestId("drawer-reason")).not.toBeEmpty();
+
+  // Бриф: рекомендация развёрнута в задание, которое можно выполнить.
+  const brief = drawer.getByTestId("action-brief");
+  await expect(brief).toBeVisible();
+  await expect(brief.getByTestId("brief-steps").locator("li").first()).not.toBeEmpty();
+  // Без признака готовности задание нельзя закрыть, не споря о том, сделано ли оно.
+  await expect(brief.getByTestId("brief-acceptance").locator("li").first()).not.toBeEmpty();
+  // Числа измерения доехали до исполнителя, а не остались на экране диагностики.
+  await expect(brief.getByTestId("brief-context")).toContainText("%");
+
   await drawer.getByRole("button", { name: "Close" }).click();
 
   // Перемещение в работу диалога не открывает.
@@ -78,6 +88,16 @@ test("actions board moves cards and offers an experiment on completion", async (
   // Статус пережил перезагрузку, а завершение попало в журнал.
   await page.reload();
   await expect(page.getByTestId("column-done").locator("article")).toHaveCount(1);
+
+  // У закрытого действия виден результат — и он честно говорит, что нового
+  // прогона после работы ещё не было, а не выдаёт молчание за отсутствие эффекта.
+  await page.getByTestId("column-done").locator("article button").first().click();
+  const doneDrawer = page.getByTestId("action-drawer");
+  const outcome = doneDrawer.getByTestId("action-outcome");
+  await expect(outcome).toBeVisible();
+  await expect(outcome).toContainText("No answers citing this source have been measured");
+  await expect(outcome).toContainText("evidence, not attribution of cause");
+  await doneDrawer.getByRole("button", { name: "Close" }).click();
 
   await page.goto(`/clients/${clientId}`);
   await expect(page.getByTestId("activity-feed")).toContainText("Action completed");

@@ -1044,6 +1044,38 @@ export async function listExperimentEvents(
 
 /** Все срезы клиента: вход для расчёта baseline (контракт C5). */
 /**
+ * Датированные факты цитирования: то же, что listCitationFacts, но с датой
+ * ответа и фильтром по домену. Нужны, чтобы отличить «было до работы» от
+ * «появилось после» — без даты этот вопрос не задать.
+ */
+export async function listDatedCitationFacts(
+  db: Database,
+  clientId: string,
+  sourceDomain?: string,
+) {
+  const conditions = [
+    eq(runs.clientId, clientId),
+    eq(runs.adaptersMode, await effectiveAdaptersMode(db, clientId)),
+  ];
+  if (sourceDomain) {
+    conditions.push(eq(citations.domain, sourceDomain));
+  }
+
+  return db
+    .select({
+      responseId: responses.id,
+      domain: citations.domain,
+      observedAt: responses.createdAt,
+      isClient: mentions.isClient,
+    })
+    .from(citations)
+    .innerJoin(responses, eq(citations.responseId, responses.id))
+    .innerJoin(runs, eq(responses.runId, runs.id))
+    .leftJoin(mentions, eq(mentions.responseId, responses.id))
+    .where(and(...conditions));
+}
+
+/**
  * Удаляет срезы клиента, которых нет в свежем пересчёте.
  *
  * Без этого в таблице остаются осиротевшие ячейки: например, срезы по Gemini

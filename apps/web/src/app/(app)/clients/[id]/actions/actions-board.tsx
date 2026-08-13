@@ -223,6 +223,9 @@ export function ActionsBoard({ clientId }: { clientId: string }) {
               </div>
             )}
           </dl>
+
+          <ActionOutcomePanel actionId={selected.id} />
+          <ActionBriefPanel actionId={selected.id} />
         </aside>
       )}
 
@@ -272,5 +275,115 @@ export function ActionsBoard({ clientId }: { clientId: string }) {
         </div>
       )}
     </>
+  );
+}
+
+/**
+ * Рабочее задание по действию.
+ *
+ * Загружается отдельным запросом при открытии drawer'а, а не вместе со списком:
+ * бриф нужен одному действию из тридцати, и тянуть его на всю доску незачем.
+ */
+function ActionBriefPanel({ actionId }: { actionId: string }) {
+  const brief = api.actions.brief.useQuery({ actionId });
+
+  if (brief.isPending) {
+    return <p className="text-sm text-muted-foreground">Loading the brief…</p>;
+  }
+
+  if (!brief.data) {
+    return null;
+  }
+
+  const { objective, context, steps, acceptance, pitfalls } = brief.data;
+
+  return (
+    <section data-testid="action-brief" className="flex flex-col gap-4 border-t pt-4">
+      <div className="flex flex-col gap-1">
+        <h3 className="text-sm font-medium">What done looks like</h3>
+        <p className="text-sm text-muted-foreground">{objective}</p>
+      </div>
+
+      {context.length > 0 && (
+        <ul data-testid="brief-context" className="flex flex-col gap-1 text-sm text-muted-foreground">
+          {context.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      )}
+
+      <div className="flex flex-col gap-1.5">
+        <h4 className="text-sm font-medium">Steps</h4>
+        <ol data-testid="brief-steps" className="flex list-inside list-decimal flex-col gap-1.5 text-sm text-muted-foreground">
+          {steps.map((step) => (
+            <li key={step}>{step}</li>
+          ))}
+        </ol>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <h4 className="text-sm font-medium">Accepted when</h4>
+        <ul data-testid="brief-acceptance" className="flex flex-col gap-1.5 text-sm text-muted-foreground">
+          {acceptance.map((line) => (
+            <li key={line} className="flex gap-2">
+              <span aria-hidden className="mt-1.5 size-1.5 shrink-0 rounded-full bg-client" />
+              <span>{line}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {pitfalls.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <h4 className="text-sm font-medium">Watch out for</h4>
+          <ul data-testid="brief-pitfalls" className="flex flex-col gap-1.5 text-sm text-muted-foreground">
+            {pitfalls.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/**
+ * Что произошло после работы.
+ *
+ * Показывается только у закрытых действий с источником: у остальных «после»
+ * не с чем сравнивать, и пустой блок был бы обещанием, а не наблюдением.
+ */
+function ActionOutcomePanel({ actionId }: { actionId: string }) {
+  const outcome = api.actions.outcome.useQuery({ actionId });
+
+  if (!outcome.data) {
+    return null;
+  }
+
+  const { note, firstSeenAt, answersAfter, disclaimer } = outcome.data;
+
+  return (
+    <section data-testid="action-outcome" className="flex flex-col gap-2 rounded-lg border p-4">
+      <h3 className="text-sm font-medium">What changed since</h3>
+      <p className="text-sm text-muted-foreground">{note}</p>
+
+      <dl className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+        <div className="flex gap-2">
+          <dt className="text-muted-foreground">Answers measured since</dt>
+          <dd className="metric font-medium">{answersAfter}</dd>
+        </div>
+        {firstSeenAt && (
+          <div className="flex gap-2">
+            <dt className="text-muted-foreground">First seen</dt>
+            <dd className="metric font-medium">
+              {new Date(firstSeenAt).toISOString().slice(0, 10)}
+            </dd>
+          </div>
+        )}
+      </dl>
+
+      {/* Совпадение по времени — не причинность, и это сказано рядом с числом. */}
+      <p className="text-xs text-muted-foreground">{disclaimer}</p>
+    </section>
   );
 }
