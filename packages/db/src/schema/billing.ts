@@ -1,5 +1,14 @@
-import { integer, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
-import { agencies } from "./tenancy";
+import {
+  boolean,
+  integer,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from "drizzle-orm/pg-core";
+import { agencies, planEnum } from "./tenancy";
 
 /**
  * Расход по агентству за биллинговый период.
@@ -29,3 +38,55 @@ export const usageCounters = pgTable(
 
 export type UsageCounter = typeof usageCounters.$inferSelect;
 export type NewUsageCounter = typeof usageCounters.$inferInsert;
+
+/**
+ * Состояния подписки у платёжного провайдера.
+ *
+ * Список повторяет статусы Stripe, а не упрощает их до «платит / не платит»:
+ * `past_due` — это ещё клиент, у которого не прошёл платёж, и выкидывать его
+ * из продукта в тот же час нельзя; `incomplete` — это ещё не клиент.
+ */
+export const subscriptionStatusEnum = pgEnum("subscription_status", [
+  "trialing",
+  "active",
+  "past_due",
+  "canceled",
+  "incomplete",
+]);
+
+/**
+ * Подписка агентства.
+ *
+ * Права доступа считаются от неё, а не от полей `agencies.plan` и
+ * `agencies.client_limit`: те остаются производными и обновляются из вебхука.
+ * Источник истины о деньгах — провайдер, и в базе лежит его слепок,
+ * чтобы продукт мог работать, пока провайдер недоступен.
+ */
+export const subscriptions = pgTable(
+  "subscriptions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    agencyId: uuid("agency_id")
+      .notNull()
+      .references(() => agencies.id, { onDelete: "cascade" }),
+    /** Пока провайдер один, но столбец есть: смена биллинга не должна ломать схему. */
+    provider: text("provider").notNull().default("stripe"),
+    customerId: text("customer_id").notNull(),
+    subscriptionId: text("subscription_id"),
+    plan: planEnum("plan").notNull(),
+    status: subscriptionStatusEnum("status").notNull(),
+    /** До какого момента оплачен период — по нему решается доступ при сбое платежа. */
+    currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
+    cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    // Одна подписка на агентство: вторая означала бы двойную оплату.
+    uniqueIndex("subscriptions_agency_idx").on(table.agencyId),
+    uniqueIndex("subscriptions_customer_idx").on(table.customerId),
+  ],
+);
+
+export type Subscription = typeof subscriptions.$inferSelect;
+export type NewSubscription = typeof subscriptions.$inferInsert;

@@ -51,6 +51,17 @@ export { domainOf, mergeMentions, parseResponse } from "./parsing/parse";
 export * from "./metrics/visibility";
 export * from "./billing/period";
 export * from "./billing/cost";
+export * from "./billing/entitlements";
+export * from "./billing/payments";
+export {
+  StripePaymentProvider,
+  verifyStripeSignature,
+  hmacSha256Hex,
+  WebhookSignatureError,
+  WEBHOOK_TOLERANCE_SECONDS,
+} from "./billing/stripe";
+export type { StripeEvent, StripePaymentProviderConfig, StripePrices } from "./billing/stripe";
+export { createPaymentProvider } from "./billing/provider";
 export * from "./import/csv";
 export * from "./prompts/generate";
 export * from "./parsing/highlight";

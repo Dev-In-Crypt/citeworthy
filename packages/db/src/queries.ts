@@ -3,7 +3,7 @@ import type { Database } from "./client";
 import { agencies, clients, users } from "./schema/tenancy";
 import type { Agency, Client, NewClient, User } from "./schema/tenancy";
 import { invitations } from "./schema/auth";
-import { usageCounters } from "./schema/billing";
+import { subscriptions, usageCounters } from "./schema/billing";
 import { citationSources, sourcePresence, sources } from "./schema/sources";
 import { actions } from "./schema/actions";
 import { activityLog } from "./schema/activity";
@@ -14,7 +14,7 @@ import type { Experiment, ExperimentEvent, NewExperiment, NewExperimentEvent } f
 import type { ActivityEntry, NewActivityEntry } from "./schema/activity";
 import type { Action, NewAction } from "./schema/actions";
 import type { NewSourcePresence, Source, SourcePresence } from "./schema/sources";
-import type { UsageCounter } from "./schema/billing";
+import type { NewSubscription, Subscription, UsageCounter } from "./schema/billing";
 type SourceTypeValue = NonNullable<Source["sourceType"]>;
 import {
   citations,
@@ -79,6 +79,21 @@ export async function updateAgency(
 ): Promise<Agency | undefined> {
   const rows = await db.update(agencies).set(patch).where(eq(agencies.id, agencyId)).returning();
   return rows[0];
+}
+
+/**
+ * Производные от подписки поля агентства.
+ *
+ * Отдельно от `updateAgency`: план и лимит меняет только вебхук провайдера,
+ * и они не должны случайно попасть в форму настроек как редактируемые.
+ */
+export async function applyPlanToAgency(
+  db: Database,
+  agencyId: string,
+  plan: Agency["plan"],
+  clientLimit: number,
+): Promise<void> {
+  await db.update(agencies).set({ plan, clientLimit }).where(eq(agencies.id, agencyId));
 }
 
 export async function listClientsByAgency(db: Database, agencyId: string): Promise<Client[]> {
@@ -529,6 +544,67 @@ export async function getUsageCounter(
     .where(and(eq(usageCounters.agencyId, agencyId), eq(usageCounters.period, period)))
     .limit(1);
   return rows[0];
+}
+
+/**
+ * Подписка агентства. Права доступа считаются от неё (контракт entitlements
+ * в @repo/core), а `agencies.plan` и `agencies.client_limit` — производные.
+ */
+export async function getSubscriptionByAgency(
+  db: Database,
+  agencyId: string,
+): Promise<Subscription | undefined> {
+  const rows = await db
+    .select()
+    .from(subscriptions)
+    .where(eq(subscriptions.agencyId, agencyId))
+    .limit(1);
+  return rows[0];
+}
+
+/**
+ * Подписка по плательщику: в событиях провайдера агентство есть не всегда,
+ * а плательщик — всегда, и по нему находится уже записанная подписка.
+ */
+export async function getSubscriptionByCustomer(
+  db: Database,
+  customerId: string,
+): Promise<Subscription | undefined> {
+  const rows = await db
+    .select()
+    .from(subscriptions)
+    .where(eq(subscriptions.customerId, customerId))
+    .limit(1);
+  return rows[0];
+}
+
+/** Записывает состояние подписки. Одна подписка на агентство — отсюда upsert. */
+export async function upsertSubscription(
+  db: Database,
+  values: NewSubscription,
+): Promise<Subscription> {
+  const rows = await db
+    .insert(subscriptions)
+    .values(values)
+    .onConflictDoUpdate({
+      target: subscriptions.agencyId,
+      set: {
+        customerId: values.customerId,
+        subscriptionId: values.subscriptionId ?? null,
+        plan: values.plan,
+        status: values.status,
+        currentPeriodEnd: values.currentPeriodEnd ?? null,
+        cancelAtPeriodEnd: values.cancelAtPeriodEnd ?? false,
+        updatedAt: new Date(),
+      },
+    })
+    .returning();
+
+  const saved = rows[0];
+  if (!saved) {
+    throw new Error("Failed to save subscription");
+  }
+  return saved;
 }
 
 /** Агентство, которому принадлежит прогон — нужно для учёта расхода. */

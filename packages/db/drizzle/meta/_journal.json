@@ -92,6 +92,13 @@
       "when": 1786631172088,
       "tag": "0012_great_guardsmen",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1786648192333,
+      "tag": "0013_low_serpent_society",
+      "breakpoints": true
     }
   ]
 }

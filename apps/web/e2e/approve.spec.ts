@@ -34,6 +34,9 @@ async function setUpReport(page: Page): Promise<{ clientId: string; token: strin
     mimeType: "text/csv",
     buffer: Buffer.from(CSV, "utf8"),
   });
+  // Импорт асинхронный: без ожидания «Run now» иногда жмётся раньше, чем
+  // промпты доедут до списка, и прогон отказывается стартовать.
+  await expect(page.getByText(/Imported \d+ prompts/)).toBeVisible();
   await page.getByRole("button", { name: "Run now" }).click();
   await expect(page.getByTestId("run-status")).toContainText("done", { timeout: 30_000 });
 

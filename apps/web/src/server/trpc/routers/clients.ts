@@ -1,16 +1,16 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { normalizeDomain } from "@repo/core";
+import { canAddClient, normalizeDomain } from "@repo/core";
 import {
   countClientsByAgency,
   createClient,
   deleteClient,
-  getAgencyById,
   getClientById,
   listClientsByAgency,
   updateClient,
 } from "@repo/db";
 import { assertTenant, protectedProcedure, roleProcedure, router } from "../trpc";
+import { entitlementsForAgency } from "../../subscription";
 
 const clientInput = z.object({
   name: z.string().min(1).max(200),
@@ -48,15 +48,19 @@ export const clientsRouter = router({
   create: roleProcedure("admin")
     .input(clientInput)
     .mutation(async ({ ctx, input }) => {
-      const agency = await getAgencyById(ctx.db, ctx.user.agencyId);
-      const used = await countClientsByAgency(ctx.db, ctx.user.agencyId);
+      const [entitlements, used] = await Promise.all([
+        entitlementsForAgency(ctx.db, ctx.user.agencyId),
+        countClientsByAgency(ctx.db, ctx.user.agencyId),
+      ]);
 
-      // Лимит тарифа — billing unit продукта это активный клиентский аккаунт.
-      if (agency && used >= agency.clientLimit) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: `Your plan covers ${agency.clientLimit} active clients. Upgrade to add more.`,
-        });
+      /**
+       * Лимит тарифа — billing unit продукта это активный клиентский аккаунт.
+       * Считается от подписки, а не от полей агентства: они производные, и
+       * рассинхрон должен разрешаться в пользу того, за что заплачено.
+       */
+      const decision = canAddClient(entitlements, used);
+      if (!decision.allowed) {
+        throw new TRPCError({ code: "FORBIDDEN", message: decision.message });
       }
 
       return createClient(ctx.db, { ...input, agencyId: ctx.user.agencyId });

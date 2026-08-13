@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Settings, Users, Wallet } from "lucide-react";
+import { BarChart3, CreditCard, Settings, Users, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SignOutButton } from "@/components/sign-out-button";
 
@@ -11,6 +11,7 @@ const NAV = [
   { href: "/clients", label: "Clients", icon: Users },
   { href: "/settings", label: "Settings", icon: Settings },
   { href: "/settings/usage", label: "Usage", icon: Wallet },
+  { href: "/settings/billing", label: "Plan", icon: CreditCard },
 ] as const;
 
 /**
