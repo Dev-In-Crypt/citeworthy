@@ -36,10 +36,22 @@ export interface PlanLimits {
   priceUsd: number;
 }
 
+/**
+ * Одна проверка — один ответ одной платформы на один промпт.
+ *
+ * Клиент при обычной работе (24 промпта × 3 сэмпла × 3 платформы, недельные
+ * прогоны) расходует ≈935 проверок в месяц и стоит нам ≈$32 при измеренной
+ * цене ответа. Allowance выставлен с запасом ~40% к этому расходу, а не «на
+ * глаз»: прежние 6 000 / 25 000 / 70 000 обещали втрое больше, чем продукт
+ * потребляет, и клиент, забравший обещанное на дорогом плане, обошёлся бы в
+ * $2 396 из уплаченных $2 499. Оффер не должен обещать то, что разоряет.
+ */
+export const CHECKS_PER_CLIENT_MONTH = 935;
+
 export const PLAN_LIMITS: Record<"starter" | "growth" | "scale", PlanLimits> = {
-  starter: { clientLimit: 3, aiCheckAllowance: 6_000, priceUsd: 499 },
-  growth: { clientLimit: 10, aiCheckAllowance: 25_000, priceUsd: 1_299 },
-  scale: { clientLimit: 25, aiCheckAllowance: 70_000, priceUsd: 2_499 },
+  starter: { clientLimit: 3, aiCheckAllowance: 4_000, priceUsd: 499 },
+  growth: { clientLimit: 10, aiCheckAllowance: 13_000, priceUsd: 1_299 },
+  scale: { clientLimit: 25, aiCheckAllowance: 32_500, priceUsd: 2_499 },
 };
 
 export interface UsageStatus {

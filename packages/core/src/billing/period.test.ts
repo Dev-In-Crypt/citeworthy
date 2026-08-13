@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { billingPeriod, billingPeriodBounds, PLAN_LIMITS, usageStatus } from "./period";
+import {
+  billingPeriod,
+  billingPeriodBounds,
+  CHECKS_PER_CLIENT_MONTH,
+  PLAN_LIMITS,
+  usageStatus,
+} from "./period";
 
 describe("billingPeriod", () => {
   const cases: [string, string][] = [
@@ -57,6 +63,18 @@ describe("PLAN_LIMITS", () => {
     expect(PLAN_LIMITS.starter.clientLimit).toBe(3);
     expect(PLAN_LIMITS.growth.clientLimit).toBe(10);
     expect(PLAN_LIMITS.scale.clientLimit).toBe(25);
+  });
+
+  it("allowance покрывает обычную работу с запасом, но не втрое", () => {
+    // Обещать больше, чем продукт потребляет, — значит продать себе убыток:
+    // клиент вправе забрать обещанное. Запас держим в коридоре 1.2–1.6.
+    for (const plan of [PLAN_LIMITS.starter, PLAN_LIMITS.growth, PLAN_LIMITS.scale]) {
+      const typical = plan.clientLimit * CHECKS_PER_CLIENT_MONTH;
+      const headroom = plan.aiCheckAllowance / typical;
+
+      expect(headroom).toBeGreaterThan(1.2);
+      expect(headroom).toBeLessThan(1.6);
+    }
   });
 
   it("цена растёт медленнее лимита клиентов — так и задумано в спеке", () => {

@@ -80,6 +80,15 @@ export const PRICING_NOTES = {
     "Every plan includes the whole product: measurement, diagnosis, the actions board, experiments, white-label reports and PDF export.",
   frame:
     "Priced against the retainer revenue it supports, not against the price of a rank tracker.",
+  /**
+   * Сказано прямо, потому что это единственная строка в тарифах, о которую
+   * агентство может обжечься: allowance рассчитан на обычную работу, и
+   * молчание про перерасход читалось бы как «сколько угодно».
+   */
+  checks:
+    "One AI check is one assistant answering one prompt once. A client measured the usual way — around two dozen prompts, three samples each, across three assistants every week — uses roughly 950 checks a month, so each plan carries about 40% headroom on top of its client count.",
+  overage:
+    "Going past the allowance does not cut anything off mid-month: you get a warning and we agree on the next step together.",
   checkout: "There is no self-serve checkout yet — accounts are set up with us.",
 };
 

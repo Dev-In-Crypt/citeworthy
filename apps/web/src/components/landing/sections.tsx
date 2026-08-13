@@ -233,6 +233,8 @@ export function Pricing() {
 
       <div className="flex max-w-prose flex-col gap-2 text-sm text-muted-foreground">
         <p>{PRICING_NOTES.included}</p>
+        <p data-testid="pricing-checks">{PRICING_NOTES.checks}</p>
+        <p>{PRICING_NOTES.overage}</p>
         <p>{PRICING_NOTES.frame}</p>
         <p>{PRICING_NOTES.checkout}</p>
       </div>

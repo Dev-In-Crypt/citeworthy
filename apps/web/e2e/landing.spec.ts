@@ -32,6 +32,11 @@ test("landing gives an anonymous visitor the offer, the plans and a way in", asy
   // Пределы названы вслух, а не спрятаны в подвал.
   await expect(page.getByTestId("landing-limits")).toContainText("ninety days");
 
+  // Allowance объяснён: сколько проверок съедает обычный клиент. Молчание
+  // здесь читалось бы как «сколько угодно».
+  await expect(page.getByTestId("pricing-checks")).toContainText("950 checks");
+  await expect(page.getByText("4,000")).toBeVisible();
+
   // Цифры витрины взяты из демонстрационного отчёта.
   await expect(page.getByTestId("landing-report-figures")).toContainText("19.4% → 28.6%");
   await expect(page.getByTestId("visibility-gap")).toContainText("11.5%");
