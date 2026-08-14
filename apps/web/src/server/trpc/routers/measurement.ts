@@ -1,6 +1,16 @@
 import { z } from "zod";
-import { competitorGapPp, MIN_SAMPLES_PER_CELL } from "@repo/core";
-import { getClientById, listVisibilitySeries } from "@repo/db";
+import {
+  collapsePromptFacts,
+  competitorGapPp,
+  computePromptMatrix,
+  MIN_SAMPLES_PER_CELL,
+} from "@repo/core";
+import {
+  getClientById,
+  listActivePromptsForClient,
+  listPromptPlatformFacts,
+  listVisibilitySeries,
+} from "@repo/db";
 import { assertTenant, protectedProcedure, router } from "../trpc";
 
 const platformEnum = z.enum(["chatgpt", "perplexity", "gemini"]);
@@ -64,6 +74,59 @@ export const measurementRouter = router({
                     10,
             }
           : null,
+      };
+    }),
+
+  /**
+   * Матрица «промпт × ассистент» за окно.
+   *
+   * Окно по умолчанию — 28 дней, а не неделя: при нынешнем расписании
+   * недельная ячейка почти всегда не набирает порог сэмплов, и экран
+   * состоял бы из прочерков. Ширина окна показана в интерфейсе рядом
+   * с числами — иначе они читались бы как «за неделю».
+   */
+  matrix: protectedProcedure
+    .input(
+      z.object({
+        clientId: z.uuid(),
+        windowDays: z.number().int().min(7).max(90).default(28),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const client = await getClientById(ctx.db, input.clientId);
+      assertTenant(client, ctx.user.agencyId);
+
+      const to = new Date();
+      const from = new Date(to.getTime() - input.windowDays * 86_400_000);
+
+      const [prompts, facts] = await Promise.all([
+        listActivePromptsForClient(ctx.db, input.clientId),
+        listPromptPlatformFacts(ctx.db, input.clientId, from, to),
+      ]);
+
+      // Порядок строк фиксируем здесь: запрос его не гарантирует, а матрица,
+      // переставляющая вопросы между заходами, нечитаема.
+      const ordered = [...prompts].sort((a, b) => {
+        const byTime = a.createdAt.getTime() - b.createdAt.getTime();
+        return byTime !== 0 ? byTime : a.id.localeCompare(b.id);
+      });
+
+      const matrix = computePromptMatrix({
+        records: collapsePromptFacts(facts),
+        prompts: ordered.map((prompt) => ({
+          id: prompt.id,
+          text: prompt.text,
+          clusterId: prompt.clusterId,
+        })),
+        from,
+        to,
+      });
+
+      return {
+        ...matrix,
+        client: { name: client.name, domain: client.domain },
+        competitorNames: client.competitorNames,
+        minSamples: MIN_SAMPLES_PER_CELL,
       };
     }),
 });

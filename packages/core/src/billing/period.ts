@@ -48,6 +48,19 @@ export interface PlanLimits {
  */
 export const CHECKS_PER_CLIENT_MONTH = 935;
 
+/**
+ * Во что обходится один ответ ассистента.
+ *
+ * Замер 2026-08-12 на живом адаптере ChatGPT при reasoning=medium: $0.0247,
+ * из них около четырёх пятых — вызовы веб-поиска. Число нужно, чтобы
+ * показать цену расписания до того, как его сохранят: агентство должно
+ * видеть, во что обойдётся «давайте замерять почаще».
+ *
+ * Это оценка для интерфейса. Настоящая стоимость каждого ответа пишется
+ * в БД самим адаптером и считается по ней, а не по этой константе.
+ */
+export const ESTIMATED_COST_PER_ANSWER_USD = 0.0247;
+
 export const PLAN_LIMITS: Record<"starter" | "growth" | "scale", PlanLimits> = {
   starter: { clientLimit: 3, aiCheckAllowance: 4_000, priceUsd: 499 },
   growth: { clientLimit: 10, aiCheckAllowance: 13_000, priceUsd: 1_299 },

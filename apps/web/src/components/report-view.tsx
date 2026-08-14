@@ -81,11 +81,24 @@ export function ReportView({
       </header>
 
       <section className="flex flex-col gap-4">
-        <h1 className="text-2xl font-semibold tracking-tight">AI Search performance</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">AI answer visibility</h1>
+
+        {/* Одна фраза перед цифрами: клиент агентства читает отчёт по диагонали,
+            и первое, что он должен унести, — что это оценка, а не счётчик. */}
+        <p data-testid="report-summary" className="max-w-prose text-sm leading-relaxed">
+          Across the tracked buyer questions, {payload.client.name} was named in an estimated{" "}
+          <span className="metric font-medium">{payload.visibility.after}%</span> of answers this
+          period, {payload.results.visibilityDeltaPp >= 0 ? "up" : "down"} from{" "}
+          <span className="metric">{payload.visibility.before}%</span>. The gap to the strongest
+          tracked competitor stands at{" "}
+          <span className="metric">{formatPp(payload.competitorGap.after)}</span>. Every figure is
+          an estimate from repeated samples of assistant answers, not a count of real buyer
+          conversations.
+        </p>
 
         <div className="grid gap-3 sm:grid-cols-2">
           <Stat
-            label="AI visibility"
+            label="Named in answers"
             testId="report-visibility"
             value={`${payload.visibility.before}% → ${payload.visibility.after}%`}
             hint={`${formatPp(payload.results.visibilityDeltaPp)} over the period`}

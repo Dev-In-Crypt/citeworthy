@@ -5,9 +5,13 @@ import { createTRPCReact } from "@trpc/react-query";
 import { httpBatchLink } from "@trpc/client";
 import superjson from "superjson";
 import { useState } from "react";
+import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "@/server/trpc/root";
 
 export const api = createTRPCReact<AppRouter>();
+
+/** Типы ответов процедур: компоненты берут форму данных отсюда, а не переписывают её. */
+export type RouterOutputs = inferRouterOutputs<AppRouter>;
 
 export function TrpcProvider({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(

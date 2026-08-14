@@ -1,12 +1,16 @@
 "use client";
 
 import { use } from "react";
+import { useSearchParams } from "next/navigation";
 import { api } from "@/trpc/react";
 import { PageHeader } from "@/components/page-header";
 import { MeasureView } from "./measure-view";
+import { OnboardingSteps } from "../onboarding/steps";
 
 export default function MeasurePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const searchParams = useSearchParams();
+  const onboarding = searchParams.get("step") === "3";
   const client = api.clients.get.useQuery({ id });
 
   if (client.error) {
@@ -15,6 +19,9 @@ export default function MeasurePage({ params }: { params: Promise<{ id: string }
 
   return (
     <>
+      {/* Шаги показываются только когда сюда пришли из онбординга: на обычном
+          заходе «3 из 3» означало бы незаконченную настройку, которой нет. */}
+      {onboarding && <OnboardingSteps current={3} />}
       <PageHeader
         title="Measure"
         description={

@@ -17,6 +17,32 @@ export const SEED_CLUSTER_COMPARISON_ID = "00000000-0000-4000-8000-000000000005"
 export const SEED_CLUSTER_LEARNING_ID = "00000000-0000-4000-8000-000000000006";
 export const SEED_SCHEDULE_ID = "00000000-0000-4000-8000-000000000007";
 
+export const SEED_CLIENT_LEDGERBROOK_ID = "00000000-0000-4000-8000-000000000008";
+export const SEED_CLUSTER_SPEND_COMPARISON_ID = "00000000-0000-4000-8000-000000000009";
+export const SEED_CLUSTER_SPEND_PURCHASE_ID = "00000000-0000-4000-8000-00000000000a";
+
+/**
+ * Ledgerbrook — вымышленный клиент из макетов: spend management для
+ * среднего бизнеса, конкуренты Outlay, Spendhaven и Tallyard.
+ *
+ * Имена выдуманы намеренно. Демо-данные с настоящими брендами означали бы
+ * отчёт с цифрами видимости компаний, которых мы никогда не измеряли, —
+ * а он уходит наружу под логотипом агентства.
+ */
+const SPEND_COMPARISON_PROMPTS: { text: string; isControl: boolean }[] = [
+  { text: "best expense management software for a 300-person company", isControl: false },
+  { text: "Ledgerbrook vs Outlay", isControl: false },
+  { text: "Outlay alternatives for mid-market finance teams", isControl: false },
+  // Контрольный промпт из другой категории: по нему видно фоновый дрейф.
+  { text: "best CRM for startups", isControl: true },
+];
+
+const SPEND_PURCHASE_PROMPTS: { text: string; isControl: boolean }[] = [
+  { text: "corporate card with automated expense reports", isControl: false },
+  { text: "spend management that syncs with NetSuite", isControl: false },
+  { text: "how to close the books faster at 500 employees", isControl: false },
+];
+
 /** Промпты кластера сравнения — коммерческий интент, где и решается видимость. */
 const COMPARISON_PROMPTS: { text: string; isControl: boolean }[] = [
   { text: "best CRM for startups", isControl: false },
@@ -91,6 +117,16 @@ export async function seed(db: Database): Promise<void> {
         competitorNames: ["Amplitude", "Mixpanel", "Heap"],
         status: "active",
       },
+      {
+        id: SEED_CLIENT_LEDGERBROOK_ID,
+        agencyId: SEED_AGENCY_ID,
+        name: "Ledgerbrook",
+        domain: "ledgerbrook.test",
+        industry: "Spend management for mid-market finance teams",
+        brandNames: ["Ledgerbrook", "Ledgerbrook Inc", "the Ledgerbrook Card"],
+        competitorNames: ["Outlay", "Spendhaven", "Tallyard"],
+        status: "active",
+      },
     ])
     .onConflictDoNothing({ target: clients.id });
 
@@ -109,6 +145,18 @@ export async function seed(db: Database): Promise<void> {
         name: "CRM basics",
         intent: "learning",
       },
+      {
+        id: SEED_CLUSTER_SPEND_COMPARISON_ID,
+        clientId: SEED_CLIENT_LEDGERBROOK_ID,
+        name: "Spend management comparison",
+        intent: "comparison",
+      },
+      {
+        id: SEED_CLUSTER_SPEND_PURCHASE_ID,
+        clientId: SEED_CLIENT_LEDGERBROOK_ID,
+        name: "Buying signals",
+        intent: "purchase",
+      },
     ])
     .onConflictDoNothing({ target: promptClusters.id });
 
@@ -119,6 +167,11 @@ export async function seed(db: Database): Promise<void> {
     const rows: NewPrompt[] = [
       ...COMPARISON_PROMPTS.map((p) => ({ ...p, clusterId: SEED_CLUSTER_COMPARISON_ID })),
       ...LEARNING_PROMPTS.map((p) => ({ ...p, clusterId: SEED_CLUSTER_LEARNING_ID })),
+      ...SPEND_COMPARISON_PROMPTS.map((p) => ({
+        ...p,
+        clusterId: SEED_CLUSTER_SPEND_COMPARISON_ID,
+      })),
+      ...SPEND_PURCHASE_PROMPTS.map((p) => ({ ...p, clusterId: SEED_CLUSTER_SPEND_PURCHASE_ID })),
     ];
     await db.insert(prompts).values(rows);
   }

@@ -11,6 +11,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { EXPERIMENT_COPY } from "@repo/core";
 import { api } from "@/trpc/react";
 import { EmptyState } from "@/components/page-header";
 
@@ -127,6 +128,18 @@ function ExperimentDetail({ experimentId }: { experimentId: string }) {
             <li key={item}>· {item}</li>
           ))}
         </ul>
+
+        {/* Отдельным блоком, а не припиской: то, чего цифра не значит, читают
+            ровно тогда, когда это выделено так же, как сама цифра. */}
+        <div
+          data-testid="not-attribution"
+          className="flex flex-col gap-1.5 rounded-lg border border-dashed p-3"
+        >
+          <h3 className="text-sm font-medium">What this does not say</h3>
+          <p className="max-w-prose text-sm text-muted-foreground">
+            {EXPERIMENT_COPY.attributionLimits}
+          </p>
+        </div>
       </section>
 
       <section className="flex flex-col gap-2 rounded-lg border p-4">

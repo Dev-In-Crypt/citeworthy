@@ -30,6 +30,15 @@ export default function PromptResponsesPage({
 
   const { prompt, dictionary, responses } = data.data;
 
+  /**
+   * Ответ считается «назвал клиента», если подсветка нашла в нём клиента —
+   * тем же способом, каким считается доля на дашборде. Второй способ счёта
+   * означал бы, что экран и цифра расходятся.
+   */
+  const mentionsClient = (text: string) =>
+    highlightMentions(text, dictionary).some((segment) => segment.kind === "client");
+  const namedIn = responses.filter((response) => mentionsClient(response.rawText));
+
   return (
     <>
       <PageHeader
@@ -54,6 +63,12 @@ export default function PromptResponsesPage({
           <span className="inline-block size-3 rounded-sm bg-competitor/20 ring-1 ring-competitor" />
           competitors
         </span>
+        {/* Сколько ответов и в скольких из них клиент — это и есть та доля,
+            которая стоит на дашборде; здесь её можно пересчитать руками. */}
+        <span data-testid="named-in" className="metric">
+          {responses.length} {responses.length === 1 ? "answer" : "answers"} · named in{" "}
+          {namedIn.length}
+        </span>
         {prompt.isControl && <span>This is a control prompt.</span>}
       </div>
 
@@ -70,10 +85,20 @@ export default function PromptResponsesPage({
                 <span className="font-medium text-foreground">
                   {PLATFORM_LABELS[response.platform] ?? response.platform}
                 </span>
-                <span>sample {response.sampleIndex + 1}</span>
+                <span className="metric">
+                  sample {response.sampleIndex + 1} of {responses.length}
+                </span>
                 <span className="metric">{response.modelVersion}</span>
                 <span className="metric">${Number(response.costUsd).toFixed(4)}</span>
                 <span className="metric">{new Date(response.createdAt).toLocaleString()}</span>
+                {!mentionsClient(response.rawText) && (
+                  <span
+                    data-testid="not-named"
+                    className="rounded-full bg-competitor/12 px-2 py-1 text-[11px] font-medium text-competitor"
+                  >
+                    not named
+                  </span>
+                )}
               </div>
 
               <p

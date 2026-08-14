@@ -1,12 +1,13 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { canAddClient, normalizeDomain } from "@repo/core";
+import { canAddClient, competitorGapPp, confidenceFor, normalizeDomain } from "@repo/core";
 import {
   countClientsByAgency,
   createClient,
   deleteClient,
   getClientById,
   listClientsByAgency,
+  listPortfolioRows,
   updateClient,
 } from "@repo/db";
 import { assertTenant, protectedProcedure, roleProcedure, router } from "../trpc";
@@ -38,6 +39,64 @@ const clientInput = z.object({
 
 export const clientsRouter = router({
   list: protectedProcedure.query(({ ctx }) => listClientsByAgency(ctx.db, ctx.user.agencyId)),
+
+  /**
+   * Портфель агентства — первый экран продукта.
+   *
+   * Отдаёт не только цифры, но и то, что требует человека: отчёт на
+   * согласовании, зависшие действия, сломанное расписание. Экран, который
+   * показывает только проценты, не отвечает на вопрос «чем мне заняться».
+   */
+  portfolio: protectedProcedure.query(async ({ ctx }) => {
+    const rows = await listPortfolioRows(ctx.db, ctx.user.agencyId);
+
+    return rows.map((row) => {
+      const gapPp =
+        row.visibilityPct === null
+          ? null
+          : competitorGapPp({
+              clusterId: null,
+              platform: null,
+              periodStart: new Date(0),
+              periodEnd: new Date(0),
+              clientVisibilityPct: row.visibilityPct,
+              competitorVisibility: row.competitorVisibility,
+              sampleCount: row.sampleCount,
+              sufficient: row.sufficient,
+            });
+
+      const needs: string[] = [];
+      if (row.reportsAwaitingApproval > 0) {
+        needs.push(
+          row.reportsAwaitingApproval === 1
+            ? "Report to approve"
+            : `${row.reportsAwaitingApproval} reports to approve`,
+        );
+      }
+      if (row.staleActions > 0) {
+        needs.push(`${row.staleActions} actions stalled`);
+      }
+      if (row.lastRunAt === null) {
+        needs.push("Awaiting first run");
+      }
+
+      return {
+        clientId: row.clientId,
+        name: row.name,
+        domain: row.domain,
+        status: row.status,
+        visibilityPct: row.visibilityPct,
+        gapPp,
+        deltaPp: row.deltaPp,
+        sampleCount: row.sampleCount,
+        sufficient: row.sufficient,
+        confidence: confidenceFor(row.sampleCount),
+        openActions: row.openActions,
+        lastRunAt: row.lastRunAt,
+        needs,
+      };
+    });
+  }),
 
   get: protectedProcedure.input(z.object({ id: z.uuid() })).query(async ({ ctx, input }) => {
     const client = await getClientById(ctx.db, input.id);

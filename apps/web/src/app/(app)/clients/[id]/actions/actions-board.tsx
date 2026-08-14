@@ -26,6 +26,19 @@ type ActionRow = {
   createdAt: Date;
 };
 
+/**
+ * Порядок работ: предполагаемая отдача против трудозатрат.
+ *
+ * Простая и открытая формула, а не скрытый скоринг: агентство должно
+ * понимать, почему одна строка выше другой, и иметь право не согласиться.
+ */
+const IMPACT_RANK: Record<string, number> = { high: 3, medium: 2, low: 1 };
+const EFFORT_RANK: Record<string, number> = { low: 3, medium: 2, high: 1 };
+
+function priority(row: { estimatedImpact: string; effort: string }): number {
+  return (IMPACT_RANK[row.estimatedImpact] ?? 2) * 2 + (EFFORT_RANK[row.effort] ?? 2);
+}
+
 const IMPACT_STYLE: Record<string, string> = {
   high: "bg-client/15 text-foreground",
   medium: "bg-secondary text-muted-foreground",
@@ -90,7 +103,14 @@ export function ActionsBoard({ clientId }: { clientId: string }) {
     <>
       <div data-testid="actions-board" className="grid gap-4 md:grid-cols-3">
         {COLUMNS.map((column) => {
-          const columnRows = rows.filter((row) => row.status === column.status);
+          const columnRows = rows
+            .filter((row) => row.status === column.status)
+            .sort((a, b) => {
+              const byPriority = priority(b) - priority(a);
+              return byPriority !== 0
+                ? byPriority
+                : new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+            });
 
           return (
             <section
@@ -112,20 +132,31 @@ export function ActionsBoard({ clientId }: { clientId: string }) {
                 <span className="metric text-muted-foreground">{columnRows.length}</span>
               </h2>
 
-              {columnRows.map((row) => (
+              {columnRows.map((row, index) => (
                 <article
                   key={row.id}
                   draggable
                   onDragStart={(event) => event.dataTransfer.setData("text/plain", row.id)}
                   className="flex cursor-grab flex-col gap-2 rounded-md border bg-background p-3"
                 >
-                  <button
-                    type="button"
-                    onClick={() => setSelected(row)}
-                    className="text-left text-sm font-medium hover:underline"
-                  >
-                    {row.title}
-                  </button>
+                  <div className="flex items-baseline gap-2">
+                    {/* Номер в очереди: колонка отсортирована по отдаче против
+                        трудозатрат, и порядок должен быть виден, а не угадываться. */}
+                    <span className="metric text-xs font-semibold text-muted-foreground/60">
+                      {String(index + 1).padStart(2, "0")}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setSelected(row)}
+                      className="text-left text-sm font-medium hover:underline"
+                    >
+                      {row.title}
+                    </button>
+                  </div>
+
+                  {/* Причина стоит на карточке, а не только в drawer'е: список
+                      задач без причин — это список задач (инвариант 7). */}
+                  <p className="line-clamp-2 text-xs text-muted-foreground">{row.reason}</p>
 
                   <div className="flex flex-wrap items-center gap-1.5 text-xs">
                     <span className="rounded-full bg-secondary px-2 py-0.5 text-muted-foreground">
@@ -134,7 +165,10 @@ export function ActionsBoard({ clientId }: { clientId: string }) {
                     <span
                       className={`rounded-full px-2 py-0.5 ${IMPACT_STYLE[row.estimatedImpact] ?? ""}`}
                     >
-                      impact: {row.estimatedImpact}
+                      impact: {row.estimatedImpact} (est.)
+                    </span>
+                    <span className="rounded-full bg-secondary px-2 py-0.5 text-muted-foreground">
+                      effort: {row.effort}
                     </span>
                     {row.sourceDomain && (
                       <span className="text-muted-foreground">{row.sourceDomain}</span>
@@ -297,11 +331,39 @@ function ActionBriefPanel({ actionId }: { actionId: string }) {
 
   const { objective, context, steps, acceptance, pitfalls } = brief.data;
 
+  /**
+   * Бриф уезжает в чужой инструмент: работу делают люди в Notion, Asana или
+   * в письме подрядчику. Отдаём простым текстом, а не разметкой — он должен
+   * читаться там, куда его вставят.
+   */
+  const asText = [
+    objective,
+    "",
+    ...context,
+    "",
+    "Steps:",
+    ...steps.map((step, index) => `${index + 1}. ${step}`),
+    "",
+    "Accepted when:",
+    ...acceptance.map((line) => `- ${line}`),
+    ...(pitfalls.length > 0 ? ["", "Watch out for:", ...pitfalls.map((line) => `- ${line}`)] : []),
+  ].join("\n");
+
   return (
     <section data-testid="action-brief" className="flex flex-col gap-4 border-t pt-4">
-      <div className="flex flex-col gap-1">
-        <h3 className="text-sm font-medium">What done looks like</h3>
-        <p className="text-sm text-muted-foreground">{objective}</p>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <h3 className="text-sm font-medium">What done looks like</h3>
+          <p className="text-sm text-muted-foreground">{objective}</p>
+        </div>
+        <button
+          type="button"
+          data-testid="copy-brief"
+          onClick={() => void navigator.clipboard?.writeText(asText)}
+          className="h-8 shrink-0 rounded-md border px-2.5 text-xs font-medium hover:bg-accent"
+        >
+          Copy brief
+        </button>
       </div>
 
       {context.length > 0 && (

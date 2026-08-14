@@ -74,7 +74,7 @@ test("agency downloads a PDF containing the client report", async ({ page }) => 
   // Содержимое, а не просто «файл скачался».
   expect(text).toContain("AcmeCRM");
   expect(text).toContain("Northwind Studio");
-  expect(text).toContain("AI Search performance");
+  expect(text).toContain("AI answer visibility");
   // Инвариант 2 держится и в печатной версии.
   expect(text).not.toMatch(/\bproven\b|\bproof\b|\bguaranteed\b|\bcaused\b/i);
 });

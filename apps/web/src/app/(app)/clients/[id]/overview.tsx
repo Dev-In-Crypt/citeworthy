@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import {
   CartesianGrid,
   Line,
@@ -10,8 +11,10 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { api } from "@/trpc/react";
+import { CONFIDENCE_LABELS, MEASUREMENT_COPY } from "@repo/core";
+import { api, type RouterOutputs } from "@/trpc/react";
 import { EmptyState } from "@/components/page-header";
+import { MatrixSection } from "./matrix-view";
 
 const PLATFORMS = [
   { value: null, label: "All platforms" },
@@ -28,6 +31,40 @@ const COMPETITOR_COLORS = [
   "oklch(0.62 0.12 40)",
   "oklch(0.72 0.10 90)",
 ];
+
+interface WeekDotProps {
+  cx?: number;
+  cy?: number;
+  index?: number;
+  payload?: { sufficient?: boolean };
+}
+
+/**
+ * Точка недели: закрашенная — измерение, полая — неделя ниже порога сэмплов.
+ *
+ * Такую неделю нельзя ни выбросить, ни нарисовать наравне с остальными:
+ * выброшенная превратила бы провал в ровную линию, а равная — выдала бы
+ * догадку за измерение.
+ */
+function renderWeekDot(props: unknown) {
+  const { cx, cy, index, payload } = props as WeekDotProps;
+  if (cx === undefined || cy === undefined) return <g key={index} />;
+
+  const sufficient = payload?.sufficient !== false;
+
+  return (
+    <circle
+      key={index}
+      cx={cx}
+      cy={cy}
+      r={3.5}
+      fill={sufficient ? "var(--color-client)" : "var(--color-background)"}
+      stroke="var(--color-client)"
+      strokeWidth={sufficient ? 0 : 1.5}
+      strokeDasharray={sufficient ? undefined : "2 2"}
+    />
+  );
+}
 
 function StatCard({
   label,
@@ -51,12 +88,84 @@ function StatCard({
   );
 }
 
+/** Одна фраза, которую агентство перескажет своему клиенту. */
+function OneLineRead({ matrix }: { matrix: RouterOutputs["measurement"]["matrix"] }) {
+  const { totals, rows } = matrix;
+  const competitor = totals.competitorTop;
+
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border p-4">
+      <h2 className="text-sm font-medium">Read as one line</h2>
+
+      <p data-testid="one-line-read" className="text-sm text-muted-foreground">
+        {totals.ratePct === null ? (
+          MEASUREMENT_COPY.noDataYet
+        ) : (
+          <>
+            {matrix.client.name} is named in an estimated{" "}
+            <span className="metric font-medium text-foreground">{Math.round(totals.ratePct)}%</span>{" "}
+            of answers to the {rows.length} tracked {rows.length === 1 ? "prompt" : "prompts"}.
+            {competitor && (
+              <>
+                {" "}
+                {competitor.name} is named in {Math.round(competitor.pct)}% of the same answers.
+              </>
+            )}
+          </>
+        )}
+      </p>
+
+      <div className="flex flex-wrap gap-1.5">
+        <span className="rounded-full bg-client/15 px-2 py-1 text-[11px] font-medium">
+          {CONFIDENCE_LABELS[totals.confidence].toLowerCase()}
+        </span>
+        <span className="metric rounded-full bg-muted px-2 py-1 text-[11px] font-medium text-muted-foreground">
+          {totals.samples} answers sampled
+        </span>
+        <span className="rounded-full bg-muted px-2 py-1 text-[11px] font-medium text-muted-foreground">
+          estimated
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/** Очередь работ — сколько открыто и сколько ждёт перепроверки. */
+function QueueCard({ clientId }: { clientId: string }) {
+  const actions = api.actions.list.useQuery({ clientId });
+  const rows = actions.data ?? [];
+
+  const open = rows.filter((action) => action.status !== "done" && action.status !== "dropped");
+  const awaiting = rows.filter((action) => action.status === "done");
+
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border p-4">
+      <h2 className="text-sm font-medium">Queue</h2>
+      <div className="flex items-baseline gap-2">
+        <span data-testid="queue-open" className="metric text-2xl font-semibold">
+          {open.length}
+        </span>
+        <span className="text-sm text-muted-foreground">
+          {open.length === 1 ? "action open" : "actions open"} · {awaiting.length} awaiting re-check
+        </span>
+      </div>
+      <Link
+        href={`/clients/${clientId}/actions`}
+        className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+      >
+        Open the queue →
+      </Link>
+    </div>
+  );
+}
+
 export function ClientOverview({ clientId }: { clientId: string }) {
   const [platform, setPlatform] = useState<PlatformFilter>(null);
   const [clusterId, setClusterId] = useState<string | null>(null);
 
   const clusters = api.prompts.clusters.useQuery({ clientId });
   const data = api.measurement.visibility.useQuery({ clientId, platform, clusterId });
+  const matrix = api.measurement.matrix.useQuery({ clientId });
 
   if (data.isPending) {
     return <p className="text-sm text-muted-foreground">Loading…</p>;
@@ -65,11 +174,13 @@ export function ClientOverview({ clientId }: { clientId: string }) {
   const latest = data.data?.latest ?? null;
   const series = data.data?.series ?? [];
   const competitors = (data.data?.competitorNames ?? []).slice(0, 4);
+  const thinWeeks = series.filter((point) => !point.sufficient).length;
 
   const chartData = series.map((point) => {
-    const row: Record<string, string | number> = {
+    const row: Record<string, string | number | boolean> = {
       week: new Date(point.periodStart).toISOString().slice(0, 10),
       client: point.clientVisibilityPct,
+      sufficient: point.sufficient,
     };
     for (const competitor of competitors) {
       row[competitor] = point.competitorVisibility[competitor] ?? 0;
@@ -79,27 +190,38 @@ export function ClientOverview({ clientId }: { clientId: string }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          label="AI visibility"
-          testId="stat-visibility"
-          value={latest ? `${latest.visibilityPct}%` : "—"}
-          hint={
-            latest
-              ? latest.deltaPp === null
-                ? `${latest.sampleCount} answers this week`
-                : `${latest.deltaPp >= 0 ? "+" : ""}${latest.deltaPp} pp vs previous week`
-              : "No measurements yet"
-          }
-        />
-        <StatCard
-          label="Competitor gap"
-          testId="stat-gap"
-          value={latest ? `${latest.competitorGapPp} pp` : "—"}
-          hint="Against the best-performing tracked competitor"
-        />
-        <StatCard label="Open actions" value="—" hint="Action queue lands in T40" />
-        <StatCard label="Last report" value="—" hint="Reporting lands in T50" />
+      {/* Что именно человек видит на этом экране — до того, как он прочтёт первую цифру. */}
+      <p
+        data-testid="method-note"
+        className="flex items-start gap-2.5 rounded-lg border border-dashed p-3 text-sm text-muted-foreground"
+      >
+        <span aria-hidden className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary" />
+        {MEASUREMENT_COPY.methodNote}
+      </p>
+
+      <div className="grid items-start gap-4 lg:grid-cols-[1.55fr_1fr]">
+        {matrix.data ? (
+          <MatrixSection matrix={matrix.data} />
+        ) : (
+          <div className="rounded-lg border p-4 text-sm text-muted-foreground">
+            {matrix.isPending ? "Loading…" : MEASUREMENT_COPY.noDataYet}
+          </div>
+        )}
+
+        <div className="flex flex-col gap-3">
+          {matrix.data && <OneLineRead matrix={matrix.data} />}
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+            <StatCard
+              label="Gap to the strongest competitor"
+              testId="stat-gap"
+              value={latest ? `${latest.competitorGapPp} pp` : "—"}
+              hint="Against the best-performing tracked competitor, same answers"
+            />
+          </div>
+
+          <QueueCard clientId={clientId} />
+        </div>
       </div>
 
       {latest && !latest.sufficient && (
@@ -175,7 +297,7 @@ export function ClientOverview({ clientId }: { clientId: string }) {
                   dataKey="client"
                   stroke="var(--color-client)"
                   strokeWidth={2}
-                  dot={false}
+                  dot={renderWeekDot}
                 />
                 {competitors.map((competitor, index) => (
                   <Line
@@ -194,8 +316,16 @@ export function ClientOverview({ clientId }: { clientId: string }) {
         )}
 
         <p className="text-sm text-muted-foreground">
-          Each point is the share of answers in that week mentioning the brand, across every sample
-          taken. Never a single answer.
+          {MEASUREMENT_COPY.visibilityBasis}
+          {thinWeeks > 0 && (
+            <>
+              {" "}
+              <span data-testid="thin-weeks">
+                {thinWeeks} {thinWeeks === 1 ? "week is" : "weeks are"} drawn hollow:{" "}
+                {MEASUREMENT_COPY.underFloor}
+              </span>
+            </>
+          )}
         </p>
       </section>
 

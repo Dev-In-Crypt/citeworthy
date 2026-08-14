@@ -90,6 +90,8 @@ export function DiagnoseView({ clientId }: { clientId: string }) {
     );
   }
 
+  const ownedShare = data.mix.find((entry) => entry.sourceType === "owned")?.sharePct ?? 0;
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between gap-3">
@@ -167,6 +169,14 @@ export function DiagnoseView({ clientId }: { clientId: string }) {
               </li>
             ))}
           </ul>
+
+          {/* Доля собственных страниц — единственная честная причина, почему
+              план «напишем ещё статей» не сдвинет эти цифры. */}
+          <p data-testid="owned-share" className="text-sm text-muted-foreground">
+            Owned pages carry <span className="metric">{ownedShare}%</span> of citations here.
+            {ownedShare < 20 &&
+              " Work confined to the client's own site would leave most of what assistants read untouched."}
+          </p>
         </section>
 
         <section className="flex flex-col gap-3 rounded-lg border p-4">

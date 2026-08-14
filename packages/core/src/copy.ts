@@ -26,6 +26,22 @@ export const MEASUREMENT_COPY = {
   visibilityBasis:
     "Share of answers in the period mentioning the brand, across every sample taken. Never a single answer.",
   noDataYet: "No measurements yet",
+  /** Шапка экрана клиента: чем являются все цифры на нём. */
+  methodNote:
+    "Everything on this screen is estimated from repeated samples of assistant answers. No figure comes from a single answer, and nothing is published anywhere until you approve it.",
+  /** Основание матрицы «промпт × ассистент». */
+  matrixBasis:
+    "Share of sampled answers mentioning the brand. Every cell is an aggregate over the window, never one answer.",
+  /**
+   * Ассистент, которого мы не спрашиваем. Формулировка обязана отличать
+   * «не спрашивали» от «спросили и не нашли» — второе было бы неправдой.
+   */
+  notMeasured:
+    "Not measured yet — we do not ask this assistant, so there is nothing to report either way.",
+  /** Ячейка, где конкурента назвали, а клиента нет. */
+  competitorOnly: "A tracked competitor was named in answers where the client was not.",
+  /** Ячейка ниже порога сэмплов. */
+  underFloor: "Under the sample floor for this window, so it shows a dash rather than a guess.",
 } as const;
 
 export const DIAGNOSIS_COPY = {

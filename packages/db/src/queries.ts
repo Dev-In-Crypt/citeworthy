@@ -349,6 +349,176 @@ export async function listResponseFactsForClient(db: Database, clientId: string)
   return rows;
 }
 
+export interface PortfolioRow {
+  clientId: string;
+  name: string;
+  domain: string;
+  status: Client["status"];
+  visibilityPct: number | null;
+  competitorVisibility: Record<string, number>;
+  sampleCount: number;
+  sufficient: boolean;
+  deltaPp: number | null;
+  openActions: number;
+  staleActions: number;
+  reportsAwaitingApproval: number;
+  lastRunAt: Date | null;
+}
+
+/**
+ * Портфель агентства: по строке на клиента.
+ *
+ * Считается из уже посчитанных срезов, а не из ответов: экран открывается
+ * на каждом заходе в продукт, и пересчитывать по нему всю историю значит
+ * платить временем за то, что уже посчитано воркером.
+ *
+ * Клиент, не набравший порог сэмплов, приезжает с `sufficient: false` —
+ * интерфейс обязан показать прочерк, а не число.
+ */
+export async function listPortfolioRows(
+  db: Database,
+  agencyId: string,
+  now: Date = new Date(),
+): Promise<PortfolioRow[]> {
+  const agencyClients = await db
+    .select()
+    .from(clients)
+    .where(eq(clients.agencyId, agencyId))
+    .orderBy(clients.createdAt);
+
+  if (agencyClients.length === 0) {
+    return [];
+  }
+
+  const ids = agencyClients.map((client) => client.id);
+
+  // Общие срезы (без разреза по кластеру и платформе) по всем клиентам разом.
+  const snapshots = await db
+    .select()
+    .from(visibilitySnapshots)
+    .where(
+      and(
+        inArray(visibilitySnapshots.clientId, ids),
+        isNull(visibilitySnapshots.clusterId),
+        isNull(visibilitySnapshots.platform),
+      ),
+    )
+    .orderBy(visibilitySnapshots.periodStart);
+
+  const byClient = new Map<string, typeof snapshots>();
+  for (const snapshot of snapshots) {
+    const list = byClient.get(snapshot.clientId) ?? [];
+    list.push(snapshot);
+    byClient.set(snapshot.clientId, list);
+  }
+
+  const actionRows = await db
+    .select({
+      clientId: actions.clientId,
+      status: actions.status,
+      createdAt: actions.createdAt,
+    })
+    .from(actions)
+    .where(inArray(actions.clientId, ids));
+
+  const pendingApprovals = await db
+    .select({ clientId: reports.clientId, shareId: reportShares.id })
+    .from(reportShares)
+    .innerJoin(reports, eq(reportShares.reportId, reports.id))
+    .where(and(inArray(reports.clientId, ids), isNull(reportShares.approvedAt)));
+
+  const lastRuns = await db
+    .select({ clientId: runs.clientId, finishedAt: runs.finishedAt, startedAt: runs.startedAt })
+    .from(runs)
+    .where(inArray(runs.clientId, ids));
+
+  /** Действие считается зависшим, если оно висит открытым дольше двух недель. */
+  const staleBefore = new Date(now.getTime() - 14 * 86_400_000);
+
+  return agencyClients.map((client): PortfolioRow => {
+    const series = byClient.get(client.id) ?? [];
+    const latest = series.at(-1);
+    const previous = series.length > 1 ? series[series.length - 2] : undefined;
+
+    const clientActions = actionRows.filter((row) => row.clientId === client.id);
+    const open = clientActions.filter(
+      (row) => row.status !== "done" && row.status !== "dropped",
+    );
+
+    const clientRuns = lastRuns.filter((row) => row.clientId === client.id);
+    const lastRunAt = clientRuns
+      .map((row) => row.finishedAt ?? row.startedAt)
+      .filter((value): value is Date => value !== null)
+      .sort((a, b) => b.getTime() - a.getTime())[0];
+
+    const latestPct = latest ? Number(latest.clientVisibilityPct) : null;
+    const previousPct = previous ? Number(previous.clientVisibilityPct) : null;
+
+    return {
+      clientId: client.id,
+      name: client.name,
+      domain: client.domain,
+      status: client.status,
+      // Ниже порога цифры нет вовсе: показать её значило бы выдать догадку.
+      visibilityPct: latest?.sufficient ? latestPct : null,
+      competitorVisibility: latest?.competitorVisibility ?? {},
+      sampleCount: latest?.sampleCount ?? 0,
+      sufficient: latest?.sufficient ?? false,
+      deltaPp:
+        latest?.sufficient && previous?.sufficient && latestPct !== null && previousPct !== null
+          ? Math.round((latestPct - previousPct) * 10) / 10
+          : null,
+      openActions: open.length,
+      staleActions: open.filter((row) => row.createdAt.getTime() < staleBefore.getTime()).length,
+      reportsAwaitingApproval: pendingApprovals.filter((row) => row.clientId === client.id).length,
+      lastRunAt: lastRunAt ?? null,
+    };
+  });
+}
+
+/**
+ * Факты для матрицы «промпт × ассистент» за окно.
+ *
+ * Отличается от `listResponseFactsForClient` двумя вещами: несёт сам промпт
+ * (матрица разложена по вопросам, а не по кластерам) и ограничена окном —
+ * матрица считается за 28 дней, чтобы ячейки набирали порог сэмплов без
+ * увеличения расхода. Фильтр по эффективному режиму адаптеров тот же:
+ * фикстурный прогон не должен попадать в измерение.
+ */
+export async function listPromptPlatformFacts(
+  db: Database,
+  clientId: string,
+  from: Date,
+  to: Date,
+) {
+  const mode = await effectiveAdaptersMode(db, clientId);
+
+  return db
+    .select({
+      responseId: responses.id,
+      promptId: responses.promptId,
+      promptText: prompts.text,
+      clusterId: prompts.clusterId,
+      platform: responses.platform,
+      createdAt: responses.createdAt,
+      entityName: mentions.entityName,
+      isClient: mentions.isClient,
+      isCompetitor: mentions.isCompetitor,
+    })
+    .from(responses)
+    .innerJoin(runs, eq(responses.runId, runs.id))
+    .innerJoin(prompts, eq(responses.promptId, prompts.id))
+    .leftJoin(mentions, eq(mentions.responseId, responses.id))
+    .where(
+      and(
+        eq(runs.clientId, clientId),
+        eq(runs.adaptersMode, mode),
+        gte(responses.createdAt, from),
+        lte(responses.createdAt, to),
+      ),
+    );
+}
+
 /**
  * Идемпотентная запись среза. Уникального ограничения в БД нет (см. комментарий
  * к индексу в схеме), поэтому существующая строка ищется явно.
