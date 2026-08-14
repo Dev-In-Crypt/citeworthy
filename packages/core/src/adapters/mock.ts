@@ -22,7 +22,7 @@ export function stableHash(input: string): number {
 export class MockAdapter implements PlatformAdapter {
   constructor(public readonly platform: Platform) {}
 
-  selectFixture(prompt: string): AdapterResult {
+  selectFixture(prompt: string, sampleIndex = 0): AdapterResult {
     const fixtures = fixturesForPlatform(this.platform);
 
     if (fixtures.length === 0) {
@@ -30,21 +30,28 @@ export class MockAdapter implements PlatformAdapter {
     }
 
     const normalized = prompt.trim().toLowerCase();
-    const exact = fixtures.find((fixture) => fixture.prompt.toLowerCase() === normalized);
-    if (exact) {
-      return exact.result;
-    }
 
-    const index = stableHash(normalized) % fixtures.length;
+    /**
+     * Точные совпадения берутся все, а не первое: у вопроса может быть
+     * несколько заготовленных ответов, и повторные сэмплы должны различаться
+     * так же, как различаются ответы живого ассистента. Один ответ на все
+     * сэмплы давал бы долю только 0% или 100%.
+     */
+    const exact = fixtures.filter((fixture) => fixture.prompt.toLowerCase() === normalized);
+    const pool = exact.length > 0 ? exact : fixtures;
+
+    // Детерминизм сохраняется: та же пара (вопрос, номер сэмпла) всегда
+    // даёт тот же ответ, иначе тесты пайплайна станут флаки.
+    const index = stableHash(`${normalized}#${sampleIndex}`) % pool.length;
     // Индекс всегда в границах массива, но noUncheckedIndexedAccess требует проверки.
-    const picked = fixtures[index];
+    const picked = pool[index];
     if (!picked) {
       throw new Error(`Fixture selection failed for platform "${this.platform}"`);
     }
     return picked.result;
   }
 
-  execute(prompt: string, _opts?: AdapterOptions): Promise<AdapterResult> {
-    return Promise.resolve(this.selectFixture(prompt));
+  execute(prompt: string, opts?: AdapterOptions): Promise<AdapterResult> {
+    return Promise.resolve(this.selectFixture(prompt, opts?.sampleIndex ?? 0));
   }
 }

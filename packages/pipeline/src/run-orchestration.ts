@@ -61,7 +61,9 @@ export async function executeRunJob(
   mode: AdaptersMode = "mock",
 ): Promise<string> {
   const adapter = getAdapter(job.platform, mode);
-  const result = await adapter.execute(job.promptText);
+  // Номер сэмпла нужен фикстурам, чтобы повторы одного вопроса различались;
+  // живые адаптеры его игнорируют.
+  const result = await adapter.execute(job.promptText, { sampleIndex: job.sampleIndex });
 
   const response = await createResponse(db, {
     runId: job.runId,

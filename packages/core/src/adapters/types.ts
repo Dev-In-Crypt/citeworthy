@@ -22,6 +22,13 @@ export interface AdapterResult {
 export interface AdapterOptions {
   geo?: string;
   lang?: string;
+  /**
+   * Номер сэмпла. Живые адаптеры его игнорируют — ассистент и так отвечает
+   * каждый раз по-своему. Фикстурам он нужен, чтобы повторные сэмплы одного
+   * вопроса различались: иначе доля в mock-режиме может быть только 0% или
+   * 100%, и весь смысл повторных замеров пропадает ещё до продакшена.
+   */
+  sampleIndex?: number;
 }
 
 export interface PlatformAdapter {

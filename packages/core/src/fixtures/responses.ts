@@ -1,4 +1,5 @@
 import type { AdapterResult, Platform } from "../adapters/types";
+import { SPEND_FIXTURES } from "./spend-responses";
 
 /**
  * Fixture-ответы платформ. На них держится весь пайплайн в mock-режиме
@@ -239,6 +240,15 @@ export const RESPONSE_FIXTURES: ResponseFixture[] = [
   },
 ];
 
+/**
+ * Полный набор: ответы про CRM (клиент AcmeCRM) плюс ответы про spend
+ * management (клиент Ledgerbrook из макетов). Разные наборы не смешиваются
+ * на одном вопросе — выбор идёт по точному совпадению текста вопроса.
+ */
+export function allFixtures(): ResponseFixture[] {
+  return [...RESPONSE_FIXTURES, ...SPEND_FIXTURES];
+}
+
 export function fixturesForPlatform(platform: Platform): ResponseFixture[] {
-  return RESPONSE_FIXTURES.filter((fixture) => fixture.platform === platform);
+  return allFixtures().filter((fixture) => fixture.platform === platform);
 }
