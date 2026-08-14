@@ -1,4 +1,4 @@
-import type { ReportPayload } from "@repo/core";
+import { MEASUREMENT_COPY, type ReportPayload } from "@repo/core";
 
 /**
  * Клиентский отчёт. Ноль брендинга продукта — только агентство (инвариант 3).
@@ -129,6 +129,26 @@ export function ReportView({
           </ul>
         )}
       </section>
+
+      {payload.movement && payload.movement.length > 0 && (
+        /* «Что изменилось» — первый вопрос клиента, и он про конкретные
+           вопросы покупателей, а не про одну усреднённую цифру. */
+        <section className="flex flex-col gap-3">
+          <h2 className="text-lg font-medium">What moved</h2>
+          <ul data-testid="report-movement" className="flex flex-col gap-1 text-sm">
+            {payload.movement.map((item) => (
+              <li key={item.prompt} className="flex justify-between gap-4 border-b py-2 last:border-0">
+                <span>{item.prompt}</span>
+                <span className="metric shrink-0 font-medium">
+                  {item.sharePct}% ({item.deltaPp >= 0 ? "+" : ""}
+                  {item.deltaPp} pp)
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="text-sm text-muted-foreground">{MEASUREMENT_COPY.movementBasis}</p>
+        </section>
+      )}
 
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-medium">Results</h2>

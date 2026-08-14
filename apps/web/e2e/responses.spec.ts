@@ -2,6 +2,9 @@ import { expect, test } from "@playwright/test";
 
 /** Verify T23: подсветка упоминаний в сыром ответе после mock-прогона. */
 
+/** Место клиента среди названных брендов видно на каждом ответе. */
+const RANK_BADGE = /named (first|\d+(st|nd|rd|th))/;
+
 const CSV = [
   "cluster,intent,prompt,is_control",
   "CRM comparison,comparison,best CRM for startups,false",
@@ -56,6 +59,11 @@ test("raw answers show highlighted client and competitor mentions", async ({ pag
 
   // Ссылки платформы показаны — на них строится диагностика источников.
   await expect(page.getByTestId("response-citations").first()).toContainText("g2.com");
+
+  // У каждого ответа видно не только «назван ли», но и каким по счёту:
+  // четвёртым в списке «а ещё бывают» — это не то же, что первым.
+  await expect(page.getByTestId("named-rank").first()).toContainText(RANK_BADGE);
+  await expect(page.getByTestId("named-in")).toContainText("named in");
 
   // Версия модели и стоимость видны у каждого ответа: без версии история
   // измерений несравнима между собой (провайдер меняет модель под тем же именем).

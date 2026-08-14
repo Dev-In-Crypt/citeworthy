@@ -11,7 +11,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { CONFIDENCE_LABELS, MEASUREMENT_COPY } from "@repo/core";
+import { CONFIDENCE_LABELS, MEASUREMENT_COPY, shareOfNamed } from "@repo/core";
 import { api, type RouterOutputs } from "@/trpc/react";
 import { EmptyState } from "@/components/page-header";
 import { MatrixSection } from "./matrix-view";
@@ -104,7 +104,28 @@ function OneLineRead({ matrix }: { matrix: RouterOutputs["measurement"]["matrix"
           <>
             {matrix.client.name} is named in an estimated{" "}
             <span className="metric font-medium text-foreground">{Math.round(totals.ratePct)}%</span>{" "}
-            of answers to the {rows.length} tracked {rows.length === 1 ? "prompt" : "prompts"}.
+            of answers to the {rows.length} tracked {rows.length === 1 ? "prompt" : "prompts"}
+            {totals.interval && (
+              <>
+                {" "}
+                (<span className="metric">
+                  {Math.round(totals.interval.low)}–{Math.round(totals.interval.high)}%
+                </span>{" "}
+                on this sample)
+              </>
+            )}
+            {matrix.totalsDeltaPp !== null && (
+              <>
+                , {matrix.totalsDeltaPp === 0 ? "flat" : matrix.totalsDeltaPp > 0 ? "up" : "down"}{" "}
+                <span className="metric">{Math.abs(matrix.totalsDeltaPp)} pp</span> against the
+                previous {matrix.windowDays} days
+                {/* Пересекающиеся интервалы — это «не различить», а не «выросло». */}
+                {!matrix.totalsDistinguishable && (
+                  <span data-testid="within-noise"> — {MEASUREMENT_COPY.withinNoise}</span>
+                )}
+              </>
+            )}
+            .
             {competitor && (
               <>
                 {" "}
@@ -126,6 +147,59 @@ function OneLineRead({ matrix }: { matrix: RouterOutputs["measurement"]["matrix"
           estimated
         </span>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Как именно назван клиент, а не только назван ли.
+ *
+ * Ответ, где клиент стоит четвёртым в списке «а ещё бывают», и ответ, где он
+ * назван первым, дают одну и ту же долю упоминаний, но продают по-разному.
+ * Порядок брендов парсер сохраняет с самого начала — считать заново нечего.
+ */
+function ProminenceCard({ matrix }: { matrix: RouterOutputs["measurement"]["matrix"] }) {
+  const { prominence } = matrix;
+
+  const first = shareOfNamed(prominence.namedFirst, prominence.named);
+  const behind = shareOfNamed(prominence.behindCompetitors, prominence.named);
+
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border p-4">
+      <h2 className="text-sm font-medium">How you are named</h2>
+
+      {prominence.named === 0 || !prominence.sufficient ? (
+        <p data-testid="prominence-empty" className="text-sm text-muted-foreground">
+          {prominence.answers === 0
+            ? MEASUREMENT_COPY.noDataYet
+            : prominence.named === 0
+              ? "Not named in any sampled answer in this window."
+              : MEASUREMENT_COPY.underFloor}
+        </p>
+      ) : (
+        <>
+          <dl className="grid grid-cols-2 gap-3 text-sm">
+            <div className="flex flex-col gap-0.5">
+              <dt className="text-muted-foreground">Named first</dt>
+              <dd data-testid="prominence-first" className="metric text-lg font-semibold">
+                {first === null ? "—" : `${Math.round(first)}%`}
+              </dd>
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <dt className="text-muted-foreground">After a competitor</dt>
+              <dd data-testid="prominence-behind" className="metric text-lg font-semibold">
+                {behind === null ? "—" : `${Math.round(behind)}%`}
+              </dd>
+            </div>
+          </dl>
+
+          <p className="text-sm text-muted-foreground">
+            Of the <span className="metric">{prominence.named}</span> answers naming{" "}
+            {matrix.client.name}, this is where the brand sits among the others. Typical place:{" "}
+            <span className="metric">{prominence.averageRank}</span> of the brands named.
+          </p>
+        </>
+      )}
     </div>
   );
 }
@@ -210,6 +284,7 @@ export function ClientOverview({ clientId }: { clientId: string }) {
 
         <div className="flex flex-col gap-3">
           {matrix.data && <OneLineRead matrix={matrix.data} />}
+          {matrix.data && <ProminenceCard matrix={matrix.data} />}
 
           {/* Общая доля за последнюю неделю: матрица показывает, где именно
               провал, а эта цифра — то, что агентство называет клиенту, и её

@@ -51,6 +51,8 @@ export { domainOf, mergeMentions, parseResponse } from "./parsing/parse";
 export * from "./metrics/visibility";
 export * from "./metrics/confidence";
 export * from "./metrics/matrix";
+export * from "./metrics/prominence";
+export * from "./metrics/interval";
 export { ASSISTANTS, isMeasurableAssistant, measurableAssistants } from "./adapters/catalogue";
 export type { Assistant } from "./adapters/catalogue";
 export * from "./billing/period";

@@ -107,6 +107,9 @@ test("client report opens without login and carries only the agency brand", asyn
   await expect(anonPage.getByTestId("report-gap")).toContainText("pp");
   await expect(anonPage.getByTestId("report-results")).toContainText("Brand mentions");
 
+  // Отчёт открывается фразой о том, чем являются цифры, а не таблицей.
+  await expect(anonPage.getByTestId("report-summary")).toContainText("estimate");
+
   // Оговорки — часть отчёта, а не мелкий шрифт.
   await expect(anonPage.getByTestId("report-caveats")).toContainText("share of AI answers");
 

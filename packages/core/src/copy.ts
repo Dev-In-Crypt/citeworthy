@@ -42,6 +42,14 @@ export const MEASUREMENT_COPY = {
   competitorOnly: "A tracked competitor was named in answers where the client was not.",
   /** Ячейка ниже порога сэмплов. */
   underFloor: "Under the sample floor for this window, so it shows a dash rather than a guess.",
+  /**
+   * Изменение, которое выборка не различает. Формулировка обязана говорить
+   * про предел выборки, а не про отсутствие изменения: это разные вещи.
+   */
+  withinNoise: "within what this sample size can tell apart",
+  /** Почему в разделе движения не все вопросы. */
+  movementBasis:
+    "Only questions where the change is larger than this sample size can explain on its own. Anything smaller is left out rather than shown as a result.",
 } as const;
 
 export const DIAGNOSIS_COPY = {

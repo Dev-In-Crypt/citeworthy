@@ -1,6 +1,7 @@
 import { ASSISTANTS, type Assistant } from "../adapters/catalogue";
 import type { Platform } from "../adapters/types";
 import { confidenceFor, meetsSampleFloor, type ConfidenceLevel } from "./confidence";
+import { isDistinguishable, wilsonInterval, type ShareInterval } from "./interval";
 
 /**
  * Матрица «промпт × ассистент».
@@ -25,6 +26,10 @@ export interface PromptResponseRecord {
   clientMentioned: boolean;
   /** Канонические имена конкурентов, названных в этом ответе. */
   competitorsMentioned: string[];
+  /** Место клиента среди названных брендов, 1-based; null — не назван. */
+  clientRank?: number | null;
+  /** Места конкурентов в том же ответе. */
+  competitorRanks?: number[];
 }
 
 export interface MatrixCell {
@@ -55,6 +60,8 @@ export interface MatrixRow {
   cells: MatrixCell[];
   samples: number;
   ratePct: number | null;
+  /** Интервал вокруг доли: без него цифра не подлежит защите перед клиентом. */
+  interval: ShareInterval | null;
   sufficient: boolean;
   /** Сильнейший конкурент в тех же ответах — вторая полоса на экране 2b. */
   competitorTop: CompetitorShare | null;
@@ -76,6 +83,7 @@ export interface PromptMatrix {
   totals: {
     samples: number;
     ratePct: number | null;
+    interval: ShareInterval | null;
     sufficient: boolean;
     confidence: ConfidenceLevel;
     competitorTop: CompetitorShare | null;
@@ -219,6 +227,7 @@ export function computePromptMatrix(input: ComputePromptMatrixInput): PromptMatr
       cells,
       samples: rowTally.total,
       ratePct: rowSufficient ? pct(rowTally.withClient, rowTally.total) : null,
+      interval: rowSufficient ? wilsonInterval(rowTally.withClient, rowTally.total) : null,
       sufficient: rowSufficient,
       competitorTop: topCompetitor(rowTally),
     };
@@ -248,11 +257,51 @@ export function computePromptMatrix(input: ComputePromptMatrixInput): PromptMatr
     totals: {
       samples: overall.total,
       ratePct: overallSufficient ? pct(overall.withClient, overall.total) : null,
+      interval: overallSufficient ? wilsonInterval(overall.withClient, overall.total) : null,
       sufficient: overallSufficient,
       confidence: confidenceFor(overall.total),
       competitorTop: topCompetitor(overall),
     },
   };
+}
+
+export interface MatrixMovement {
+  promptId: string;
+  /** Изменение доли в процентных пунктах; null — сравнивать не с чем. */
+  deltaPp: number | null;
+  /**
+   * Различимо ли изменение на этих выборках. false при пересекающихся
+   * интервалах — это «на такой выборке не различить», а не «не изменилось».
+   */
+  distinguishable: boolean;
+}
+
+/**
+ * Что изменилось по каждому вопросу против прошлого окна.
+ *
+ * Клиент агентства спрашивает не «какая у нас видимость», а «что изменилось
+ * и почему». Общая цифра на этот вопрос не отвечает: она может стоять на
+ * месте, пока один вопрос вырос, а другой просел.
+ *
+ * Окно, не набравшее порог сэмплов, сравнивать не с чем — там `null`, а не
+ * ноль: «не изменилось» и «не измерено» это разные утверждения.
+ */
+export function computeMovement(
+  current: PromptMatrix,
+  previous: PromptMatrix,
+): MatrixMovement[] {
+  const before = new Map(previous.rows.map((row) => [row.promptId, row]));
+
+  return current.rows.map((row) => {
+    const past = before.get(row.promptId);
+    const comparable = row.ratePct !== null && past?.ratePct != null;
+
+    return {
+      promptId: row.promptId,
+      deltaPp: comparable ? round1(row.ratePct! - past!.ratePct!) : null,
+      distinguishable: comparable && isDistinguishable(row.interval, past!.interval),
+    };
+  });
 }
 
 /**
@@ -272,6 +321,8 @@ export function collapsePromptFacts(
     entityName: string | null;
     isClient: boolean | null;
     isCompetitor: boolean | null;
+    /** Порядок появления бренда в ответе (контракт C2). */
+    position?: number | null;
   }[],
 ): PromptResponseRecord[] {
   const byResponse = new Map<string, PromptResponseRecord>();
@@ -288,15 +339,25 @@ export function collapsePromptFacts(
         createdAt: fact.createdAt,
         clientMentioned: false,
         competitorsMentioned: [],
+        clientRank: null,
+        competitorRanks: [],
       };
       byResponse.set(fact.responseId, record);
     }
 
     if (fact.isClient) {
       record.clientMentioned = true;
+      // Клиент может совпасть по нескольким alias — держим самое раннее место.
+      if (fact.position != null) {
+        record.clientRank =
+          record.clientRank == null ? fact.position : Math.min(record.clientRank, fact.position);
+      }
     }
     if (fact.isCompetitor && fact.entityName) {
       record.competitorsMentioned.push(fact.entityName);
+      if (fact.position != null) {
+        record.competitorRanks?.push(fact.position);
+      }
     }
   }
 

@@ -6,6 +6,13 @@ import { highlightMentions } from "@repo/core";
 import { api } from "@/trpc/react";
 import { EmptyState, PageHeader } from "@/components/page-header";
 
+/** «2nd», «3rd» — порядковый суффикс для места среди названных брендов. */
+function ordinal(rank: number | null): string {
+  if (rank === null) return "";
+  if (rank % 100 >= 11 && rank % 100 <= 13) return "th";
+  return { 1: "st", 2: "nd", 3: "rd" }[rank % 10] ?? "th";
+}
+
 const PLATFORM_LABELS: Record<string, string> = {
   chatgpt: "ChatGPT",
   perplexity: "Perplexity",
@@ -38,6 +45,26 @@ export default function PromptResponsesPage({
   const mentionsClient = (text: string) =>
     highlightMentions(text, dictionary).some((segment) => segment.kind === "client");
   const namedIn = responses.filter((response) => mentionsClient(response.rawText));
+
+  /**
+   * Место клиента среди названных брендов этого ответа. Одна доля упоминаний
+   * не различает ответ, который начинается с клиента, и ответ, где он стоит
+   * четвёртым после трёх конкурентов, — а покупатель различает.
+   */
+  const rankOf = (text: string): number | null => {
+    const order: string[] = [];
+    for (const segment of highlightMentions(text, dictionary)) {
+      if (segment.kind === "plain") continue;
+      const name = segment.entity ?? segment.text;
+      if (!order.includes(name)) {
+        order.push(name);
+      }
+      if (segment.kind === "client") {
+        return order.length;
+      }
+    }
+    return null;
+  };
 
   return (
     <>
@@ -91,7 +118,16 @@ export default function PromptResponsesPage({
                 <span className="metric">{response.modelVersion}</span>
                 <span className="metric">${Number(response.costUsd).toFixed(4)}</span>
                 <span className="metric">{new Date(response.createdAt).toLocaleString()}</span>
-                {!mentionsClient(response.rawText) && (
+                {mentionsClient(response.rawText) ? (
+                  <span
+                    data-testid="named-rank"
+                    className="rounded-full bg-client/15 px-2 py-1 text-[11px] font-medium"
+                  >
+                    {rankOf(response.rawText) === 1
+                      ? "named first"
+                      : `named ${rankOf(response.rawText)}${ordinal(rankOf(response.rawText))}`}
+                  </span>
+                ) : (
                   <span
                     data-testid="not-named"
                     className="rounded-full bg-competitor/12 px-2 py-1 text-[11px] font-medium text-competitor"

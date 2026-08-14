@@ -172,6 +172,37 @@ describe("measurement.matrix", () => {
     expect(wide.totals.samples).toBe(6);
   });
 
+  it("заметность считается по тем же ответам, что и доля", async () => {
+    // Клиент назван, но после конкурента — доля та же, заметность другая.
+    await addAnswers(4, { mode: "live", mentionsClient: true, competitor: "Outlay" });
+
+    const matrix = await caller(agencyId).measurement.matrix({ clientId });
+
+    expect(matrix.prominence).toMatchObject({
+      answers: 4,
+      named: 4,
+      namedFirst: 4,
+      behindCompetitors: 0,
+      averageRank: 1,
+      sufficient: true,
+    });
+  });
+
+  it("доля приезжает с интервалом, а движение — с признаком различимости", async () => {
+    await addAnswers(6, { mode: "live", mentionsClient: true });
+
+    const matrix = await caller(agencyId).measurement.matrix({ clientId });
+
+    expect(matrix.totals.interval).not.toBeNull();
+    expect(matrix.totals.interval!.low).toBeLessThanOrEqual(matrix.totals.ratePct!);
+    expect(matrix.totals.interval!.high).toBeGreaterThanOrEqual(matrix.totals.ratePct!);
+
+    // Прошлого окна нет — сравнивать не с чем, и это не «не изменилось».
+    expect(matrix.totalsDeltaPp).toBeNull();
+    expect(matrix.totalsDistinguishable).toBe(false);
+    expect(matrix.movement.every((entry) => entry.distinguishable === false)).toBe(true);
+  });
+
   it("чужой клиент неотличим от несуществующего", async () => {
     const other = await createAgency(db, { name: "Other Agency", clientLimit: 10 });
     try {

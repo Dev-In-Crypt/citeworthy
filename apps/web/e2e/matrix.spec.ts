@@ -60,6 +60,10 @@ test("the client overview leads with the prompt × assistant matrix", async ({ p
   // Одна фраза, которую агентство перескажет клиенту.
   await expect(page.getByTestId("one-line-read")).toContainText("Ledgerbrook");
 
+  // «Назван» и «назван первым» — разные вещи, и экран их различает.
+  await expect(page.getByTestId("prominence-first")).toContainText("%");
+  await expect(page.getByTestId("prominence-behind")).toContainText("%");
+
   // Те же ответы в двух других прочтениях.
   await page.getByTestId("matrix-view-bars").click();
   await expect(page.getByTestId("matrix-bars")).toBeVisible();

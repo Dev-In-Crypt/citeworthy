@@ -98,6 +98,16 @@ describe("reports.generate", () => {
     expect(payload.competitorGap).toEqual({ before: -14, after: -6 });
   });
 
+  it("вопрос без сравнимой выборки не попадает в «что изменилось»", async () => {
+    const report = await generate();
+    const payload = reportPayloadSchema.parse(report.payload);
+
+    // У этого клиента ответов за период нет вовсе, поэтому раздела быть не
+    // должно: пустая строка «0 pp» означала бы «не изменилось», хотя верное
+    // утверждение — «не измерено».
+    expect(payload.movement ?? []).toEqual([]);
+  });
+
   it("раздел «что сделано» собирается из завершённых действий периода", async () => {
     const api = caller(agencyId);
     const { setActionCompletedAt } = await import("@repo/db");

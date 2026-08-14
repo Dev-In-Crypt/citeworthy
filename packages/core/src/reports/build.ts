@@ -31,6 +31,12 @@ export interface ReportInputs {
   /** Слабые места, которые нельзя прятать от клиента. */
   caveats: string[];
   /**
+   * Движение по отдельным вопросам. Вопросы, где выборки не хватило на
+   * сравнение, вызывающий не передаёт вовсе — в отчёте они не должны
+   * выглядеть как «не изменилось».
+   */
+  movement?: { prompt: string; deltaPp: number; sharePct: number }[];
+  /**
    * Платформы, по которым реально есть измерения. От них зависит формулировка
    * оговорки: отчёт по одной платформе не вправе говорить «several platforms».
    */
@@ -113,6 +119,9 @@ export function buildReportPayload(inputs: ReportInputs): ReportPayload {
     },
     highestImpactAction: null,
     nextSprint: inputs.nextSprint,
+    // Пустой список не кладём: раздел «что изменилось» без строк выглядел бы
+    // как «ничего не изменилось», а это другое утверждение.
+    ...(inputs.movement && inputs.movement.length > 0 ? { movement: inputs.movement } : {}),
     opportunity: inputs.opportunity ?? null,
     // Пояснение о природе измерения идёт в каждом отчёте, а не по желанию,
     // и описывает то, что измерялось на самом деле.

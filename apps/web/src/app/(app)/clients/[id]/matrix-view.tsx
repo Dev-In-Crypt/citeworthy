@@ -141,13 +141,32 @@ function MatrixRow({ row, matrix }: { row: Row; matrix: Matrix }) {
 }
 
 function PresenceBars({ matrix }: { matrix: Matrix }) {
+  const movement = new Map(matrix.movement.map((entry) => [entry.promptId, entry.deltaPp]));
+
   return (
     <div data-testid="matrix-bars" className="flex flex-col gap-4">
-      {matrix.rows.map((row) => (
+      {matrix.rows.map((row) => {
+        const delta = movement.get(row.promptId) ?? null;
+
+        return (
         <div key={row.promptId} className="flex flex-col gap-1.5">
           <div className="flex items-baseline justify-between gap-3">
             <span className="text-xs">{row.promptText}</span>
             <span className="metric shrink-0 text-xs text-muted-foreground">
+              {/* Что изменилось — вопрос, который клиент задаёт первым. */}
+              {delta !== null && (
+                <span
+                  data-testid="row-delta"
+                  className={cn(
+                    "mr-2 font-medium",
+                    delta > 0 && "text-client",
+                    delta < 0 && "text-competitor",
+                  )}
+                >
+                  {delta > 0 ? "+" : ""}
+                  {delta} pp
+                </span>
+              )}
               {formatPct(row.ratePct)}
               {row.competitorTop && ` vs ${formatPct(row.competitorTop.pct)}`}
             </span>
@@ -174,7 +193,8 @@ function PresenceBars({ matrix }: { matrix: Matrix }) {
               : `${row.samples} answers so far. ${MEASUREMENT_COPY.underFloor}`}
           </span>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

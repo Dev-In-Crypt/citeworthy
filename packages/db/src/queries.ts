@@ -504,6 +504,9 @@ export async function listPromptPlatformFacts(
       entityName: mentions.entityName,
       isClient: mentions.isClient,
       isCompetitor: mentions.isCompetitor,
+      // Порядок появления бренда в ответе: по нему считается заметность —
+      // назван первым или четвёртым в списке «а ещё бывают».
+      position: mentions.position,
     })
     .from(responses)
     .innerJoin(runs, eq(responses.runId, runs.id))

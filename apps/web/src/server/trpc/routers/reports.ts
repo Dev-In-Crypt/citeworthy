@@ -4,6 +4,9 @@ import {
   buildOpportunity,
   buildRecommendations,
   buildReportPayload,
+  collapsePromptFacts,
+  computeMovement,
+  computePromptMatrix,
   diagnose,
   OPPORTUNITY_CAVEATS,
   OPPORTUNITY_DEFAULTS,
@@ -21,7 +24,9 @@ import {
   getShareForReport,
   listActions,
   listActionsCompletedBetween,
+  listActivePromptsForClient,
   listAllSnapshots,
+  listPromptPlatformFacts,
   listReports,
   listExperiments,
   logActivity,
@@ -162,7 +167,73 @@ export const reportsRouter = router({
         ),
       ];
 
+      /**
+       * Движение по отдельным вопросам за период против такого же окна перед
+       * ним. Считается по тем же ответам, что и экран клиента, и попадает
+       * в отчёт только там, где обе выборки набрали порог: вопрос, который
+       * нечем сравнить, не должен выглядеть как «не изменился».
+       */
+      const periodMs = periodEnd.getTime() - periodStart.getTime();
+      const previousStart = new Date(periodStart.getTime() - periodMs);
+
+      const [currentFacts, previousFacts, activePrompts] = await Promise.all([
+        listPromptPlatformFacts(ctx.db, input.clientId, periodStart, periodEnd),
+        listPromptPlatformFacts(ctx.db, input.clientId, previousStart, periodStart),
+        listActivePromptsForClient(ctx.db, input.clientId),
+      ]);
+
+      const promptRows = activePrompts.map((prompt) => ({
+        id: prompt.id,
+        text: prompt.text,
+        clusterId: prompt.clusterId,
+      }));
+
+      const currentMatrix = computePromptMatrix({
+        records: collapsePromptFacts(currentFacts),
+        prompts: promptRows,
+        from: periodStart,
+        to: periodEnd,
+      });
+      const previousMatrix = computePromptMatrix({
+        records: collapsePromptFacts(previousFacts),
+        prompts: promptRows,
+        from: previousStart,
+        to: periodStart,
+      });
+
+      const deltas = new Map(
+        computeMovement(currentMatrix, previousMatrix).map((entry) => [
+          entry.promptId,
+          entry.deltaPp,
+        ]),
+      );
+
+      const distinguishable = new Set(
+        computeMovement(currentMatrix, previousMatrix)
+          .filter((entry) => entry.distinguishable)
+          .map((entry) => entry.promptId),
+      );
+
+      const movement = currentMatrix.rows
+        // В отчёт клиенту идёт только то, что выборка действительно различает:
+        // «+3 pp», неотличимые от шума, читаются как результат работы.
+        .filter(
+          (row) =>
+            deltas.get(row.promptId) != null &&
+            row.ratePct !== null &&
+            distinguishable.has(row.promptId),
+        )
+        .map((row) => ({
+          prompt: row.promptText,
+          deltaPp: deltas.get(row.promptId)!,
+          sharePct: row.ratePct!,
+        }))
+        // Сначала то, что сдвинулось сильнее — об этом и спросят.
+        .sort((a, b) => Math.abs(b.deltaPp) - Math.abs(a.deltaPp))
+        .slice(0, 20);
+
       const payload = buildReportPayload({
+        movement,
         clientName: client.name,
         periodStart,
         periodEnd,
