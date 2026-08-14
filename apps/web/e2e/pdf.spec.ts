@@ -39,8 +39,9 @@ test("agency downloads a PDF containing the client report", async ({ page }) => 
   await page.getByLabel("Client name").fill("AcmeCRM");
   await page.getByLabel("Domain").fill("acmecrm.test");
   await page.getByRole("button", { name: "Create client" }).click();
-  await page.getByRole("link", { name: /AcmeCRM/ }).click();
-  await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}$/);
+  // Заведение клиента ведёт на второй шаг онбординга, а не в список.
+  await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}\/onboarding$/);
+  await page.goto(page.url().replace(/\/onboarding$/, ""));
   const clientId = page.url().split("/").pop()!;
 
   await page.goto(`/clients/${clientId}/measure`);
@@ -93,8 +94,9 @@ test("PDF of another agency's report is not reachable", async ({ page, browser }
   await page.getByLabel("Client name").fill("Secret Client");
   await page.getByLabel("Domain").fill("secret.test");
   await page.getByRole("button", { name: "Create client" }).click();
-  await page.getByRole("link", { name: /Secret Client/ }).click();
-  await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}$/);
+  // Заведение клиента ведёт на второй шаг онбординга, а не в список.
+  await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}\/onboarding$/);
+  await page.goto(page.url().replace(/\/onboarding$/, ""));
   const clientId = page.url().split("/").pop()!;
 
   await page.goto(`/clients/${clientId}/reports`);

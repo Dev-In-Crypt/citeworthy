@@ -23,8 +23,11 @@ test("prospect client gets generated prompts, edited before saving", async ({ pa
   await page.getByLabel("Competitors").fill("HubSpot, Pipedrive");
   await page.getByLabel("Prospect (free audit)").check();
   await page.getByRole("button", { name: "Create client" }).click();
+  // Заведение клиента ведёт на второй шаг онбординга, а не в список.
+  await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}\/onboarding$/);
 
   // Пометка видна в списке — аудит не путается с платящим клиентом.
+  await page.goto("/clients");
   await expect(page.getByTestId("prospect-badge")).toBeVisible();
 
   await page.getByRole("link", { name: /AcmeCRM/ }).click();

@@ -22,9 +22,9 @@ test("one audit run leads straight to a ready diagnosis", async ({ page }) => {
   await page.getByLabel("Competitors").fill("HubSpot, Pipedrive, Close");
   await page.getByLabel("Prospect (free audit)").check();
   await page.getByRole("button", { name: "Create client" }).click();
-
-  await page.getByRole("link", { name: /AcmeCRM/ }).click();
-  await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}$/);
+  // Заведение клиента ведёт на второй шаг онбординга, а не в список.
+  await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}\/onboarding$/);
+  await page.goto(page.url().replace(/\/onboarding$/, ""));
   const clientId = page.url().split("/").pop()!;
 
   // До промптов аудит честно говорит, что мерить нечего.

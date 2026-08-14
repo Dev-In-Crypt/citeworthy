@@ -53,9 +53,15 @@ describe("seed", () => {
     expect(rows[0]?.agencyId).toBe(SEED_AGENCY_ID);
   });
 
-  it("создаёт ровно двух клиентов агентства, без дублей после повторного прогона", async () => {
+  it("создаёт ровно трёх клиентов агентства, без дублей после повторного прогона", async () => {
     const rows = await db.select().from(clients).where(eq(clients.agencyId, SEED_AGENCY_ID));
-    expect(rows).toHaveLength(2);
+
+    expect(rows).toHaveLength(3);
+    expect(rows.map((row) => row.name).sort()).toEqual([
+      "AcmeCRM",
+      "Ledgerbrook",
+      "Northwind Analytics",
+    ]);
   });
 
   it("создаёт 2 кластера и 10 промптов без дублей после повторного прогона", async () => {

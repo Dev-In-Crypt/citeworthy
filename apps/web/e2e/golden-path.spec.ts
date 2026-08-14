@@ -40,7 +40,9 @@ test("golden path: from signup to a verifiable visibility number", async ({ page
   await page.getByLabel("Brand names").fill("AcmeCRM, Acme CRM, Acme");
   await page.getByLabel("Competitors").fill("HubSpot, Pipedrive, Close");
   await page.getByRole("button", { name: "Create client" }).click();
-  await expect(page).toHaveURL(/\/clients$/);
+  // Заведение клиента ведёт на второй шаг онбординга, а не в список.
+  await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}\/onboarding$/);
+  await page.goto("/clients");
 
   await page.getByRole("link", { name: /AcmeCRM/ }).click();
   await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}$/);

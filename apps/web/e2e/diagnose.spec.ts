@@ -29,8 +29,9 @@ test("diagnose screen shows source mix, presence matrix and reasoned recommendat
   await page.getByLabel("Brand names").fill("AcmeCRM, Acme CRM, Acme");
   await page.getByLabel("Competitors").fill("HubSpot, Pipedrive, Close");
   await page.getByRole("button", { name: "Create client" }).click();
-  await page.getByRole("link", { name: /AcmeCRM/ }).click();
-  await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}$/);
+  // Заведение клиента ведёт на второй шаг онбординга, а не в список.
+  await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}\/onboarding$/);
+  await page.goto(page.url().replace(/\/onboarding$/, ""));
   const clientId = page.url().split("/").pop()!;
 
   // До прогона экран честно говорит, что цитат ещё нет.
@@ -101,8 +102,9 @@ test("a client missing from the answers gets reasoned recommendations", async ({
   await page.getByLabel("Brand names").fill("Northwind CRM, Northwind");
   await page.getByLabel("Competitors").fill("HubSpot, Pipedrive, Close");
   await page.getByRole("button", { name: "Create client" }).click();
-  await page.getByRole("link", { name: /Northwind CRM/ }).click();
-  await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}$/);
+  // Заведение клиента ведёт на второй шаг онбординга, а не в список.
+  await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}\/onboarding$/);
+  await page.goto(page.url().replace(/\/onboarding$/, ""));
   const clientId = page.url().split("/").pop()!;
 
   await page.goto(`/clients/${clientId}/measure`);

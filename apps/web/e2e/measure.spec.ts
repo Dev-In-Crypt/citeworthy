@@ -31,7 +31,9 @@ async function signUpAndAddClient(page: Page): Promise<string> {
   await page.getByLabel("Client name").fill("AcmeCRM");
   await page.getByLabel("Domain").fill("acmecrm.test");
   await page.getByRole("button", { name: "Create client" }).click();
-  await expect(page).toHaveURL(/\/clients$/);
+  // Заведение клиента ведёт на второй шаг онбординга, а не в список.
+  await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}\/onboarding$/);
+  await page.goto("/clients");
 
   await page.getByRole("link", { name: /AcmeCRM/ }).click();
   await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}$/);

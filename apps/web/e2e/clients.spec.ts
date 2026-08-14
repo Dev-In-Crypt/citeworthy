@@ -30,8 +30,9 @@ test("create a client with brand aliases and competitors, then edit it", async (
   await page.getByLabel("Brand names").fill("AcmeCRM, Acme CRM");
   await page.getByLabel("Competitors").fill("HubSpot, Pipedrive, Close");
   await page.getByRole("button", { name: "Create client" }).click();
-
-  await expect(page).toHaveURL(/\/clients$/);
+  // Заведение клиента ведёт на второй шаг онбординга, а не в список.
+  await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}\/onboarding$/);
+  await page.goto("/clients");
   const list = page.getByTestId("clients-list");
   await expect(list).toContainText("AcmeCRM");
   await expect(list).toContainText("acmecrm.com");
@@ -61,8 +62,9 @@ test("client screens are tabs: the current one is marked and the way back is the
   await page.getByLabel("Client name").fill("Tabbed Co");
   await page.getByLabel("Domain").fill("tabbed.test");
   await page.getByRole("button", { name: "Create client" }).click();
-  await page.getByRole("link", { name: /Tabbed Co/ }).click();
-  await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}$/);
+  // Заведение клиента ведёт на второй шаг онбординга, а не в список.
+  await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}\/onboarding$/);
+  await page.goto(page.url().replace(/\/onboarding$/, ""));
 
   const tabs = page.getByTestId("client-tabs");
   await expect(tabs.getByRole("link", { name: "Overview" })).toHaveAttribute(
@@ -95,7 +97,9 @@ test("a client from another agency is not reachable", async ({ page, browser }) 
   await page.getByLabel("Client name").fill("Secret Client");
   await page.getByLabel("Domain").fill("secret.test");
   await page.getByRole("button", { name: "Create client" }).click();
-  await expect(page).toHaveURL(/\/clients$/);
+  // Заведение клиента ведёт на второй шаг онбординга, а не в список.
+  await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}\/onboarding$/);
+  await page.goto("/clients");
   await page.getByRole("link", { name: /Secret Client/ }).click();
   // Дождаться перехода: без этого page.url() ещё отдаёт страницу списка.
   await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}$/);

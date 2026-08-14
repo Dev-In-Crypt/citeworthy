@@ -45,8 +45,9 @@ async function setUpAgencyWithReport(page: Page): Promise<{ clientId: string; to
   await page.getByLabel("Brand names").fill("AcmeCRM, Acme CRM");
   await page.getByLabel("Competitors").fill("HubSpot, Pipedrive");
   await page.getByRole("button", { name: "Create client" }).click();
-  await page.getByRole("link", { name: /AcmeCRM/ }).click();
-  await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}$/);
+  // Заведение клиента ведёт на второй шаг онбординга, а не в список.
+  await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}\/onboarding$/);
+  await page.goto(page.url().replace(/\/onboarding$/, ""));
   const clientId = page.url().split("/").pop()!;
 
   await page.goto(`/clients/${clientId}/measure`);

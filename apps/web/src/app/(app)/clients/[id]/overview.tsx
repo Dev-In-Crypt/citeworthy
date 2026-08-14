@@ -211,7 +211,22 @@ export function ClientOverview({ clientId }: { clientId: string }) {
         <div className="flex flex-col gap-3">
           {matrix.data && <OneLineRead matrix={matrix.data} />}
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+          {/* Общая доля за последнюю неделю: матрица показывает, где именно
+              провал, а эта цифра — то, что агентство называет клиенту, и её
+              можно пересчитать по сырым ответам. */}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <StatCard
+              label="Named in answers"
+              testId="stat-visibility"
+              value={latest ? `${latest.visibilityPct}%` : "—"}
+              hint={
+                latest
+                  ? latest.deltaPp === null
+                    ? `${latest.sampleCount} answers this week`
+                    : `${latest.deltaPp >= 0 ? "+" : ""}${latest.deltaPp} pp vs previous week`
+                  : MEASUREMENT_COPY.noDataYet
+              }
+            />
             <StatCard
               label="Gap to the strongest competitor"
               testId="stat-gap"

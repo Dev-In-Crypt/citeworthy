@@ -25,7 +25,9 @@ async function setUpClientWithPrompts(page: Page): Promise<string> {
   await page.getByLabel("Brand names").fill("AcmeCRM, Acme CRM");
   await page.getByLabel("Competitors").fill("HubSpot, Pipedrive");
   await page.getByRole("button", { name: "Create client" }).click();
-  await expect(page).toHaveURL(/\/clients$/);
+  // Заведение клиента ведёт на второй шаг онбординга, а не в список.
+  await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}\/onboarding$/);
+  await page.goto("/clients");
 
   await page.getByRole("link", { name: /AcmeCRM/ }).click();
   await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}$/);
@@ -79,8 +81,9 @@ test("running a check without prompts explains what to do", async ({ page }) => 
   await page.getByLabel("Client name").fill("No Prompts");
   await page.getByLabel("Domain").fill("noprompts.test");
   await page.getByRole("button", { name: "Create client" }).click();
-  await page.getByRole("link", { name: /No Prompts/ }).click();
-  await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}$/);
+  // Заведение клиента ведёт на второй шаг онбординга, а не в список.
+  await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}\/onboarding$/);
+  await page.goto(page.url().replace(/\/onboarding$/, ""));
   const clientId = page.url().split("/").pop()!;
 
   await page.goto(`/clients/${clientId}/measure`);
