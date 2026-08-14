@@ -160,20 +160,33 @@ export async function seed(db: Database): Promise<void> {
     ])
     .onConflictDoNothing({ target: promptClusters.id });
 
-  // Промпты без фиксированных id: вставляем только если кластер пуст,
-  // иначе повторный прогон seed создал бы дубликаты.
-  const existingPrompts = await db.select({ id: prompts.id }).from(prompts);
-  if (existingPrompts.length === 0) {
-    const rows: NewPrompt[] = [
-      ...COMPARISON_PROMPTS.map((p) => ({ ...p, clusterId: SEED_CLUSTER_COMPARISON_ID })),
-      ...LEARNING_PROMPTS.map((p) => ({ ...p, clusterId: SEED_CLUSTER_LEARNING_ID })),
-      ...SPEND_COMPARISON_PROMPTS.map((p) => ({
-        ...p,
-        clusterId: SEED_CLUSTER_SPEND_COMPARISON_ID,
-      })),
-      ...SPEND_PURCHASE_PROMPTS.map((p) => ({ ...p, clusterId: SEED_CLUSTER_SPEND_PURCHASE_ID })),
-    ];
-    await db.insert(prompts).values(rows);
+  /**
+   * Промпты без фиксированных id, поэтому пустоту проверяем по каждому
+   * кластеру отдельно.
+   *
+   * Глобальная проверка «в базе вообще нет промптов» здесь стояла раньше и
+   * тихо ломалась: стоило появиться любому промпту у любого клиента — и
+   * новый кластер оставался пустым навсегда, а seed при этом рапортовал
+   * об успехе.
+   */
+  const seedClusters: [string, { text: string; isControl: boolean }[]][] = [
+    [SEED_CLUSTER_COMPARISON_ID, COMPARISON_PROMPTS],
+    [SEED_CLUSTER_LEARNING_ID, LEARNING_PROMPTS],
+    [SEED_CLUSTER_SPEND_COMPARISON_ID, SPEND_COMPARISON_PROMPTS],
+    [SEED_CLUSTER_SPEND_PURCHASE_ID, SPEND_PURCHASE_PROMPTS],
+  ];
+
+  for (const [clusterId, texts] of seedClusters) {
+    const existing = await db
+      .select({ id: prompts.id })
+      .from(prompts)
+      .where(eq(prompts.clusterId, clusterId))
+      .limit(1);
+
+    if (existing.length === 0) {
+      const rows: NewPrompt[] = texts.map((prompt) => ({ ...prompt, clusterId }));
+      await db.insert(prompts).values(rows);
+    }
   }
 
   await db
