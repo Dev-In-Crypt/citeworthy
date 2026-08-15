@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
-import { REPORT_COPY, reportPayloadSchema } from "@repo/core";
+import { MemoryEmailSender, REPORT_COPY, reportPayloadSchema } from "@repo/core";
 import {
   createAgency,
   createClient,
@@ -10,6 +10,7 @@ import {
 } from "@repo/db";
 import { appRouter } from "./root";
 import type { SessionUser, TrpcContext } from "./context";
+import { setEmailSender } from "../email";
 
 /** Verify T50: payload валиден по схеме, числа совпадают с ручным расчётом. */
 
@@ -96,6 +97,53 @@ describe("reports.generate", () => {
     expect(payload.results.visibilityDeltaPp).toBe(8);
     // 23 − 37 = −14 pp в начале, 31 − 37 = −6 pp в конце.
     expect(payload.competitorGap).toEqual({ before: -14, after: -6 });
+  });
+
+  it("переходы попадают в отчёт только если их импортировали", async () => {
+    const withoutTraffic = reportPayloadSchema.parse((await generate()).payload);
+    // Пустая таблица читалась бы клиентом как «переходов не было».
+    expect(withoutTraffic.assistantTraffic).toBeUndefined();
+
+    await caller(agencyId).analytics.importTraffic({
+      clientId,
+      csv: ["date,source,sessions", `${new Date().toISOString().slice(0, 10)},chatgpt.com,17`].join(
+        "\n",
+      ),
+    });
+
+    const withTraffic = reportPayloadSchema.parse((await generate()).payload);
+    expect(withTraffic.assistantTraffic).toMatchObject({
+      totalSessions: 17,
+      byAssistant: [{ assistant: "chatgpt", sessions: 17 }],
+    });
+  });
+
+  it("отправка отчёта письмом даёт ссылку и попадает в журнал", async () => {
+    const mailbox = new MemoryEmailSender();
+    setEmailSender(mailbox);
+
+    try {
+      const report = await generate();
+      const result = await caller(agencyId).reports.send({
+        reportId: report.id,
+        to: "finance@ledgerbrook.test",
+        note: "Numbers for the quarter.",
+      });
+
+      expect(result.sent).toBe(true);
+
+      const message = mailbox.lastTo("finance@ledgerbrook.test");
+      expect(message?.text).toContain(`/r/${result.token}`);
+      // White-label: письмо подписано агентством, названия продукта в нём нет.
+      expect(message?.text).toContain("Report Agency");
+      expect(message?.text).not.toMatch(/citeworthy/i);
+      expect(message?.text).toContain("Numbers for the quarter.");
+
+      const activity = await listActivity(db, clientId, 10);
+      expect(activity.some((entry) => entry.eventType === "report_shared")).toBe(true);
+    } finally {
+      setEmailSender(null);
+    }
   });
 
   it("вопрос без сравнимой выборки не попадает в «что изменилось»", async () => {

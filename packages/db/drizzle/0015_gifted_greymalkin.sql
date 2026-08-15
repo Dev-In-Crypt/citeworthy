@@ -1,0 +1,1 @@
+ALTER TYPE "public"."activity_event" ADD VALUE 'report_shared' BEFORE 'report_approved';

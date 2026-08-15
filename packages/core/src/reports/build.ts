@@ -36,6 +36,8 @@ export interface ReportInputs {
    * выглядеть как «не изменилось».
    */
   movement?: { prompt: string; deltaPp: number; sharePct: number }[];
+  /** Переходы от ассистентов; не передаются, если аналитику не импортировали. */
+  assistantTraffic?: NonNullable<ReportPayload["assistantTraffic"]>;
   /**
    * Платформы, по которым реально есть измерения. От них зависит формулировка
    * оговорки: отчёт по одной платформе не вправе говорить «several platforms».
@@ -122,6 +124,10 @@ export function buildReportPayload(inputs: ReportInputs): ReportPayload {
     // Пустой список не кладём: раздел «что изменилось» без строк выглядел бы
     // как «ничего не изменилось», а это другое утверждение.
     ...(inputs.movement && inputs.movement.length > 0 ? { movement: inputs.movement } : {}),
+    // Ноль сессий — это «не импортировали», а не «никто не пришёл».
+    ...(inputs.assistantTraffic && inputs.assistantTraffic.totalSessions > 0
+      ? { assistantTraffic: inputs.assistantTraffic }
+      : {}),
     opportunity: inputs.opportunity ?? null,
     // Пояснение о природе измерения идёт в каждом отчёте, а не по желанию,
     // и описывает то, что измерялось на самом деле.

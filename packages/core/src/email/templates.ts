@@ -74,6 +74,54 @@ export function passwordResetEmail(input: PasswordResetEmailInput): EmailMessage
   };
 }
 
+export interface ReportReadyEmailInput {
+  to: string;
+  agencyName: string;
+  clientName: string;
+  periodStart: string;
+  periodEnd: string;
+  reportUrl: string;
+  /** Приписка от агентства своими словами. */
+  note?: string;
+}
+
+/**
+ * Письмо клиенту агентства со ссылкой на отчёт.
+ *
+ * Здесь действует white-label (инвариант 3): письмо подписано агентством, и
+ * названия продукта в нём нет. Ссылка, а не вложение: документ живёт на
+ * своей странице, где его можно согласовать, и не расходится копиями.
+ */
+export function reportReadyEmail(input: ReportReadyEmailInput): EmailMessage {
+  const period = `${input.periodStart} — ${input.periodEnd}`;
+
+  const text = [
+    `Your AI answer visibility report for ${input.clientName} is ready.`,
+    `Period: ${period}.`,
+    ...(input.note ? ["", input.note] : []),
+    "",
+    `Read it here: ${input.reportUrl}`,
+    "",
+    "Every figure in it is an estimate from repeated samples of assistant answers, and the report says where that is uncertain.",
+    "",
+    `Sent by ${input.agencyName}.`,
+  ].join("\n");
+
+  return {
+    to: input.to,
+    subject: `${input.clientName}: AI answer visibility, ${period}`,
+    text,
+    html: paragraphs([
+      `Your AI answer visibility report for <strong>${escapeHtml(input.clientName)}</strong> is ready.`,
+      `Period: ${escapeHtml(period)}.`,
+      ...(input.note ? [escapeHtml(input.note)] : []),
+      `<a href="${escapeHtml(input.reportUrl)}">Read the report</a>`,
+      "Every figure in it is an estimate from repeated samples of assistant answers, and the report says where that is uncertain.",
+      `Sent by ${escapeHtml(input.agencyName)}.`,
+    ]),
+  };
+}
+
 function paragraphs(lines: readonly string[]): string {
   return lines.map((line) => `<p>${line}</p>`).join("\n");
 }

@@ -94,6 +94,26 @@ export const reportPayloadSchema = z.object({
     )
     .max(20)
     .optional(),
+  /**
+   * Переходы от ассистентов за период.
+   *
+   * Отдельный раздел, а не строка рядом с видимостью: это другое наблюдение,
+   * из аналитики клиента, и оно недосчитывается. Раздела нет вовсе, если
+   * данных не импортировали — пустая таблица читалась бы как «переходов нет».
+   */
+  assistantTraffic: z
+    .object({
+      totalSessions: z.number().int().min(0),
+      byAssistant: z
+        .array(
+          z.object({
+            assistant: z.string().min(1),
+            sessions: z.number().int().min(0),
+          }),
+        )
+        .max(10),
+    })
+    .optional(),
   /** Оговорки, которые обязаны дойти до клиента вместе с цифрами. */
   caveats: z.array(z.string().min(1)),
 });

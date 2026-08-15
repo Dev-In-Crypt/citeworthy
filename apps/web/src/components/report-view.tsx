@@ -1,4 +1,9 @@
-import { MEASUREMENT_COPY, type ReportPayload } from "@repo/core";
+import { ASSISTANTS, MEASUREMENT_COPY, type ReportPayload } from "@repo/core";
+
+/** Имена ассистентов из каталога: в отчёте клиента идентификаторов быть не должно. */
+const ASSISTANT_LABELS: Record<string, string> = Object.fromEntries(
+  ASSISTANTS.map((assistant) => [assistant.id, assistant.label]),
+);
 
 /**
  * Клиентский отчёт. Ноль брендинга продукта — только агентство (инвариант 3).
@@ -169,6 +174,28 @@ export function ReportView({
           </li>
         </ul>
       </section>
+
+      {payload.assistantTraffic && (
+        /* Другое наблюдение, а не следствие видимости: заголовок и оговорка
+           держат эти цифры на своём месте. */
+        <section className="flex flex-col gap-3">
+          <h2 className="text-lg font-medium">Visits referred by assistants</h2>
+          <ul data-testid="report-traffic" className="flex flex-col gap-1 text-sm">
+            {payload.assistantTraffic.byAssistant.map((entry) => (
+              <li
+                key={entry.assistant}
+                className="flex justify-between border-b py-2 last:border-0"
+              >
+                <span>{ASSISTANT_LABELS[entry.assistant] ?? entry.assistant}</span>
+                <span className="metric font-medium">
+                  {entry.sessions.toLocaleString("en-US")}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="text-sm text-muted-foreground">{MEASUREMENT_COPY.trafficUndercount}</p>
+        </section>
+      )}
 
       {payload.highestImpactAction && (
         <section className="flex flex-col gap-2 rounded-lg border border-l-4 border-l-primary p-5">

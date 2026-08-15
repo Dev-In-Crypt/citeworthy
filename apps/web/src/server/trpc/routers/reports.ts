@@ -11,6 +11,8 @@ import {
   OPPORTUNITY_CAVEATS,
   OPPORTUNITY_DEFAULTS,
   REPORT_COPY,
+  reportReadyEmail,
+  summariseTraffic,
 } from "@repo/core";
 import type { CitationFact, SourceType, VisibilitySnapshot } from "@repo/core";
 import {
@@ -19,6 +21,7 @@ import {
   countNewCitedDomains,
   createReport,
   createReportShare,
+  getAgencyById,
   getClientById,
   getReportById,
   getShareForReport,
@@ -26,6 +29,7 @@ import {
   listActionsCompletedBetween,
   listActivePromptsForClient,
   listAllSnapshots,
+  listAssistantTraffic,
   listPromptPlatformFacts,
   listReports,
   listExperiments,
@@ -33,6 +37,7 @@ import {
   setReportStatus,
 } from "@repo/db";
 import { assertTenant, protectedProcedure, roleProcedure, router } from "../trpc";
+import { appUrl, getEmailSender } from "../../email";
 
 /** Та же схлопка, что в роутере диагностики: один факт на пару (ответ, домен). */
 function toFacts(
@@ -232,8 +237,34 @@ export const reportsRouter = router({
         .sort((a, b) => Math.abs(b.deltaPp) - Math.abs(a.deltaPp))
         .slice(0, 20);
 
+      /**
+       * Переходы от ассистентов за тот же период. В отчёт попадают только
+       * если аналитику импортировали: пустая таблица читалась бы клиентом
+       * как «переходов не было», а верное утверждение — «мы их не считали».
+       */
+      const trafficRows = await listAssistantTraffic(ctx.db, input.clientId);
+      const traffic = summariseTraffic(
+        trafficRows.map((row) => ({
+          day: new Date(`${row.day}T00:00:00.000Z`),
+          assistant: row.assistant,
+          sessions: row.sessions,
+        })),
+        periodStart,
+        periodEnd,
+      );
+
       const payload = buildReportPayload({
         movement,
+        ...(traffic.totalSessions > 0
+          ? {
+              assistantTraffic: {
+                totalSessions: traffic.totalSessions,
+                byAssistant: traffic.byAssistant
+                  .slice(0, 10)
+                  .map(({ assistant, sessions }) => ({ assistant, sessions })),
+              },
+            }
+          : {}),
         clientName: client.name,
         periodStart,
         periodEnd,
@@ -417,5 +448,62 @@ export const reportsRouter = router({
       await setReportStatus(ctx.db, report.id, "shared");
 
       return { token, created: true };
+    }),
+
+  /**
+   * Отправляет клиенту ссылку на отчёт.
+   *
+   * Явное действие человека, а не рассылка: продукт ничего не отправляет сам
+   * (инвариант 4). Письмо несёт ссылку, а не сам отчёт — документ живёт на
+   * своей странице, где его можно согласовать, и не расходится копиями по
+   * почтовым ящикам.
+   */
+  send: roleProcedure("member")
+    .input(z.object({ reportId: z.uuid(), to: z.email(), note: z.string().max(500).optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const report = await getReportById(ctx.db, input.reportId);
+      if (!report) {
+        assertTenant(null, ctx.user.agencyId);
+        throw new Error("unreachable");
+      }
+      const client = await getClientById(ctx.db, report.clientId);
+      assertTenant(client, ctx.user.agencyId);
+
+      const agency = await getAgencyById(ctx.db, ctx.user.agencyId);
+
+      // Ссылка выдаётся здесь же, если её ещё не было: отправлять отчёт,
+      // который некуда открыть, бессмысленно.
+      let share = await getShareForReport(ctx.db, report.id);
+      if (!share) {
+        const token = randomBytes(32).toString("base64url");
+        share = await createReportShare(ctx.db, { reportId: report.id, token });
+        await setReportStatus(ctx.db, report.id, "shared");
+      }
+
+      const message = reportReadyEmail({
+        to: input.to,
+        // Письмо клиенту агентства несёт бренд агентства, а не продукта
+        // (инвариант 3): подписывается оно именем агентства.
+        agencyName: agency?.name ?? "Your agency",
+        clientName: client.name,
+        periodStart: report.periodStart.toISOString().slice(0, 10),
+        periodEnd: report.periodEnd.toISOString().slice(0, 10),
+        reportUrl: `${appUrl()}/r/${share.token}`,
+        ...(input.note ? { note: input.note } : {}),
+      });
+
+      await getEmailSender().send(message);
+
+      await logActivity(ctx.db, {
+        agencyId: ctx.user.agencyId,
+        clientId: client.id,
+        // Как и остальные события журнала — без ссылки на пользователя:
+        // строка живёт дольше учётной записи, которая её создала.
+        actorUserId: null,
+        eventType: "report_shared",
+        payload: { reportId: report.id, to: input.to },
+      });
+
+      return { sent: true, token: share.token };
     }),
 });

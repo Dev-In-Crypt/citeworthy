@@ -7,6 +7,8 @@ export const activityEventEnum = pgEnum("activity_event", [
   "action_completed",
   "run_finished",
   "report_generated",
+  /** Отчёт отправлен клиенту агентства письмом — по явному действию человека. */
+  "report_shared",
   "report_approved",
 ]);
 

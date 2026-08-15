@@ -13,6 +13,8 @@ export function ReportsView({ clientId }: { clientId: string }) {
   const client = api.clients.get.useQuery({ id: clientId });
   const reports = api.reports.list.useQuery({ clientId });
   const [shareLinks, setShareLinks] = useState<Record<string, string>>({});
+  const [sending, setSending] = useState<string | null>(null);
+  const [sentTo, setSentTo] = useState<Record<string, string>>({});
 
   const generate = api.reports.generate.useMutation({
     onSuccess: async () => {
@@ -87,8 +89,34 @@ export function ReportsView({ clientId }: { clientId: string }) {
                     >
                       Get client link
                     </button>
+                    <button
+                      type="button"
+                      data-testid={`send-${report.id}`}
+                      onClick={() => setSending(sending === report.id ? null : report.id)}
+                      className="h-9 rounded-md border border-input px-3 text-sm font-medium hover:bg-accent"
+                    >
+                      Send to client
+                    </button>
                   </span>
                 </div>
+
+                {sending === report.id && (
+                  <SendReport
+                    reportId={report.id}
+                    onSent={(to) => {
+                      setSentTo((current) => ({ ...current, [report.id]: to }));
+                      setSending(null);
+                    }}
+                    onCancel={() => setSending(null)}
+                  />
+                )}
+
+                {sentTo[report.id] && (
+                  <p data-testid="send-done" className="text-sm text-muted-foreground">
+                    Sent to <span className="metric">{sentTo[report.id]}</span>. The client opens
+                    the report by link — no account needed, and approves it there.
+                  </p>
+                )}
 
                 {token && (
                   <p data-testid="share-link" className="break-all text-sm text-muted-foreground">
@@ -236,5 +264,90 @@ function OpportunityForm({
         </p>
       )}
     </section>
+  );
+}
+
+/**
+ * Отправка отчёта клиенту агентства.
+ *
+ * Явное действие человека, по одному адресу за раз: рассылок в продукте нет
+ * и не планируется (инвариант 4). Письмо несёт ссылку, а не сам документ —
+ * отчёт живёт на своей странице, где его можно согласовать.
+ */
+function SendReport({
+  reportId,
+  onSent,
+  onCancel,
+}: {
+  reportId: string;
+  /** Подтверждение показывает родитель: форма после отправки закрывается. */
+  onSent: (to: string) => void;
+  onCancel: () => void;
+}) {
+  const [to, setTo] = useState("");
+  const [note, setNote] = useState("");
+
+  const send = api.reports.send.useMutation({
+    onSuccess: (_result, variables) => {
+      onSent(variables.to);
+    },
+  });
+
+  return (
+    <div className="flex flex-col gap-2 rounded-md border border-dashed p-3">
+      <label className="flex flex-col gap-1.5">
+        <span className="text-sm font-medium">Client email</span>
+        <input
+          type="email"
+          value={to}
+          onChange={(event) => setTo(event.target.value)}
+          placeholder="finance@ledgerbrook.test"
+          className={inputClass}
+        />
+      </label>
+
+      <label className="flex flex-col gap-1.5">
+        <span className="text-sm font-medium">Note (optional)</span>
+        <textarea
+          value={note}
+          onChange={(event) => setNote(event.target.value)}
+          rows={2}
+          placeholder="Anything you want to say in your own words"
+          className="rounded-md border border-input bg-background p-2 text-sm"
+        />
+      </label>
+
+      {send.error && (
+        <p data-testid="form-error" className="text-sm text-destructive">
+          {send.error.message}
+        </p>
+      )}
+
+      <div className="flex gap-2">
+        <button
+          type="button"
+          data-testid="confirm-send"
+          disabled={!to.includes("@") || send.isPending}
+          onClick={() =>
+            send.mutate({ reportId, to: to.trim(), ...(note.trim() ? { note: note.trim() } : {}) })
+          }
+          className="h-9 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground disabled:opacity-60"
+        >
+          {send.isPending ? "Sending…" : "Send"}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="h-9 rounded-md border border-input px-3 text-sm font-medium hover:bg-accent"
+        >
+          Cancel
+        </button>
+      </div>
+
+      {/* Письмо уходит от имени агентства: названия продукта в нём нет. */}
+      <p className="text-xs text-muted-foreground">
+        The email is signed with your agency name and carries a link, not an attachment.
+      </p>
+    </div>
   );
 }
