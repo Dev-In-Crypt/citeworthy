@@ -1677,6 +1677,22 @@ export async function listUsersByAgency(db: Database, agencyId: string): Promise
   return db.select().from(users).where(eq(users.agencyId, agencyId));
 }
 
+/**
+ * Заводит пользователя напрямую. Обычный путь — регистрация через Better
+ * Auth; это нужно сидам и тестам, которым учётные данные не требуются.
+ */
+export async function createUser(
+  db: Database,
+  values: { agencyId: string; email: string; name: string; role?: User["role"] },
+): Promise<User> {
+  const rows = await db.insert(users).values(values).returning();
+  const created = rows[0];
+  if (!created) {
+    throw new Error("Failed to create user");
+  }
+  return created;
+}
+
 export async function getUserByEmail(db: Database, email: string): Promise<User | undefined> {
   const rows = await db.select().from(users).where(eq(users.email, email)).limit(1);
   return rows[0];

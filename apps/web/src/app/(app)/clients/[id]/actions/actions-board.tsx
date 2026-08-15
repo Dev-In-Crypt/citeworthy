@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ACTION_TYPES } from "@repo/core";
 import { api } from "@/trpc/react";
 import { EmptyState } from "@/components/page-header";
 
@@ -22,6 +23,7 @@ type ActionRow = {
   status: string;
   sourceDomain: string | null;
   affectedClusterIds: string[];
+  ownerUserId: string | null;
   completedAt: Date | null;
   createdAt: Date;
 };
@@ -45,11 +47,26 @@ const IMPACT_STYLE: Record<string, string> = {
   low: "bg-secondary text-muted-foreground",
 };
 
+interface Member {
+  id: string;
+  name: string;
+  email: string;
+}
+
+function ownerName(ownerUserId: string | null, members: Member[] | undefined): string | null {
+  if (!ownerUserId) return null;
+  const owner = members?.find((member) => member.id === ownerUserId);
+  return owner?.name ?? owner?.email ?? "assigned";
+}
+
 export function ActionsBoard({ clientId }: { clientId: string }) {
   const utils = api.useUtils();
   const actions = api.actions.list.useQuery({ clientId });
+  const members = api.agency.members.useQuery();
 
   const [selected, setSelected] = useState<ActionRow | null>(null);
+  const [dropReason, setDropReason] = useState("");
+  const [adding, setAdding] = useState(false);
   const [experimentPrompt, setExperimentPrompt] = useState<ActionRow | null>(null);
   const [experimentWarnings, setExperimentWarnings] = useState<string[]>([]);
 
@@ -89,18 +106,56 @@ export function ActionsBoard({ clientId }: { clientId: string }) {
   }
 
   const rows = (actions.data ?? []) as ActionRow[];
+  const dropped = rows.filter((row) => row.status === "dropped");
+
+  const addButton = (
+    <button
+      type="button"
+      data-testid="add-action"
+      onClick={() => setAdding(true)}
+      className="h-9 rounded-md border border-input px-3 text-sm font-medium hover:bg-accent"
+    >
+      Add action
+    </button>
+  );
 
   if (rows.length === 0) {
     return (
-      <EmptyState
-        title="No actions yet"
-        description="Actions come from the Diagnose screen, where each recommendation carries the reason it exists. You can also add one by hand."
-      />
+      <>
+        <EmptyState
+          title="No actions yet"
+          description="Actions come from the Diagnose screen, where each recommendation carries the reason it exists. You can also add one by hand."
+          action={addButton}
+        />
+        {adding && (
+          <NewActionDialog
+            clientId={clientId}
+            onClose={() => setAdding(false)}
+            onCreated={async () => {
+              setAdding(false);
+              await utils.actions.list.invalidate({ clientId });
+            }}
+          />
+        )}
+      </>
     );
   }
 
   return (
     <>
+      <div className="mb-3 flex justify-end">{addButton}</div>
+
+      {adding && (
+        <NewActionDialog
+          clientId={clientId}
+          onClose={() => setAdding(false)}
+          onCreated={async () => {
+            setAdding(false);
+            await utils.actions.list.invalidate({ clientId });
+          }}
+        />
+      )}
+
       <div data-testid="actions-board" className="grid gap-4 md:grid-cols-3">
         {COLUMNS.map((column) => {
           const columnRows = rows
@@ -175,6 +230,12 @@ export function ActionsBoard({ clientId }: { clientId: string }) {
                     )}
                   </div>
 
+                  {/* Кто ведёт работу. Без владельца задача стоит молча, и
+                      через месяц никто не помнит, чья она. */}
+                  <span className="text-xs text-muted-foreground">
+                    {ownerName(row.ownerUserId, members.data) ?? "unassigned"}
+                  </span>
+
                   {/* Кнопки перемещения рядом с drag-and-drop: перетаскивание
                       неудобно на узких экранах и недоступно с клавиатуры. */}
                   <div className="flex gap-1">
@@ -196,6 +257,32 @@ export function ActionsBoard({ clientId }: { clientId: string }) {
           );
         })}
       </div>
+
+      {dropped.length > 0 && (
+        // Снятые работы не исчезают: агентство должно уметь ответить, почему
+        // сняли, когда та же рекомендация придёт снова.
+        <details data-testid="dropped-actions" className="rounded-lg border p-3">
+          <summary className="cursor-pointer text-sm text-muted-foreground">
+            {dropped.length} dropped
+          </summary>
+          <ul className="mt-2 flex flex-col gap-1 text-sm">
+            {dropped.map((row) => (
+              <li key={row.id} className="flex justify-between gap-3 border-b py-1.5 last:border-0">
+                <button
+                  type="button"
+                  onClick={() => setSelected(row)}
+                  className="text-left hover:underline"
+                >
+                  {row.title}
+                </button>
+                <span className="metric shrink-0 text-xs text-muted-foreground">
+                  {new Date(row.createdAt).toLocaleDateString()}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
 
       {selected && (
         <aside
@@ -257,6 +344,63 @@ export function ActionsBoard({ clientId }: { clientId: string }) {
               </div>
             )}
           </dl>
+
+          <div className="flex flex-col gap-1.5 border-t pt-4">
+            <label htmlFor="owner" className="text-sm font-medium">
+              Owner
+            </label>
+            <select
+              id="owner"
+              data-testid="owner-select"
+              value={selected.ownerUserId ?? ""}
+              onChange={(event) => {
+                const ownerUserId = event.target.value || null;
+                setSelected({ ...selected, ownerUserId });
+                update.mutate({ id: selected.id, ownerUserId });
+              }}
+              className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+            >
+              <option value="">Unassigned</option>
+              {(members.data ?? []).map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.name || member.email}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {selected.status !== "dropped" && (
+            <div className="flex flex-col gap-1.5">
+              <span className="text-sm font-medium">Not going to do it?</span>
+              {/* Причина обязательна: задача, снятая молча, вернётся той же
+                  рекомендацией через месяц, и спорить придётся заново. */}
+              <textarea
+                data-testid="drop-reason"
+                value={dropReason}
+                onChange={(event) => setDropReason(event.target.value)}
+                placeholder="Why this is not worth doing"
+                rows={2}
+                className="rounded-md border border-input bg-background p-2 text-sm"
+              />
+              <button
+                type="button"
+                data-testid="drop-action"
+                disabled={!dropReason.trim() || update.isPending}
+                onClick={() => {
+                  update.mutate({
+                    id: selected.id,
+                    status: "dropped",
+                    dropReason: dropReason.trim(),
+                  });
+                  setDropReason("");
+                  setSelected(null);
+                }}
+                className="h-9 self-start rounded-md border px-3 text-sm font-medium hover:bg-accent disabled:opacity-60"
+              >
+                Drop the action
+              </button>
+            </div>
+          )}
 
           <ActionOutcomePanel actionId={selected.id} />
           <ActionBriefPanel actionId={selected.id} />
@@ -447,5 +591,154 @@ function ActionOutcomePanel({ actionId }: { actionId: string }) {
       {/* Совпадение по времени — не причинность, и это сказано рядом с числом. */}
       <p className="text-xs text-muted-foreground">{disclaimer}</p>
     </section>
+  );
+}
+
+/**
+ * Ручное заведение работы.
+ *
+ * Не всё приходит из диагностики: агентство знает про клиента то, чего нет
+ * в цитатах. Причина обязательна и здесь — задача без объяснения не
+ * защищается перед клиентом (инвариант 7), и форма не даёт её пропустить.
+ */
+function NewActionDialog({
+  clientId,
+  onClose,
+  onCreated,
+}: {
+  clientId: string;
+  onClose: () => void;
+  onCreated: () => Promise<void>;
+}) {
+  const [title, setTitle] = useState("");
+  const [reason, setReason] = useState("");
+  const [actionType, setActionType] = useState<string>("create_page");
+  const [estimatedImpact, setEstimatedImpact] = useState<string>("medium");
+  const [effort, setEffort] = useState<string>("medium");
+
+  const create = api.actions.create.useMutation({
+    onSuccess: async () => {
+      await onCreated();
+    },
+  });
+
+  const ready = title.trim().length > 0 && reason.trim().length > 0;
+
+  return (
+    <div
+      data-testid="new-action-dialog"
+      role="dialog"
+      aria-label="Add action"
+      className="fixed inset-0 z-30 flex items-center justify-center bg-foreground/20 p-4"
+    >
+      <div className="flex w-full max-w-md flex-col gap-3 rounded-lg border bg-background p-6 shadow-lg">
+        <h2 className="text-base font-medium">Add an action</h2>
+
+        <label className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium">Title</span>
+          <input
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+          />
+        </label>
+
+        <label className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium">Why this action exists</span>
+          <textarea
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            rows={3}
+            placeholder="What in the measurements makes this worth doing"
+            className="rounded-md border border-input bg-background p-2 text-sm"
+          />
+        </label>
+
+        <div className="grid grid-cols-3 gap-2">
+          <label className="flex flex-col gap-1.5">
+            <span className="text-sm font-medium">Type</span>
+            <select
+              aria-label="Type"
+              value={actionType}
+              onChange={(event) => setActionType(event.target.value)}
+              className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+            >
+              {ACTION_TYPES.map((type) => (
+                <option key={type} value={type}>
+                  {type.replaceAll("_", " ")}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-sm font-medium">Impact</span>
+            <select
+              aria-label="Impact"
+              value={estimatedImpact}
+              onChange={(event) => setEstimatedImpact(event.target.value)}
+              className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+            >
+              {["low", "medium", "high"].map((level) => (
+                <option key={level} value={level}>
+                  {level}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-sm font-medium">Effort</span>
+            <select
+              aria-label="Effort"
+              value={effort}
+              onChange={(event) => setEffort(event.target.value)}
+              className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+            >
+              {["low", "medium", "high"].map((level) => (
+                <option key={level} value={level}>
+                  {level}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        {create.error && (
+          <p data-testid="form-error" className="text-sm text-destructive">
+            {create.error.message}
+          </p>
+        )}
+
+        <div className="flex gap-2">
+          <button
+            type="button"
+            data-testid="create-manual-action"
+            disabled={!ready || create.isPending}
+            onClick={() =>
+              create.mutate({
+                clientId,
+                title: title.trim(),
+                reason: reason.trim(),
+                actionType: actionType as (typeof ACTION_TYPES)[number],
+                estimatedImpact: estimatedImpact as "low" | "medium" | "high",
+                effort: effort as "low" | "medium" | "high",
+                affectedClusterIds: [],
+              })
+            }
+            className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60"
+          >
+            Create action
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-10 rounded-md border border-input px-4 text-sm font-medium hover:bg-accent"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

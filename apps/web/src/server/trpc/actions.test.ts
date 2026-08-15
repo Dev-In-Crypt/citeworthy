@@ -1,7 +1,14 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import { TRPCError } from "@trpc/server";
 import { makeRecommendation } from "@repo/core";
-import { createAgency, createClient, createDb, deleteAgency, listActions } from "@repo/db";
+import {
+  createAgency,
+  createClient,
+  createDb,
+  createUser,
+  deleteAgency,
+  listActions,
+} from "@repo/db";
 import { appRouter } from "./root";
 import type { SessionUser, TrpcContext } from "./context";
 
@@ -191,6 +198,81 @@ describe("actions CRUD", () => {
     const reopened = await api.actions.update({ id: created.id, status: "in_progress" });
 
     expect(reopened?.completedAt).toBeNull();
+  });
+
+  async function manualAction(agency: string) {
+    return caller(agency).actions.create({
+      clientId,
+      title: "Manual action",
+      reason: "Because the page is stale.",
+      actionType: "refresh_page",
+      estimatedImpact: "medium",
+      effort: "medium",
+      affectedClusterIds: [],
+    });
+  }
+
+  it("снять действие без причины нельзя", async () => {
+    const created = await manualAction(agencyId);
+
+    // Задача, снятая молча, вернётся той же рекомендацией через месяц.
+    await expect(
+      caller(agencyId).actions.update({ id: created.id, status: "dropped" }),
+    ).rejects.toThrow(/why/i);
+  });
+
+  it("причина отказа сохраняется в журнале", async () => {
+    const created = await manualAction(agencyId);
+
+    await caller(agencyId).actions.update({
+      id: created.id,
+      status: "dropped",
+      dropReason: "The client owns this page and will not touch it.",
+    });
+
+    const activity = await caller(agencyId).actions.activity({ clientId, limit: 10 });
+    const entry = activity.find((row) => row.payload["actionId"] === created.id);
+
+    expect(entry?.payload["dropReason"]).toContain("will not touch it");
+  });
+
+  it("исполнителем может быть только сотрудник своего агентства", async () => {
+    const created = await manualAction(agencyId);
+
+    const other = await createAgency(db, { name: "Other", clientLimit: 10 });
+    try {
+      const stranger = await createUser(db, {
+        agencyId: other.id,
+        email: `stranger-${crypto.randomUUID().slice(0, 8)}@other.test`,
+        name: "Stranger",
+        role: "member",
+      });
+
+      await expect(
+        caller(agencyId).actions.update({ id: created.id, ownerUserId: stranger.id }),
+      ).rejects.toThrow(TRPCError);
+    } finally {
+      await deleteAgency(db, other.id);
+    }
+  });
+
+  it("исполнителя можно назначить и снять", async () => {
+    const created = await manualAction(agencyId);
+    const member = await createUser(db, {
+      agencyId,
+      email: `member-${crypto.randomUUID().slice(0, 8)}@agency.test`,
+      name: "Maya",
+      role: "member",
+    });
+
+    const assigned = await caller(agencyId).actions.update({
+      id: created.id,
+      ownerUserId: member.id,
+    });
+    expect(assigned?.ownerUserId).toBe(member.id);
+
+    const cleared = await caller(agencyId).actions.update({ id: created.id, ownerUserId: null });
+    expect(cleared?.ownerUserId).toBeNull();
   });
 
   it("чужое действие недоступно", async () => {

@@ -16,9 +16,11 @@ import {
   listActions,
   listActivity,
   listDatedCitationFacts,
+  listUsersByAgency,
   logActivity,
   updateAction,
 } from "@repo/db";
+import { TRPCError } from "@trpc/server";
 import { assertTenant, protectedProcedure, roleProcedure, router } from "../trpc";
 
 const IMPACT = ["low", "medium", "high"] as const;
@@ -231,6 +233,14 @@ export const actionsRouter = router({
         status: z.enum(STATUS).optional(),
         estimatedImpact: z.enum(IMPACT).optional(),
         effort: z.enum(IMPACT).optional(),
+        /** null — снять исполнителя. Работа без владельца стоит молча. */
+        ownerUserId: z.uuid().nullable().optional(),
+        /**
+         * Почему действие отброшено. Обязательно при переводе в dropped:
+         * задача, исчезнувшая без объяснения, вернётся той же рекомендацией
+         * через месяц, и никто не вспомнит, почему её сняли.
+         */
+        dropReason: z.string().min(1).max(500).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -242,7 +252,23 @@ export const actionsRouter = router({
       const client = await getClientById(ctx.db, action.clientId);
       assertTenant(client, ctx.user.agencyId);
 
-      const { id, status, ...patch } = input;
+      const { id, status, dropReason, ownerUserId, ...patch } = input;
+
+      if (status === "dropped" && !dropReason) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Say why the action is being dropped. It will come back otherwise.",
+        });
+      }
+
+      // Исполнитель — только из своего агентства. Чужой пользователь
+      // неотличим от несуществующего (инвариант 1).
+      if (ownerUserId) {
+        const members = await listUsersByAgency(ctx.db, ctx.user.agencyId);
+        if (!members.some((member) => member.id === ownerUserId)) {
+          throw new TRPCError({ code: "NOT_FOUND" });
+        }
+      }
 
       // Дата завершения ставится вместе со статусом: без неё эксперимент
       // не сможет отделить «до» от «после».
@@ -252,6 +278,7 @@ export const actionsRouter = router({
       const updated = await updateAction(ctx.db, id, {
         ...patch,
         ...(status ? { status } : {}),
+        ...(ownerUserId !== undefined ? { ownerUserId } : {}),
         ...(completedAt !== undefined ? { completedAt } : {}),
       });
 
@@ -263,7 +290,15 @@ export const actionsRouter = router({
           // Завершение — отдельное событие: именно оно попадёт в отчёт клиенту
           // и станет точкой отсчёта для эксперимента.
           eventType: status === "done" ? "action_completed" : "action_status_changed",
-          payload: { actionId: action.id, title: action.title, from: action.status, to: status },
+          payload: {
+            actionId: action.id,
+            title: action.title,
+            from: action.status,
+            to: status,
+            // Причина отказа хранится там же, где остальная история: в отчёте
+            // клиенту её нет, но агентство должно уметь ответить, почему сняли.
+            ...(dropReason ? { dropReason } : {}),
+          },
         });
       }
 

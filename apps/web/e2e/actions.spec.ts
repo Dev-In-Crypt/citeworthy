@@ -69,6 +69,10 @@ test("actions board moves cards and offers an experiment on completion", async (
   // Числа измерения доехали до исполнителя, а не остались на экране диагностики.
   await expect(brief.getByTestId("brief-context")).toContainText("%");
 
+  // Исполнитель назначается здесь же: работа без владельца стоит молча.
+  await drawer.getByTestId("owner-select").selectOption({ index: 1 });
+  await expect(page.getByTestId("column-backlog")).not.toContainText("unassigned");
+
   await drawer.getByRole("button", { name: "Close" }).click();
 
   // Перемещение в работу диалога не открывает.
@@ -120,4 +124,54 @@ test("actions board moves cards and offers an experiment on completion", async (
   await expect(page.getByTestId("evidence-list").locator("li").first()).toBeVisible();
   await expect(page.getByTestId("experiment-timeline")).toContainText("Action shipped");
   await expect(page.getByTestId("experiment-chart")).toBeVisible();
+});
+
+test("an action can be dropped, but only with a reason", async ({ page }) => {
+  const email = `drop-${Math.random().toString(36).slice(2, 10)}@northwind-agency.test`;
+
+  await page.goto("/signup");
+  await page.getByLabel("Your name").fill("Drop Tester");
+  await page.getByLabel("Work email").fill(email);
+  await page.getByLabel("Password").fill("correct-horse-battery");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(page).toHaveURL(/\/dashboard$/);
+
+  await page.goto("/clients/new");
+  await page.getByLabel("Client name").fill("AcmeCRM");
+  await page.getByLabel("Domain").fill("acmecrm.test");
+  await page.getByRole("button", { name: "Create client" }).click();
+  await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}\/onboarding$/);
+  await page.goto(page.url().replace(/\/onboarding$/, ""));
+  const clientId = page.url().split("/").pop()!;
+
+  // Не всё приходит из диагностики: агентство знает про клиента то, чего
+  // нет в цитатах, и должно уметь завести работу руками.
+  await page.goto(`/clients/${clientId}/actions`);
+  await page.getByTestId("add-action").click();
+
+  const form = page.getByTestId("new-action-dialog");
+  await form.getByLabel("Title").fill("Pitch the trade outlet");
+
+  // Без причины действие не создаётся: инвариант 7 держится и здесь.
+  await expect(form.getByTestId("create-manual-action")).toBeDisabled();
+
+  await form
+    .getByLabel("Why this action exists")
+    .fill("Editorial carries a third of the citations here.");
+  await form.getByTestId("create-manual-action").click();
+
+  const backlog = page.getByTestId("column-backlog");
+  await expect(backlog.locator("article")).toHaveCount(1);
+
+  await backlog.locator("article button").first().click();
+  const drawer = page.getByTestId("action-drawer");
+
+  // Без причины кнопка не работает: снятая молча задача вернётся снова.
+  await expect(drawer.getByTestId("drop-action")).toBeDisabled();
+
+  await drawer.getByTestId("drop-reason").fill("The client owns this outlet and will not pitch it.");
+  await drawer.getByTestId("drop-action").click();
+
+  await expect(backlog.locator("article")).toHaveCount(0);
+  await expect(page.getByTestId("dropped-actions")).toContainText("1 dropped");
 });
