@@ -1,5 +1,10 @@
 # Развёртывание на одной машине: база, очередь, веб, воркер.
 #
+# Имя проекта задано явно и отличается от проекта разработки. Без него оба
+# compose-файла из одной папки получают одно имя, а значит и одни тома:
+# `down -v` для прода стирает базу разработки. Так уже было — данные потеряны.
+name: citeworthy-prod
+#
 # Этого достаточно для первых десятков агентств и не требует управляемой
 # платформы. Когда понадобится больше — веб и воркер масштабируются
 # независимо, потому что уже разделены.
@@ -59,7 +64,13 @@ services:
     restart: unless-stopped
     ports:
       - "${WEB_PORT:-3000}:3000"
+    volumes:
+      # Общий том с воркером: сырые ответы пишет он, а отдаёт их веб. Без
+      # общего тома ответы прогонов по расписанию не открываются из интерфейса,
+      # а перезапуск контейнера стирает всё, что положено на диск.
+      - storage-data:/data/storage
     environment:
+      STORAGE_DIR: /data/storage
       DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET}
@@ -79,33 +90,40 @@ services:
       STRIPE_PRICE_STARTER: ${STRIPE_PRICE_STARTER:-}
       STRIPE_PRICE_GROWTH: ${STRIPE_PRICE_GROWTH:-}
       STRIPE_PRICE_SCALE: ${STRIPE_PRICE_SCALE:-}
-      STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-}
-      STORAGE_BUCKET: ${STORAGE_BUCKET:-}
-      STORAGE_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY_ID:-}
-      STORAGE_SECRET_ACCESS_KEY: ${STORAGE_SECRET_ACCESS_KEY:-}
       SENTRY_DSN: ${SENTRY_DSN:-}
     depends_on:
       postgres:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+    healthcheck:
+      # Живость проверяется по базе, а не по факту запуска процесса: инстанс
+      # без базы отдал бы клиенту пустой отчёт вместо ошибки.
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      start_period: 20s
+      retries: 5
 
   worker:
     build:
       context: .
       dockerfile: apps/worker/Dockerfile
     restart: unless-stopped
+    volumes:
+      - storage-data:/data/storage
     environment:
+      STORAGE_DIR: /data/storage
       DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       ADAPTERS_MODE: ${ADAPTERS_MODE:-mock}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       PERPLEXITY_API_KEY: ${PERPLEXITY_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-}
-      STORAGE_BUCKET: ${STORAGE_BUCKET:-}
-      STORAGE_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY_ID:-}
-      STORAGE_SECRET_ACCESS_KEY: ${STORAGE_SECRET_ACCESS_KEY:-}
       SENTRY_DSN: ${SENTRY_DSN:-}
     depends_on:
       redis:
@@ -116,3 +134,6 @@ services:
 volumes:
   postgres-data:
   redis-data:
+  # Сырые ответы, логотипы агентств и напечатанные PDF. Сырые ответы хранятся
+  # всегда: по ним переобрабатывают измерения, когда меняется парсер.
+  storage-data:

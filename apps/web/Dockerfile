@@ -55,6 +55,11 @@ RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 COPY --from=build --chown=nextjs:nodejs /repo/apps/web/.next/standalone ./
 COPY --from=build --chown=nextjs:nodejs /repo/apps/web/.next/static ./apps/web/.next/static
 
+# Каталог хранилища создаётся до монтирования тома и с нужным владельцем:
+# свежий именованный том наследует права точки монтирования из образа, иначе
+# процесс без root не сможет в него писать.
+RUN mkdir -p /data/storage && chown -R nextjs:nodejs /data/storage
+
 USER nextjs
 EXPOSE 3000
 

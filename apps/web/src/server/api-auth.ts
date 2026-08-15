@@ -1,5 +1,6 @@
 import { parseApiKey, verifyApiKey } from "@repo/core";
 import { findApiKeyByPrefix, touchApiKey, type Database } from "@repo/db";
+import { getRedis } from "./redis";
 
 /**
  * Авторизация публичного API по ключу агентства.
@@ -19,22 +20,25 @@ export type ApiAuthResult =
   | { ok: false; status: 401 | 429; message: string };
 
 /**
- * Простой ограничитель частоты в памяти процесса.
+ * Ограничитель частоты: счёт в Redis, если он есть.
  *
- * Не распределённый и это честно сказано: за несколькими инстансами он
- * ограничивает каждый по отдельности. Его задача — не пустить один ключ
- * положить базу, а не быть точным счётчиком.
+ * В памяти процесса счётчик считал бы каждый инстанс отдельно, и предъявленный
+ * лимит тихо умножался бы на их число. Redis в развёртывании уже стоит —
+ * очередь воркера без него не работает.
+ *
+ * Без Redis остаётся счёт в памяти: разработка и тесты не должны требовать
+ * поднятой очереди, а один процесс считает себя правильно.
  */
-const WINDOW_MS = 60_000;
+const WINDOW_SECONDS = 60;
 const MAX_REQUESTS_PER_WINDOW = 120;
 
 const hits = new Map<string, { count: number; resetAt: number }>();
 
-function withinRateLimit(keyId: string, now = Date.now()): boolean {
+function withinLocalLimit(keyId: string, now = Date.now()): boolean {
   const entry = hits.get(keyId);
 
   if (!entry || now >= entry.resetAt) {
-    hits.set(keyId, { count: 1, resetAt: now + WINDOW_MS });
+    hits.set(keyId, { count: 1, resetAt: now + WINDOW_SECONDS * 1000 });
     return true;
   }
 
@@ -42,7 +46,33 @@ function withinRateLimit(keyId: string, now = Date.now()): boolean {
   return entry.count <= MAX_REQUESTS_PER_WINDOW;
 }
 
-/** Только для тестов: счётчик живёт в памяти процесса. */
+async function withinRateLimit(keyId: string, now = Date.now()): Promise<boolean> {
+  const redis = getRedis();
+  if (!redis) {
+    return withinLocalLimit(keyId, now);
+  }
+
+  // Окно привязано к минуте, а не к первому запросу: так двум инстансам не
+  // нужно договариваться, когда оно началось.
+  const window = Math.floor(now / (WINDOW_SECONDS * 1000));
+  const key = `api-rate:${keyId}:${window}`;
+
+  try {
+    const count = await redis.incr(key);
+    if (count === 1) {
+      await redis.expire(key, WINDOW_SECONDS * 2);
+    }
+    return count <= MAX_REQUESTS_PER_WINDOW;
+  } catch (error) {
+    // Недоступный Redis не должен закрывать API целиком: считаем в памяти
+    // и продолжаем. Хуже пустить лишний запрос, чем отключить агентству
+    // выгрузку из-за перезапуска очереди.
+    console.error("[api] rate limit fell back to memory", error);
+    return withinLocalLimit(keyId, now);
+  }
+}
+
+/** Только для тестов: счётчик в памяти живёт в процессе. */
 export function resetRateLimit(): void {
   hits.clear();
 }
@@ -65,7 +95,7 @@ export async function authenticateApiRequest(
     return { ok: false, status: 401, message: "Provide a valid API key as a bearer token." };
   }
 
-  if (!withinRateLimit(stored.id)) {
+  if (!(await withinRateLimit(stored.id))) {
     return { ok: false, status: 429, message: "Too many requests for this key. Try in a minute." };
   }
 

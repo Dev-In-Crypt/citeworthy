@@ -6,9 +6,11 @@ coverage/
 *.tsbuildinfo
 next-env.d.ts
 
-.env
-.env.local
-.env.*.local
+# Игнорируется всё семейство, а примеры — по исключению. Перечислять файлы
+# поимённо значит однажды завести .env.staging и закоммитить его секреты.
+.env*
+!.env.example
+!.env.production.example
 
 loop/run.log
 

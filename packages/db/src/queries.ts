@@ -7,7 +7,7 @@ import type { ApiKey, NewApiKey } from "./schema/auth";
 import { assistantTraffic } from "./schema/analytics";
 import type { AssistantTraffic, NewAssistantTraffic } from "./schema/analytics";
 import { subscriptions, usageCounters } from "./schema/billing";
-import { citationSources, sourcePresence, sources } from "./schema/sources";
+import { citationSources, sources } from "./schema/sources";
 import { actions } from "./schema/actions";
 import { activityLog } from "./schema/activity";
 import { experimentEvents, experiments } from "./schema/experiments";
@@ -16,7 +16,7 @@ import type { NewReport, Report, ReportShare } from "./schema/reports";
 import type { Experiment, ExperimentEvent, NewExperiment, NewExperimentEvent } from "./schema/experiments";
 import type { ActivityEntry, NewActivityEntry } from "./schema/activity";
 import type { Action, NewAction } from "./schema/actions";
-import type { NewSourcePresence, Source, SourcePresence } from "./schema/sources";
+import type { Source } from "./schema/sources";
 import type { NewSubscription, Subscription, UsageCounter } from "./schema/billing";
 type SourceTypeValue = NonNullable<Source["sourceType"]>;
 import {
@@ -1036,29 +1036,6 @@ export async function linkCitationToSource(
   await db.insert(citationSources).values({ citationId, sourceId }).onConflictDoNothing();
 }
 
-export async function upsertSourcePresence(
-  db: Database,
-  values: NewSourcePresence,
-): Promise<void> {
-  await db
-    .insert(sourcePresence)
-    .values(values)
-    .onConflictDoUpdate({
-      target: [sourcePresence.clientId, sourcePresence.sourceId],
-      set: {
-        clientPresent: values.clientPresent ?? false,
-        competitorsPresent: values.competitorsPresent ?? [],
-        checkedAt: new Date(),
-      },
-    });
-}
-
-export async function listSourcePresence(
-  db: Database,
-  clientId: string,
-): Promise<SourcePresence[]> {
-  return db.select().from(sourcePresence).where(eq(sourcePresence.clientId, clientId));
-}
 
 /**
  * Факты цитирования для диагностики: домен, его тип и кто упомянут
