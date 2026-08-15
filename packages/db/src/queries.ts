@@ -925,22 +925,16 @@ export async function getScheduleForClient(
 }
 
 /** У клиента одно расписание: повторный вызов обновляет существующее. */
+/**
+ * Расписание клиента. Одно на клиента — это держит уникальный индекс, а не
+ * порядок чтения-записи: два одновременных сохранения раньше оставляли два
+ * расписания, и каждый тик заводил по прогону на каждое.
+ */
 export async function upsertRunSchedule(
   db: Database,
   clientId: string,
   values: Pick<RunSchedule, "cadence" | "platforms" | "samplesPerPrompt" | "active">,
 ): Promise<RunSchedule> {
-  const existing = await getScheduleForClient(db, clientId);
-
-  if (existing) {
-    const rows = await db
-      .update(runSchedules)
-      .set(values)
-      .where(eq(runSchedules.id, existing.id))
-      .returning();
-    return rows[0]!;
-  }
-
   const rows = await db
     .insert(runSchedules)
     .values({
@@ -950,7 +944,14 @@ export async function upsertRunSchedule(
       // и неделю не понимает, почему данных нет.
       nextRunAt: new Date(),
     })
+    .onConflictDoUpdate({
+      target: runSchedules.clientId,
+      // nextRunAt не трогаем: изменение настроек не должно сдвигать
+      // ближайший замер ни вперёд, ни назад.
+      set: values,
+    })
     .returning();
+
   return rows[0]!;
 }
 

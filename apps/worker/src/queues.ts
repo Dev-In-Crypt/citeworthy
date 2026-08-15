@@ -12,6 +12,8 @@ export const QUEUE_NAMES = {
   runs: "runs",
   parse: "parse",
   aggregate: "aggregate",
+  /** Сборка прогона: выполняется, когда доехали все его ответы. */
+  finalize: "run-finalize",
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
@@ -40,6 +42,17 @@ export const PLATFORM_RATE_LIMITS: Record<Platform, { max: number; duration: num
   perplexity: { max: 30, duration: 60_000 },
   gemini: { max: 60, duration: 60_000 },
 };
+
+export interface FinalizeJobData {
+  runId: string;
+  clientId: string;
+  /**
+   * Сколько ответов должно было получиться. Считается в момент постановки
+   * задач и едет сюда: пересчёт в момент сборки дал бы другое число, если
+   * набор промптов за время прогона изменился.
+   */
+  expected: number;
+}
 
 export interface ParseJobData {
   responseId: string;

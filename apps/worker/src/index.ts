@@ -1,4 +1,4 @@
-import { Queue, Worker } from "bullmq";
+import { FlowProducer, Queue, Worker } from "bullmq";
 import { createDb } from "@repo/db";
 import { PLATFORMS, parseAdaptersMode, registerLiveAdapters } from "@repo/core";
 import { ADAPTERS_MODE_RAW } from "./env";
@@ -6,11 +6,14 @@ import {
   createConnection,
   createQueues,
   PLATFORM_RATE_LIMITS,
+  QUEUE_NAMES,
   runsQueueName,
+  type FinalizeJobData,
   type RunJobData,
 } from "./queues";
 import { tickSchedules } from "./scheduler";
-import { executeRunJob } from "@repo/pipeline";
+import { enqueueRun } from "./enqueue-run";
+import { executeRunJob, finalizeRun } from "@repo/pipeline";
 import { errorReporter, logger } from "./observability";
 
 const TICK_QUEUE = "scheduler-tick";
@@ -31,17 +34,54 @@ async function main(): Promise<void> {
   const tickQueue = new Queue(TICK_QUEUE, { connection });
   await tickQueue.upsertJobScheduler(TICK_JOB, { every: TICK_EVERY_MS });
 
+  const flow = new FlowProducer({ connection });
+
   const tickWorker = new Worker(
     TICK_QUEUE,
     async () => {
       const started = await tickSchedules(db, new Date(), mode);
+
+      let queued = 0;
+      let failed = 0;
+      for (const result of started) {
+        // Прогон, для которого не поставили задачи, остаётся pending навсегда:
+        // расписание сдвинуто, а измерения нет — и заметить это можно только
+        // по молчанию цифр через неделю.
+        //
+        // Каждое расписание ставится отдельно: сбой у одного клиента не
+        // должен отменять замер у всех остальных в этом тике.
+        try {
+          queued += await enqueueRun(db, flow, result.runId, result.clientId);
+        } catch (error) {
+          failed++;
+          logger.error("scheduler.enqueue_failed", {
+            runId: result.runId,
+            clientId: result.clientId,
+            message: error instanceof Error ? error.message : String(error),
+          });
+          errorReporter.captureError(error, { scope: "scheduler.enqueue", runId: result.runId });
+        }
+      }
+
       if (started.length > 0) {
         logger.info("scheduler.tick", {
           startedRuns: started.length,
+          queuedJobs: queued,
+          failedSchedules: failed,
           runIds: started.map((result) => result.runId),
         });
       }
-      return { started: started.length };
+      return { started: started.length, queued, failed };
+    },
+    { connection },
+  );
+
+  const finalizeWorker = new Worker<FinalizeJobData>(
+    QUEUE_NAMES.finalize,
+    async (job) => {
+      const outcome = await finalizeRun(db, job.data);
+      logger.info("run.finalized", { runId: job.data.runId, ...outcome });
+      return outcome;
     },
     { connection },
   );
@@ -68,7 +108,7 @@ async function main(): Promise<void> {
       ),
   );
 
-  for (const worker of [tickWorker, ...runWorkers]) {
+  for (const worker of [tickWorker, finalizeWorker, ...runWorkers]) {
     worker.on("failed", (job, error) => {
       // Упавшая задача — единственное место, где теряются измерения:
       // она должна доехать до Sentry, а не остаться строкой в консоли.
@@ -94,8 +134,13 @@ async function main(): Promise<void> {
     shuttingDown = true;
     logger.info("worker.shutdown", { signal });
 
-    await Promise.all([tickWorker.close(), ...runWorkers.map((w) => w.close())]);
     await Promise.all([
+      tickWorker.close(),
+      finalizeWorker.close(),
+      ...runWorkers.map((w) => w.close()),
+    ]);
+    await Promise.all([
+      flow.close(),
       tickQueue.close(),
       queues.runs.close(),
       queues.parse.close(),

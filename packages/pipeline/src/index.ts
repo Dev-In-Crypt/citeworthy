@@ -18,3 +18,5 @@ export type { ClassifyOutcome } from "./classify-sources";
 export { detectExperimentEvents } from "./experiment-events";
 export { completeRun } from "./complete-run";
 export type { CompleteRunOutcome } from "./complete-run";
+export { finalizeRun } from "./finalize-run";
+export type { FinalizeRunOutcome } from "./finalize-run";

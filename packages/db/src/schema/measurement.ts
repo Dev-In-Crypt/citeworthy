@@ -90,7 +90,17 @@ export const runSchedules = pgTable(
     active: boolean("active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index("run_schedules_next_run_at_idx").on(table.nextRunAt)],
+  (table) => [
+    index("run_schedules_next_run_at_idx").on(table.nextRunAt),
+    /**
+     * Одно расписание на клиента.
+     *
+     * Без этого ограничения гонка между двумя сохранениями оставляла второе
+     * расписание, и каждый тик заводил по прогону на каждое — двойной расход
+     * на живых адаптерах и удвоенные цифры в измерениях.
+     */
+    uniqueIndex("run_schedules_client_idx").on(table.clientId),
+  ],
 );
 
 export const runs = pgTable(
