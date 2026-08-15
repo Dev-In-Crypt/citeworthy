@@ -1,11 +1,12 @@
 import { expect, test } from "@playwright/test";
+import type { Page } from "@playwright/test";
 
 /**
  * Verify T96/T97: ключ выдаётся один раз и работает, а импорт переходов
  * появляется на экране клиента рядом с видимостью, а не внутри неё.
  */
 
-async function signUp(page: import("@playwright/test").Page, prefix: string): Promise<void> {
+async function signUp(page: Page, prefix: string): Promise<void> {
   const email = `${prefix}-${Math.random().toString(36).slice(2, 10)}@northslope-agency.test`;
 
   await page.goto("/signup");

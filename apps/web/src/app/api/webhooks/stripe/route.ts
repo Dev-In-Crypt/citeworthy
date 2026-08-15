@@ -11,8 +11,11 @@ import { applySubscriptionChange } from "@/server/subscription";
  * больше: без этой проверки план агентства мог бы выдать себе кто угодно.
  */
 
-const { db } = createDb();
-
+/**
+ * Подключение создаётся внутри обработчика, а не на уровне модуля: сборка
+ * образа выполняет модуль, чтобы собрать данные страницы, и подключение
+ * на импорте делает сборку зависимой от рантайм-настроек.
+ */
 export async function POST(request: Request): Promise<Response> {
   const signature = request.headers.get("stripe-signature");
   if (!signature) {
@@ -34,10 +37,16 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ received: true, applied: false, reason: event.reason });
   }
 
-  const outcome = await applySubscriptionChange(db, event);
-  if (!outcome.applied) {
-    console.error("[stripe] unlinked subscription event", outcome.reason);
-  }
+  const { db, close } = createDb();
 
-  return Response.json({ received: true, applied: outcome.applied });
+  try {
+    const outcome = await applySubscriptionChange(db, event);
+    if (!outcome.applied) {
+      console.error("[stripe] unlinked subscription event", outcome.reason);
+    }
+
+    return Response.json({ received: true, applied: outcome.applied });
+  } finally {
+    await close();
+  }
 }

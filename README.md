@@ -53,6 +53,49 @@ pnpm lint && pnpm typecheck
 pnpm db:migrate | db:seed | db:studio
 ```
 
+## Deploying
+
+One machine with Docker is enough for the first dozens of agencies:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+```
+
+Four services: Postgres, Redis, web, worker. Migrations run as a one-shot service before the app
+starts — the application never changes the schema itself, or two instances would do it at once.
+Web and worker are separate images because a measurement run takes minutes and must not share a
+process with request handling.
+
+`/api/health` answers 503 while the database is unreachable, so the platform can hold traffic back
+instead of serving empty reports.
+
+`.env.production` needs at minimum `POSTGRES_PASSWORD`, `DATABASE_URL`, `BETTER_AUTH_SECRET`,
+`BETTER_AUTH_URL` and `NEXT_PUBLIC_APP_URL`. Everything else is optional and the product states
+plainly what it cannot do without it: `ADAPTERS_MODE` stays on fixtures until platform keys are
+present, email is written to the log until `RESEND_API_KEY` is set, and payments are simply not
+offered until Stripe is configured.
+
+## Public API
+
+Read-only, keyed per agency, created in Settings → API. The key is shown once; only its hash is
+stored.
+
+```bash
+curl -H "Authorization: Bearer $CITEWORTHY_KEY" https://your-host/api/v1/clients
+```
+
+| Endpoint | Returns |
+|---|---|
+| `GET /api/v1/clients` | Clients of the agency |
+| `GET /api/v1/clients/{id}/visibility` | Prompt × assistant matrix, intervals, movement |
+| `GET /api/v1/clients/{id}/sources` | Cited sources and presence |
+| `GET /api/v1/clients/{id}/actions` | Work queue, each row with its reason |
+| `GET /api/v1/reports` | Reports and their status |
+
+Figures come from the same functions that render the screens, and carry the same intervals — a
+number without one becomes "we grew three points" in someone else's dashboard, which the sample
+never claimed.
+
 ## Conventions worth knowing
 
 - Every data query goes through `protectedProcedure` + `assertTenant`. A resource belonging to

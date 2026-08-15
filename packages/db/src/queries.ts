@@ -352,6 +352,19 @@ export async function listResponseFactsForClient(db: Database, clientId: string)
   return rows;
 }
 
+/**
+ * Живо ли соединение с базой. Используется проверкой готовности контейнера:
+ * инстанс без базы не должен принимать трафик.
+ */
+export async function pingDatabase(db: Database): Promise<void> {
+  const rows = await db.execute(sql`select 1 as ok`);
+  const ok = (rows as unknown as { ok: number }[])[0]?.ok;
+
+  if (ok !== 1) {
+    throw new Error("Database did not answer the liveness query");
+  }
+}
+
 /* ---------- Ключи публичного API ---------- */
 
 export async function createApiKey(db: Database, values: NewApiKey): Promise<ApiKey> {

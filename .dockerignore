@@ -1,0 +1,23 @@
+# Всё, что не нужно образу. Секреты — в первую очередь: .env не должен
+# попасть в слой сборки даже временно.
+.env
+.env.*
+!.env.example
+
+node_modules
+**/node_modules
+**/.next
+**/.turbo
+**/dist
+**/test-results
+**/playwright-report
+
+.git
+.github
+.claude
+.storage
+docs
+loop
+
+*.md
+!README.md
