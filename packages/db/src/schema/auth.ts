@@ -1,5 +1,5 @@
 import { pgTable, text, timestamp, uuid, boolean, index } from "drizzle-orm/pg-core";
-import { users } from "./tenancy";
+import { agencies, users } from "./tenancy";
 
 /**
  * Таблицы Better Auth. User-моделью служит `users` из tenancy.ts —
@@ -56,6 +56,35 @@ export const verifications = pgTable("verifications", {
 });
 
 /** Приглашения участников в агентство (используется на /invite/[token], T04). */
+/**
+ * Ключи публичного API.
+ *
+ * Хранится только хэш: продукт, который умеет показать ключ второй раз,
+ * держит его в открытом виде, и утечка базы становится утечкой доступа ко
+ * всем агентствам сразу. Префикс не секретен — по нему ключ находится без
+ * перебора хэшей и опознаётся агентством в списке.
+ */
+export const apiKeys = pgTable(
+  "api_keys",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    agencyId: uuid("agency_id")
+      .notNull()
+      .references(() => agencies.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    prefix: text("prefix").notNull().unique(),
+    hash: text("hash").notNull(),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    /** Отзыв, а не удаление: у ключа есть история использования. */
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("api_keys_agency_idx").on(table.agencyId)],
+);
+
+export type ApiKey = typeof apiKeys.$inferSelect;
+export type NewApiKey = typeof apiKeys.$inferInsert;
+
 export const invitations = pgTable("invitations", {
   id: uuid("id").primaryKey().defaultRandom(),
   agencyId: uuid("agency_id").notNull(),

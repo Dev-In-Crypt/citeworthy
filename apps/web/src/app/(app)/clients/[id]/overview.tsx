@@ -15,6 +15,7 @@ import { CONFIDENCE_LABELS, MEASUREMENT_COPY, shareOfNamed } from "@repo/core";
 import { api, type RouterOutputs } from "@/trpc/react";
 import { EmptyState } from "@/components/page-header";
 import { MatrixSection } from "./matrix-view";
+import { TrafficCard } from "./traffic";
 
 const PLATFORMS = [
   { value: null, label: "All platforms" },
@@ -310,6 +311,7 @@ export function ClientOverview({ clientId }: { clientId: string }) {
             />
           </div>
 
+          <TrafficCard clientId={clientId} />
           <QueueCard clientId={clientId} />
         </div>
       </div>

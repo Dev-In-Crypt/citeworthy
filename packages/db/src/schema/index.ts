@@ -13,3 +13,4 @@ export * from "./actions";
 export * from "./activity";
 export * from "./experiments";
 export * from "./reports";
+export * from "./analytics";

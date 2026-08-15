@@ -99,6 +99,13 @@
       "when": 1786648192333,
       "tag": "0013_low_serpent_society",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1786782589489,
+      "tag": "0014_bright_nightmare",
+      "breakpoints": true
     }
   ]
 }

@@ -2,7 +2,10 @@ import { and, desc, eq, gte, inArray, isNotNull, isNull, lte, sql } from "drizzl
 import type { Database } from "./client";
 import { agencies, clients, users } from "./schema/tenancy";
 import type { Agency, Client, NewClient, User } from "./schema/tenancy";
-import { invitations } from "./schema/auth";
+import { apiKeys, invitations } from "./schema/auth";
+import type { ApiKey, NewApiKey } from "./schema/auth";
+import { assistantTraffic } from "./schema/analytics";
+import type { AssistantTraffic, NewAssistantTraffic } from "./schema/analytics";
 import { subscriptions, usageCounters } from "./schema/billing";
 import { citationSources, sourcePresence, sources } from "./schema/sources";
 import { actions } from "./schema/actions";
@@ -347,6 +350,86 @@ export async function listResponseFactsForClient(db: Database, clientId: string)
     .where(and(eq(runs.clientId, clientId), eq(runs.adaptersMode, mode)));
 
   return rows;
+}
+
+/* ---------- Ключи публичного API ---------- */
+
+export async function createApiKey(db: Database, values: NewApiKey): Promise<ApiKey> {
+  const rows = await db.insert(apiKeys).values(values).returning();
+  const created = rows[0];
+  if (!created) {
+    throw new Error("Failed to create API key");
+  }
+  return created;
+}
+
+export async function listApiKeys(db: Database, agencyId: string): Promise<ApiKey[]> {
+  return db
+    .select()
+    .from(apiKeys)
+    .where(eq(apiKeys.agencyId, agencyId))
+    .orderBy(desc(apiKeys.createdAt));
+}
+
+/**
+ * Ключ по открытому префиксу. Хэши не перебираются: сравнение делает
+ * вызывающий, за постоянное время.
+ */
+export async function findApiKeyByPrefix(
+  db: Database,
+  prefix: string,
+): Promise<ApiKey | undefined> {
+  const rows = await db.select().from(apiKeys).where(eq(apiKeys.prefix, prefix)).limit(1);
+  return rows[0];
+}
+
+/** Отзыв, а не удаление: история использования ключа остаётся видимой. */
+export async function revokeApiKey(db: Database, id: string, agencyId: string): Promise<void> {
+  await db
+    .update(apiKeys)
+    .set({ revokedAt: new Date() })
+    .where(and(eq(apiKeys.id, id), eq(apiKeys.agencyId, agencyId)));
+}
+
+export async function touchApiKey(db: Database, id: string): Promise<void> {
+  await db.update(apiKeys).set({ lastUsedAt: new Date() }).where(eq(apiKeys.id, id));
+}
+
+/* ---------- Переходы от ассистентов ---------- */
+
+/**
+ * Записывает импортированный трафик. Повторный импорт того же дня
+ * перезаписывает строку: агентство должно иметь право прислать файл дважды,
+ * не удвоив цифру.
+ */
+export async function upsertAssistantTraffic(
+  db: Database,
+  rows: NewAssistantTraffic[],
+): Promise<number> {
+  if (rows.length === 0) {
+    return 0;
+  }
+
+  await db
+    .insert(assistantTraffic)
+    .values(rows)
+    .onConflictDoUpdate({
+      target: [assistantTraffic.clientId, assistantTraffic.day, assistantTraffic.assistant],
+      set: { sessions: sql`excluded.sessions`, updatedAt: new Date() },
+    });
+
+  return rows.length;
+}
+
+export async function listAssistantTraffic(
+  db: Database,
+  clientId: string,
+): Promise<AssistantTraffic[]> {
+  return db
+    .select()
+    .from(assistantTraffic)
+    .where(eq(assistantTraffic.clientId, clientId))
+    .orderBy(assistantTraffic.day);
 }
 
 export interface PortfolioRow {

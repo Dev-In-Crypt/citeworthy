@@ -1,20 +1,8 @@
 import { z } from "zod";
-import {
-  collapsePromptFacts,
-  competitorGapPp,
-  computeMovement,
-  computeProminence,
-  computePromptMatrix,
-  isDistinguishable,
-  MIN_SAMPLES_PER_CELL,
-} from "@repo/core";
-import {
-  getClientById,
-  listActivePromptsForClient,
-  listPromptPlatformFacts,
-  listVisibilitySeries,
-} from "@repo/db";
+import { competitorGapPp, MIN_SAMPLES_PER_CELL } from "@repo/core";
+import { getClientById, listVisibilitySeries } from "@repo/db";
 import { assertTenant, protectedProcedure, router } from "../trpc";
+import { clientVisibility } from "../../visibility";
 
 const platformEnum = z.enum(["chatgpt", "perplexity", "gemini"]);
 
@@ -99,69 +87,8 @@ export const measurementRouter = router({
       const client = await getClientById(ctx.db, input.clientId);
       assertTenant(client, ctx.user.agencyId);
 
-      const to = new Date();
-      const windowMs = input.windowDays * 86_400_000;
-      const from = new Date(to.getTime() - windowMs);
-      // Предыдущее окно той же длины — только для ответа «что изменилось».
-      const previousFrom = new Date(from.getTime() - windowMs);
-
-      const [prompts, facts, previousFacts] = await Promise.all([
-        listActivePromptsForClient(ctx.db, input.clientId),
-        listPromptPlatformFacts(ctx.db, input.clientId, from, to),
-        listPromptPlatformFacts(ctx.db, input.clientId, previousFrom, from),
-      ]);
-
-      // Порядок строк фиксируем здесь: запрос его не гарантирует, а матрица,
-      // переставляющая вопросы между заходами, нечитаема.
-      const ordered = [...prompts].sort((a, b) => {
-        const byTime = a.createdAt.getTime() - b.createdAt.getTime();
-        return byTime !== 0 ? byTime : a.id.localeCompare(b.id);
-      });
-
-      const records = collapsePromptFacts(facts);
-      const promptRows = ordered.map((prompt) => ({
-        id: prompt.id,
-        text: prompt.text,
-        clusterId: prompt.clusterId,
-      }));
-
-      const matrix = computePromptMatrix({ records, prompts: promptRows, from, to });
-
-      const previous = computePromptMatrix({
-        records: collapsePromptFacts(previousFacts),
-        prompts: promptRows,
-        from: previousFrom,
-        to: from,
-      });
-
-      /**
-       * Заметность считается по тем же ответам, что и матрица: «назван» и
-       * «назван первым» — разные вещи, а мерить их по разным выборкам
-       * значит получить два числа, которые нельзя сопоставить.
-       */
-      const prominence = computeProminence(
-        records.map((record) => ({
-          responseId: record.responseId,
-          clientRank: record.clientRank ?? null,
-          competitorRanks: record.competitorRanks ?? [],
-        })),
-      );
-
-      return {
-        ...matrix,
-        prominence,
-        movement: computeMovement(matrix, previous),
-        // Общее движение — та же логика: сравнивать можно только два окна,
-        // каждое из которых само по себе набрало порог.
-        totalsDeltaPp:
-          matrix.totals.ratePct !== null && previous.totals.ratePct !== null
-            ? Math.round((matrix.totals.ratePct - previous.totals.ratePct) * 10) / 10
-            : null,
-        /** Различает ли выборка это изменение вообще. */
-        totalsDistinguishable: isDistinguishable(matrix.totals.interval, previous.totals.interval),
-        client: { name: client.name, domain: client.domain },
-        competitorNames: client.competitorNames,
-        minSamples: MIN_SAMPLES_PER_CELL,
-      };
+      // Считает общая функция: ту же цифру отдаёт публичный API, и второе
+      // её определение однажды разошлось бы с первым.
+      return clientVisibility(ctx.db, client, input.windowDays);
     }),
 });

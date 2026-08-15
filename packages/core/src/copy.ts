@@ -47,6 +47,12 @@ export const MEASUREMENT_COPY = {
    * про предел выборки, а не про отсутствие изменения: это разные вещи.
    */
   withinNoise: "within what this sample size can tell apart",
+  /**
+   * Предел метрики переходов. Стоит рядом с цифрой, а не в сноске: без этой
+   * фразы её прочитают как полный счёт визитов из ассистентов.
+   */
+  trafficUndercount:
+    "Referred sessions are undercounted: in-app browsers drop the source, and many people type the brand instead of clicking. Read this beside visibility, not as its result.",
   /** Почему в разделе движения не все вопросы. */
   movementBasis:
     "Only questions where the change is larger than this sample size can explain on its own. Anything smaller is left out rather than shown as a result.",
