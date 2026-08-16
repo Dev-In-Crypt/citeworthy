@@ -158,7 +158,7 @@ function OpportunityCard({
   onConverted: () => void;
 }) {
   return (
-    <li data-testid="opportunity-card" className="rounded-lg border">
+    <li data-testid="opportunity-card" className="min-w-0 rounded-lg border">
       <button
         onClick={onToggle}
         aria-expanded={expanded}
@@ -171,7 +171,7 @@ function OpportunityCard({
           >
             {opportunity.score}
           </span>
-          <span className="text-base font-medium">{opportunity.title}</span>
+          <span className="break-words text-base font-medium">{opportunity.title}</span>
         </div>
 
         <p data-testid="opportunity-reason" className="max-w-prose text-sm text-muted-foreground">
@@ -251,7 +251,7 @@ function OpportunityDetail({
     .safeParse(detail.data.recommendedActions);
 
   return (
-    <div data-testid="opportunity-detail" className="flex flex-col gap-5 border-t p-4">
+    <div data-testid="opportunity-detail" className="flex min-w-0 flex-col gap-5 border-t p-4">
       <section className="flex flex-col gap-2">
         <h3 className="text-sm font-medium">Why this score</h3>
         <ul data-testid="score-breakdown" className="flex flex-col gap-1.5">
@@ -264,9 +264,12 @@ function OpportunityDetail({
               ["confidence", OPPORTUNITY_COPY.factorLabels.confidence],
             ] as const
           ).map(([key, label]) => (
-            <li key={key} className="flex items-center gap-3 text-sm">
-              <span className="w-52 shrink-0 text-muted-foreground">{label}</span>
-              <span className="h-1.5 w-32 shrink-0 overflow-hidden rounded-full bg-secondary">
+            // На узком экране подпись занимает всю строку, а полоса уходит
+            // под неё: втроём в 375 пикселей они не помещаются и раздвигают
+            // страницу шире экрана.
+            <li key={key} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+              <span className="w-full shrink-0 text-muted-foreground sm:w-52">{label}</span>
+              <span className="h-1.5 w-24 shrink-0 overflow-hidden rounded-full bg-secondary sm:w-32">
                 <span
                   className="block h-full bg-primary"
                   style={{ width: `${Math.round((breakdown.factors[key] ?? 0) * 100)}%` }}
@@ -316,7 +319,7 @@ function OpportunityDetail({
             </dl>
 
             {evidence.data.prompts.length > 0 && (
-              <ul data-testid="evidence-prompts" className="flex flex-col gap-1">
+              <ul data-testid="evidence-prompts" className="flex flex-col gap-1 break-words">
                 {evidence.data.prompts.map((prompt) => (
                   <li key={prompt.id} className="text-muted-foreground">
                     <span className="text-foreground">{prompt.text}</span> · {prompt.clusterName}
@@ -337,7 +340,7 @@ function OpportunityDetail({
                   Example answers ({evidence.data.responses.length} of{" "}
                   {evidence.data.totalResponsesInWindow})
                 </summary>
-                <ul className="mt-2 flex flex-col gap-1 text-xs text-muted-foreground">
+                <ul className="mt-2 flex flex-col gap-1 break-words text-xs text-muted-foreground">
                   {evidence.data.responses.map((response) => (
                     <li key={response.responseId}>
                       {response.platform} ·{" "}

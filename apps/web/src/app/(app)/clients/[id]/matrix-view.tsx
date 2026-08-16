@@ -241,7 +241,10 @@ export function MatrixSection({ matrix }: { matrix: Matrix }) {
   const unmeasured = matrix.assistants.filter((assistant) => !assistant.measurable);
 
   return (
-    <section className="flex flex-col gap-4 rounded-lg border p-4">
+    // min-w-0 обязателен: без него элемент сетки не сжимается уже своего
+    // содержимого, внутренняя прокрутка матрицы не срабатывает, и на телефоне
+    // горизонтально едет вся страница, а не одна широкая таблица.
+    <section className="flex min-w-0 flex-col gap-4 rounded-lg border p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-col gap-1">
           <h2 className="text-base font-medium">Prompts × assistants</h2>

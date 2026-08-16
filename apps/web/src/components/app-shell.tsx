@@ -73,19 +73,31 @@ export function AppShell({
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 items-center justify-between gap-4 border-b px-6">
-          <nav className="flex gap-3 md:hidden">
+        {/*
+          На телефоне шесть ссылок и кнопка выхода не помещаются в 375 пикселей
+          и раздвигают страницу шире экрана — на каждом экране продукта, а не
+          только на новых. Ряд ссылок прокручивается сам, кнопка не сжимается,
+          а горизонтальную прокрутку самой страницы это больше не создаёт.
+        */}
+        <header className="flex h-14 items-center justify-between gap-4 border-b px-4 sm:px-6">
+          <nav className="-mx-1 flex min-w-0 gap-3 overflow-x-auto px-1 md:hidden">
             {NAV.map(({ href, label }) => (
-              <Link key={href} href={href} className="text-sm text-muted-foreground">
+              <Link
+                key={href}
+                href={href}
+                className="shrink-0 text-sm whitespace-nowrap text-muted-foreground"
+              >
                 {label}
               </Link>
             ))}
           </nav>
           <span className="hidden text-sm text-muted-foreground md:inline">AI Search delivery</span>
-          <SignOutButton />
+          <div className="shrink-0">
+            <SignOutButton />
+          </div>
         </header>
 
-        <main className="min-w-0 flex-1 px-6 py-8">{children}</main>
+        <main className="min-w-0 flex-1 px-4 py-8 sm:px-6">{children}</main>
       </div>
     </div>
   );
