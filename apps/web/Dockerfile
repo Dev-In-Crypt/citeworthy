@@ -45,7 +45,11 @@ RUN DATABASE_URL=postgresql://build:build@127.0.0.1:5432/build \
 # ---------- Рантайм ----------
 FROM node:22-alpine AS runner
 WORKDIR /app
-ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000
+# HOSTNAME задан явно: standalone-сервер Next берёт адрес привязки из этой
+# переменной, а Docker подставляет в неё id контейнера. Тогда сервер слушает
+# только внешний адрес, снаружи всё работает, а проверка живости изнутри
+# ходит на 127.0.0.1 и не достучится — контейнер вечно unhealthy.
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0
 
 # Непривилегированный пользователь: процессу приложения root не нужен.
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
