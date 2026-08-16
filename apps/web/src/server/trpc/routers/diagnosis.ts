@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { buildRecommendations, diagnose } from "@repo/core";
+import { buildRecommendations, diagnose, suggestCompetitors } from "@repo/core";
 import { getClientById, listCitationFacts } from "@repo/db";
 import { assertTenant, protectedProcedure, router } from "../trpc";
 import { clientSources, toCitationFacts } from "../../sources";
@@ -34,5 +34,26 @@ export const diagnosisRouter = router({
       );
 
       return buildRecommendations(diagnose(facts), input.clusterId ?? undefined);
+    }),
+
+  /**
+   * Кого ещё стоит отслеживать — по тому, что модели уже цитируют.
+   *
+   * Не «мы нашли ваших конкурентов», а «эти продуктовые сайты попадают в
+   * ответы на ваши же вопросы». Решение остаётся за человеком: список
+   * конкурентов задаёт, что вообще считается конкурентом в метриках.
+   */
+  suggestedCompetitors: protectedProcedure
+    .input(z.object({ clientId: z.uuid() }))
+    .query(async ({ ctx, input }) => {
+      const client = await getClientById(ctx.db, input.clientId);
+      assertTenant(client, ctx.user.agencyId);
+
+      const rows = await listCitationFacts(ctx.db, input.clientId);
+
+      return suggestCompetitors(
+        rows.map((row) => ({ domain: row.domain, sourceType: row.sourceType })),
+        { clientDomain: client.domain, trackedNames: client.competitorNames },
+      );
     }),
 });

@@ -8,6 +8,8 @@ import { api, type RouterOutputs } from "@/trpc/react";
 import { EmptyState } from "@/components/page-header";
 import { ConfidenceBadge } from "@/components/stat";
 import { NotePanel } from "@/components/note-panel";
+import { ProspectPanel } from "./prospect-panel";
+import { PlanPanel } from "./plan-panel";
 import { cn } from "@/lib/utils";
 
 type Opportunity = RouterOutputs["opportunities"]["list"][number];
@@ -67,6 +69,10 @@ export function OpportunitiesView({ clientId }: { clientId: string }) {
 
   return (
     <div className="flex flex-col gap-5">
+      {/* У проспекта это ещё и экран продажи: что нашли, кого не отслеживают
+          и как превратить в клиента, ничего не пересобирая. */}
+      <ProspectPanel clientId={clientId} />
+
       <div className="flex flex-wrap items-start justify-between gap-3">
         <p className="max-w-prose text-sm text-muted-foreground">{OPPORTUNITY_COPY.basis}</p>
         <button
@@ -109,6 +115,8 @@ export function OpportunitiesView({ clientId }: { clientId: string }) {
           ))}
         </ul>
       )}
+
+      {open.length > 0 && <PlanPanel clientId={clientId} />}
 
       {decided.length > 0 && (
         <details data-testid="decided-opportunities" className="rounded-lg border p-4">

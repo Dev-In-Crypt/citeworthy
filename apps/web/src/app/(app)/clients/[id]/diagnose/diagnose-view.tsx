@@ -74,6 +74,18 @@ export function DiagnoseView({ clientId }: { clientId: string }) {
   const clusters = api.prompts.clusters.useQuery({ clientId });
   const graph = api.diagnosis.sourceGraph.useQuery({ clientId, clusterId });
   const recommendations = api.diagnosis.recommendations.useQuery({ clientId, clusterId });
+  const opportunities = api.opportunities.list.useQuery({ clientId });
+
+  /**
+   * Источник, у которого есть посчитанная возможность, показывает её оценку.
+   * «Reddit процитирован 17 раз» — наблюдение; «Reddit, 91» — приоритет, и
+   * именно за приоритетом агентство сюда приходит.
+   */
+  const scoreByDomain = new Map(
+    (opportunities.data ?? [])
+      .filter((row) => row.sourceDomain !== null && row.status === "open")
+      .map((row) => [row.sourceDomain as string, row.score]),
+  );
 
   if (graph.isPending) {
     return <p className="text-sm text-muted-foreground">Loading…</p>;
@@ -197,6 +209,7 @@ export function DiagnoseView({ clientId }: { clientId: string }) {
                   <th className="py-2 text-right font-medium">Share</th>
                   <th className="py-2 text-center font-medium">Client</th>
                   <th className="py-2 font-medium">Competitors</th>
+                  <th className="py-2 text-right font-medium">Opportunity</th>
                 </tr>
               </thead>
               <tbody>
@@ -229,6 +242,13 @@ export function DiagnoseView({ clientId }: { clientId: string }) {
                           </span>
                         ))}
                       </span>
+                    </td>
+                    {/* Оценка берётся из уже посчитанных возможностей, а не
+                        считается здесь заново: два определения одной цифры
+                        однажды разойдутся, и таблица начнёт спорить со
+                        списком возможностей. */}
+                    <td className="metric py-2 text-right" data-testid="source-opportunity">
+                      {scoreByDomain.get(source.domain) ?? "—"}
                     </td>
                   </tr>
                 ))}

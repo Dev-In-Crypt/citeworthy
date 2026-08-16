@@ -107,6 +107,39 @@ export function Portfolio() {
         </dl>
       </section>
 
+      {/* Список того, что требует человека, — прежде таблицы со всеми цифрами.
+          Агентство ведёт десяток клиентов и не должно вычитывать таблицу,
+          чтобы понять, где сегодня нужно его участие. */}
+      {waiting.length > 0 && (
+        <section data-testid="needs-attention-list" className="flex flex-col gap-2">
+          <h2 className="text-sm font-medium">Needs attention</h2>
+          <ul className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+            {waiting.slice(0, 6).map((row) => (
+              <li key={row.clientId} className="flex flex-col gap-1 rounded-lg border p-4">
+                <Link
+                  href={`/clients/${row.clientId}`}
+                  className="text-sm font-medium underline-offset-4 hover:underline"
+                >
+                  {row.name}
+                </Link>
+                <span className="text-sm text-muted-foreground">{row.needs[0]}</span>
+                {row.needs.length > 1 && (
+                  <span className="text-xs text-muted-foreground">
+                    and {row.needs.length - 1} more
+                  </span>
+                )}
+                <Link
+                  href={`/clients/${row.clientId}/opportunities`}
+                  className="mt-auto pt-1 text-sm text-primary hover:underline"
+                >
+                  Review →
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <div className="overflow-x-auto">
         <table data-testid="portfolio-table" className="w-full min-w-[720px] text-sm">
           <thead className="text-left text-muted-foreground">

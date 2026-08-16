@@ -45,6 +45,8 @@ export interface ReportInputs {
   measuredPlatforms?: readonly string[];
   /** Раздел бесплатного аудита; у платящего клиента его нет. */
   opportunity?: NonNullable<ReportPayload["opportunity"]> | null;
+  topOpportunities?: NonNullable<ReportPayload["topOpportunities"]>;
+  whatWeLearned?: NonNullable<ReportPayload["whatWeLearned"]>;
 }
 
 function round1(value: number): number {
@@ -127,6 +129,14 @@ export function buildReportPayload(inputs: ReportInputs): ReportPayload {
     // Ноль сессий — это «не импортировали», а не «никто не пришёл».
     ...(inputs.assistantTraffic && inputs.assistantTraffic.totalSessions > 0
       ? { assistantTraffic: inputs.assistantTraffic }
+      : {}),
+    // Пустые разделы не пишутся вовсе: «ничего не нашли» и «раздела нет» —
+    // разные утверждения, и второе честнее, когда сказать нечего.
+    ...(inputs.topOpportunities && inputs.topOpportunities.length > 0
+      ? { topOpportunities: inputs.topOpportunities }
+      : {}),
+    ...(inputs.whatWeLearned && inputs.whatWeLearned.length > 0
+      ? { whatWeLearned: inputs.whatWeLearned }
       : {}),
     opportunity: inputs.opportunity ?? null,
     // Пояснение о природе измерения идёт в каждом отчёте, а не по желанию,

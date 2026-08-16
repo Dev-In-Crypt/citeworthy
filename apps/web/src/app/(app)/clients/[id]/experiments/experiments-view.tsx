@@ -16,6 +16,43 @@ import { api } from "@/trpc/react";
 import { EmptyState } from "@/components/page-header";
 import { ConfidenceBadge, type ConfidenceLevel } from "@/components/stat";
 
+/** Строка группы. Прочерк вместо числа — там, где выборка его не набрала. */
+function GroupRow({
+  label,
+  group,
+  deltaPp,
+  testId,
+}: {
+  label: string;
+  group: {
+    beforePct: number | null;
+    afterPct: number | null;
+    samplesAfter: number;
+    sufficient: boolean;
+  };
+  deltaPp: number | null;
+  testId: string;
+}) {
+  const pct = (value: number | null) => (value === null ? "—" : `${value}%`);
+
+  return (
+    <tr data-testid={testId} className="border-b last:border-0">
+      <td className="py-2">{label}</td>
+      <td className="metric py-2 text-right">{pct(group.beforePct)}</td>
+      <td className="metric py-2 text-right">{pct(group.afterPct)}</td>
+      <td className="metric py-2 text-right">
+        {deltaPp === null ? "—" : `${deltaPp >= 0 ? "+" : ""}${deltaPp} pp`}
+      </td>
+      <td className="metric py-2 text-right">
+        {group.samplesAfter}
+        {!group.sufficient && group.samplesAfter > 0 && (
+          <span className="ml-1 text-xs text-muted-foreground">(thin)</span>
+        )}
+      </td>
+    </tr>
+  );
+}
+
 const EVENT_LABELS: Record<string, string> = {
   action_shipped: "Action shipped",
   indexed: "Page indexed",
@@ -80,7 +117,8 @@ function ExperimentDetail({ experimentId }: { experimentId: string }) {
     return <p className="text-sm text-muted-foreground">Nothing to show.</p>;
   }
 
-  const { experiment, events, estimate, series, formattedEstimate } = detail.data;
+  const { experiment, events, estimate, series, formattedEstimate, groups, baselineWindow } =
+    detail.data;
   const actionWeek = new Date(experiment.actionDate).toISOString().slice(0, 10);
 
   return (
@@ -98,16 +136,58 @@ function ExperimentDetail({ experimentId }: { experimentId: string }) {
           />
         </div>
 
-        <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+        {/* Обе группы целиком: до, после и на скольких ответах. Движение без
+            размера выборки читается как результат, а «+9 pp на двенадцати
+            ответах» и «+9 pp на двухстах» — разные утверждения. */}
+        <div className="overflow-x-auto">
+          <table data-testid="experiment-groups" className="w-full min-w-[520px] text-sm">
+            <thead className="text-left text-muted-foreground">
+              <tr className="border-b">
+                <th className="py-2 font-medium">Group</th>
+                <th className="py-2 text-right font-medium">Before</th>
+                <th className="py-2 text-right font-medium">After</th>
+                <th className="py-2 text-right font-medium">Movement</th>
+                <th className="py-2 text-right font-medium">Answers after</th>
+              </tr>
+            </thead>
+            <tbody>
+              <GroupRow
+                label={`Test group (${groups.treatment.clusters} topics)`}
+                group={groups.treatment}
+                deltaPp={estimate.treatmentDeltaPp}
+                testId="group-treatment"
+              />
+              <GroupRow
+                label={
+                  groups.control.clusters === 0
+                    ? "Comparison group (none)"
+                    : `Comparison group (${groups.control.clusters} topics)`
+                }
+                group={groups.control}
+                deltaPp={estimate.controlDeltaPp}
+                testId="group-control"
+              />
+            </tbody>
+          </table>
+        </div>
+
+        <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
           <div>
-            <dt className="text-muted-foreground">Treated before</dt>
-            <dd className="metric">{estimate.treatmentDeltaPp === null ? "—" : `${estimate.treatmentDeltaPp >= 0 ? "+" : ""}${estimate.treatmentDeltaPp} pp`}</dd>
+            <dt className="text-muted-foreground">Relative movement</dt>
+            <dd data-testid="relative-movement" className="metric">
+              {estimate.incrementalPp === null
+                ? "—"
+                : `${estimate.incrementalPp >= 0 ? "+" : ""}${estimate.incrementalPp} pp`}
+            </dd>
           </div>
           <div>
-            <dt className="text-muted-foreground">Comparison group</dt>
-            <dd className="metric">{estimate.controlDeltaPp === null ? "—" : `${estimate.controlDeltaPp >= 0 ? "+" : ""}${estimate.controlDeltaPp} pp`}</dd>
+            <dt className="text-muted-foreground">Baseline window</dt>
+            <dd className="metric">
+              {new Date(baselineWindow.start).toLocaleDateString()} –{" "}
+              {new Date(baselineWindow.end).toLocaleDateString()}
+            </dd>
           </div>
-          <div className="col-span-2">
+          <div>
             <dt className="text-muted-foreground">Action date</dt>
             <dd className="metric">{new Date(experiment.actionDate).toLocaleDateString()}</dd>
           </div>

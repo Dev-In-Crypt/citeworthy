@@ -15,7 +15,14 @@ import { api } from "@/trpc/react";
 
 const LABELS = new Map(ASSISTANTS.map((assistant) => [assistant.id, assistant.label]));
 
-export function TrafficCard({ clientId }: { clientId: string }) {
+export function TrafficCard({
+  clientId,
+  visibilityDeltaPp = null,
+}: {
+  clientId: string;
+  /** Движение видимости за то же окно — только чтобы поставить рядом. */
+  visibilityDeltaPp?: number | null;
+}) {
   const utils = api.useUtils();
   const input = useRef<HTMLInputElement>(null);
   const [result, setResult] = useState<{ imported: number; skipped: string[] } | null>(null);
@@ -61,6 +68,22 @@ export function TrafficCard({ clientId }: { clientId: string }) {
             </span>
             <span className="text-sm text-muted-foreground">sessions referred</span>
           </div>
+
+          {/* Видимость и переходы — рядом, но без связи между ними: «выросло
+              вместе» и «одно вызвало другое» проверяются по-разному, и второе
+              на этих данных не проверяется никак. */}
+          {visibilityDeltaPp !== null && (
+            <div data-testid="outcomes-side-by-side" className="flex flex-col gap-1 border-t pt-2">
+              <div className="flex items-baseline justify-between gap-3 text-sm">
+                <span className="text-muted-foreground">Visibility, same period</span>
+                <span className="metric">
+                  {visibilityDeltaPp >= 0 ? "+" : ""}
+                  {visibilityDeltaPp} pp
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">{MEASUREMENT_COPY.observedTogether}</p>
+            </div>
+          )}
 
           <ul data-testid="traffic-list" className="flex flex-col gap-1 text-sm">
             {data.byAssistant.map((entry) => (

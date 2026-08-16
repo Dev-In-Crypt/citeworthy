@@ -1,7 +1,10 @@
 import { expect, test } from "@playwright/test";
 
 /**
- * Verify T61: от кнопки «Run audit» до готового diagnose-экрана без ручных шагов.
+ * Verify T61: от кнопки «Run audit» до ранжированной работы без ручных шагов.
+ *
+ * Аудит ведёт к возможностям, а не к срезу по источникам: следующий шаг
+ * продажи — «вот что мы нашли и в каком порядке», а прибор лежит уровнем ниже.
  */
 
 test("one audit run leads straight to a ready diagnosis", async ({ page }) => {
@@ -45,10 +48,17 @@ test("one audit run leads straight to a ready diagnosis", async ({ page }) => {
   await page.getByTestId("run-audit").click();
   await expect(page.getByTestId("audit-done")).toBeVisible({ timeout: 120_000 });
 
-  // Дальше экран сам ведёт к диагностике: ручных шагов между ними нет.
-  await expect(page).toHaveURL(new RegExp(`/clients/${clientId}/diagnose$`), { timeout: 30_000 });
+  // Дальше экран сам ведёт к найденным возможностям: ручных шагов между ними нет.
+  await expect(page).toHaveURL(new RegExp(`/clients/${clientId}/opportunities$`), {
+    timeout: 30_000,
+  });
 
-  // Диагностика готова: типы источников проставлены той же цепочкой.
+  // Проспекту сразу предложено, что делать дальше, и всё это — из одного прогона.
+  await expect(page.getByTestId("prospect-panel")).toBeVisible();
+  await expect(page.getByTestId("opportunity-card").first()).toBeVisible({ timeout: 15_000 });
+
+  // Диагностика тоже готова: типы источников проставлены той же цепочкой.
+  await page.goto(`/clients/${clientId}/diagnose`);
   await expect(page.getByTestId("diagnosis-statement")).toBeVisible();
   const table = page.getByTestId("sources-table");
   await expect(table).toContainText("g2.com");

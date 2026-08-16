@@ -27,6 +27,7 @@ import {
   getShareForReport,
   listActions,
   listActionsCompletedBetween,
+  listOpportunities,
   listActivePromptsForClient,
   listAllSnapshots,
   listAssistantTraffic,
@@ -121,15 +122,27 @@ export const reportsRouter = router({
       const periodStart = input.periodStart ? new Date(input.periodStart) : fallback.start;
       const periodEnd = input.periodEnd ? new Date(input.periodEnd) : fallback.end;
 
-      const [snapshotRows, completedActions, newCitedUrls, newBrandMentions, experiments, allActions] =
-        await Promise.all([
-          listAllSnapshots(ctx.db, input.clientId),
-          listActionsCompletedBetween(ctx.db, input.clientId, periodStart, periodEnd),
-          countNewCitedDomains(ctx.db, input.clientId, periodStart, periodEnd),
-          countClientMentionsBetween(ctx.db, input.clientId, periodStart, periodEnd),
-          listExperiments(ctx.db, input.clientId),
-          listActions(ctx.db, input.clientId),
-        ]);
+      const [
+        snapshotRows,
+        completedActions,
+        newCitedUrls,
+        newBrandMentions,
+        experiments,
+        allActions,
+        allOpportunities,
+      ] = await Promise.all([
+        listAllSnapshots(ctx.db, input.clientId),
+        listActionsCompletedBetween(ctx.db, input.clientId, periodStart, periodEnd),
+        countNewCitedDomains(ctx.db, input.clientId, periodStart, periodEnd),
+        countClientMentionsBetween(ctx.db, input.clientId, periodStart, periodEnd),
+        listExperiments(ctx.db, input.clientId),
+        listActions(ctx.db, input.clientId),
+        listOpportunities(ctx.db, input.clientId),
+      ]);
+
+      // Уже отсортированы движком по оценке; в отчёт едут заголовок, причина
+      // и объём — без самой оценки.
+      const openOpportunities = allOpportunities.filter((row) => row.status === "open");
 
       // Только свёртки (все кластеры, все платформы) и только внутри периода:
       // клиенту показывается общая видимость, а не срез по одной платформе.
@@ -283,6 +296,17 @@ export const reportsRouter = router({
           .filter((action) => action.status === "backlog" || action.status === "in_progress")
           .slice(0, 3)
           .map((action) => action.title),
+        /**
+         * Что стоит сделать дальше — из найденных возможностей, уже
+         * отсортированных движком. Внутренняя оценка в отчёт не переносится:
+         * клиенту она читалась бы как балл его сайта.
+         */
+        topOpportunities: openOpportunities.slice(0, 5).map((opportunity) => ({
+          title: opportunity.title,
+          reason: opportunity.reason,
+          affectedPrompts: opportunity.affectedPromptIds.length,
+          evidence: opportunity.evidenceLevel,
+        })),
         caveats,
       });
 

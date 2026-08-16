@@ -111,6 +111,32 @@ export const experimentsRouter = router({
       estimate,
       series,
       formattedEstimate: formatEstimate(estimate),
+      /**
+       * Обе группы целиком: до, после и на скольких ответах.
+       *
+       * Без размеров выборки движение читается как результат, а «+9 pp на
+       * двенадцати ответах» и «+9 pp на двухстах» — разные утверждения.
+       * Экран обязан показывать оба конца сравнения, а не только вывод.
+       */
+      groups: {
+        treatment: {
+          beforePct: treatmentBefore.visibilityPct,
+          afterPct: treatmentAfter.visibilityPct,
+          samplesBefore: treatmentBefore.samples,
+          samplesAfter: treatmentAfter.samples,
+          sufficient: treatmentAfter.sufficient,
+          clusters: experiment.treatmentClusterIds.length,
+        },
+        control: {
+          beforePct: controlBefore.visibilityPct,
+          afterPct: controlAfter.visibilityPct,
+          samplesBefore: controlBefore.samples,
+          samplesAfter: controlAfter.samples,
+          sufficient: controlAfter.sufficient,
+          clusters: experiment.controlClusterIds.length,
+        },
+      },
+      baselineWindow,
     };
   }),
 

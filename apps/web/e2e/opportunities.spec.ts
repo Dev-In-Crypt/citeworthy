@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 /**
  * Verify: путь, ради которого продукт переделан.
@@ -16,7 +16,7 @@ const CSV = [
   "CRM basics,learning,CRM vs spreadsheet for a small team,false",
 ].join("\n");
 
-async function signUpWithClient(page: import("@playwright/test").Page): Promise<string> {
+async function signUpWithClient(page: Page): Promise<string> {
   const email = `opp-${Math.random().toString(36).slice(2, 10)}@northwind-agency.test`;
 
   await page.goto("/signup");

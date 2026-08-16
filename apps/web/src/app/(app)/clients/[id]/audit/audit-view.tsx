@@ -46,7 +46,9 @@ export function AuditView({ clientId }: { clientId: string }) {
   // заканчиваться вопросом «а дальше куда».
   useEffect(() => {
     if (phase !== "done") return;
-    const timer = setTimeout(() => router.push(`/clients/${clientId}/diagnose`), 1200);
+    // Аудит ведёт к ранжированной работе, а не к прибору: следующий шаг
+    // продажи — «вот что мы нашли и в каком порядке», а не срез по источникам.
+    const timer = setTimeout(() => router.push(`/clients/${clientId}/opportunities`), 1200);
     return () => clearTimeout(timer);
   }, [phase, clientId, router]);
 
@@ -130,10 +132,10 @@ export function AuditView({ clientId }: { clientId: string }) {
         <p data-testid="audit-done" className="text-sm">
           Audit complete —{" "}
           <Link
-            href={`/clients/${clientId}/diagnose`}
+            href={`/clients/${clientId}/opportunities`}
             className="text-primary underline-offset-4 hover:underline"
           >
-            open the diagnosis
+            open the opportunities
           </Link>
           .
         </p>

@@ -54,6 +54,13 @@ export const MEASUREMENT_COPY = {
   trafficUndercount:
     "Referred sessions are undercounted: in-app browsers drop the source, and many people type the brand instead of clicking. Read this beside visibility, not as its result.",
   /** Почему в разделе движения не все вопросы. */
+  /**
+   * Видимость и переходы стоят рядом — и это всё, что о них можно сказать.
+   * «Выросло вместе» и «одно вызвало другое» — разные утверждения, и второе
+   * на этих данных не проверяется никак.
+   */
+  observedTogether:
+    "Observed during the same period. Shown side by side because both moved, not because one produced the other.",
   movementBasis:
     "Only questions where the change is larger than this sample size can explain on its own. Anything smaller is left out rather than shown as a result.",
 } as const;

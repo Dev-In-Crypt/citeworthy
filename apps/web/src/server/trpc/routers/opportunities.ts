@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { recommendationSchema, OPPORTUNITY_COPY } from "@repo/core";
+import {
+  buildNinetyDayPlan,
+  expectedSignalFor,
+  OPPORTUNITY_COPY,
+  recommendationSchema,
+} from "@repo/core";
 import { generateOpportunities } from "@repo/pipeline";
 import {
   getClientById,
@@ -7,6 +12,7 @@ import {
   getOpportunityById,
   lastOpportunityGenerationAt,
   listActionsForOpportunity,
+  listOpportunities,
   listOpportunityEvidence,
   logActivity,
   setOpportunityDecision,
@@ -195,6 +201,40 @@ export const opportunitiesRouter = router({
       }
 
       return result;
+    }),
+
+  /**
+   * План на 90 дней. Собирается из уже найденных возможностей, а не пишется
+   * заново: каждая задача тянет за собой причину, объём и уровень
+   * доказательности — то, чем он и отличается от универсального плана.
+   */
+  plan: protectedProcedure
+    .input(z.object({ clientId: z.uuid() }))
+    .query(async ({ ctx, input }) => {
+      const client = await getClientById(ctx.db, input.clientId);
+      assertTenant(client, ctx.user.agencyId);
+
+      const rows = (await listOpportunities(ctx.db, input.clientId)).filter(
+        (row) => row.status === "open" || row.status === "converted",
+      );
+
+      const inputs = rows.flatMap((row) => {
+        const parsed = recommendationSchema.safeParse(row.recommendedActions[0]);
+        if (!parsed.success) return [];
+
+        return [
+          {
+            title: parsed.data.title,
+            reason: row.reason,
+            actionType: parsed.data.actionType,
+            affectedPrompts: row.affectedPromptIds.length,
+            evidence: row.evidenceLevel,
+            expectedSignal: expectedSignalFor(parsed.data.actionType),
+          },
+        ];
+      });
+
+      return buildNinetyDayPlan(inputs);
     }),
 
   refresh: roleProcedure("member")

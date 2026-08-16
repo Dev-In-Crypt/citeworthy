@@ -262,6 +262,42 @@ export function ReportView({
         </section>
       )}
 
+      {payload.whatWeLearned && payload.whatWeLearned.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <h2 className="text-lg font-medium">What we learned</h2>
+          <ul data-testid="report-learned" className="flex flex-col gap-3 text-sm">
+            {payload.whatWeLearned.map((item) => (
+              <li key={item.title} className="flex flex-col gap-1">
+                <span className="font-medium">{item.title}</span>
+                <span className="text-muted-foreground">{item.observed}</span>
+                <span className="text-xs text-muted-foreground">Evidence: {item.confidence}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {payload.topOpportunities && payload.topOpportunities.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <h2 className="text-lg font-medium">Where the next gains are</h2>
+          <ul data-testid="report-top-opportunities" className="flex flex-col gap-3 text-sm">
+            {payload.topOpportunities.map((item) => (
+              <li key={item.title} className="flex flex-col gap-1">
+                <span className="font-medium">{item.title}</span>
+                {/* Причина обязательна: пункт без объяснения клиент не может
+                    ни оценить, ни оспорить. */}
+                <span className="text-muted-foreground">{item.reason}</span>
+                <span className="text-xs text-muted-foreground">
+                  {item.affectedPrompts} tracked{" "}
+                  {item.affectedPrompts === 1 ? "question" : "questions"} · evidence:{" "}
+                  {item.evidence}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {payload.nextSprint.length > 0 && (
         <section className="flex flex-col gap-3">
           <h2 className="text-lg font-medium">Next sprint</h2>

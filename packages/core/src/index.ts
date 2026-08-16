@@ -59,6 +59,12 @@ export * from "./analytics/import";
 export * from "./analytics/provider";
 export { ASSISTANTS, isMeasurableAssistant, measurableAssistants } from "./adapters/catalogue";
 export type { Assistant } from "./adapters/catalogue";
+export {
+  surfaceCapabilities,
+  SurfaceProviderNotConfiguredError,
+  UnconfiguredSerpProvider,
+} from "./adapters/surfaces";
+export type { SerpProvider, SurfaceCapability, SurfaceRequirement } from "./adapters/surfaces";
 export * from "./billing/period";
 export * from "./billing/cost";
 export * from "./billing/entitlements";
@@ -80,6 +86,7 @@ export * from "./sources/classifier";
 export * from "./diagnosis/source-graph";
 export * from "./copy";
 export * from "./diagnosis/recommendations";
+export * from "./diagnosis/competitors";
 export * from "./opportunities/types";
 export * from "./opportunities/score";
 export * from "./opportunities/detectors";
@@ -91,6 +98,7 @@ export * from "./experiments/events";
 export * from "./experiments/math";
 export * from "./reports/schema";
 export * from "./reports/build";
+export * from "./reports/plan";
 export * from "./reports/proposal";
 export * from "./email/types";
 export * from "./email/templates";

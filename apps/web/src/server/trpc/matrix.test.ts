@@ -118,7 +118,7 @@ describe("measurement.matrix", () => {
     }
   }
 
-  it("столбцов столько же, сколько ассистентов в каталоге, и четыре из них не измеряются", async () => {
+  it("столбцов столько же, сколько ассистентов в каталоге, и неизмеряемые помечены", async () => {
     await addAnswers(4, { mode: "live", mentionsClient: true });
 
     const matrix = await caller(agencyId).measurement.matrix({ clientId });
@@ -126,7 +126,12 @@ describe("measurement.matrix", () => {
 
     expect(matrix.assistants).toHaveLength(ASSISTANTS.length);
     expect(row?.cells).toHaveLength(ASSISTANTS.length);
-    expect(matrix.assistants.filter((a) => !a.measurable)).toHaveLength(4);
+    // Счёт берётся из каталога, а не вписан: список поверхностей растёт по
+    // мере того, как продукт признаёт новые, и тест не должен падать от того,
+    // что мы честно добавили ещё одну неизмеряемую.
+    expect(matrix.assistants.filter((a) => !a.measurable)).toHaveLength(
+      ASSISTANTS.filter((a) => !a.measurable).length,
+    );
   });
 
   it("доля считается по сохранённым ответам", async () => {

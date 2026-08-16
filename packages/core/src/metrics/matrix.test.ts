@@ -108,8 +108,12 @@ describe("computePromptMatrix", () => {
     expect(matrix.totals.samples).toBe(6);
     expect(matrix.totals.ratePct).toBe(100);
 
+    // Число берётся из каталога, а не вписано: список поверхностей растёт по
+    // мере того, как продукт признаёт новые, и тест не должен падать от того,
+    // что мы честно добавили ещё одну неизмеряемую.
     const unmeasured = matrix.assistants.filter((a) => !a.measurable);
-    expect(unmeasured).toHaveLength(4);
+    expect(unmeasured).toHaveLength(ASSISTANTS.filter((a) => !a.measurable).length);
+    expect(unmeasured.length).toBeGreaterThan(0);
     expect(unmeasured.every((a) => a.samples === 0 && a.ratePct === null)).toBe(true);
   });
 

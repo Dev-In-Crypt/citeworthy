@@ -405,7 +405,7 @@ export function ClientOverview({ clientId }: { clientId: string }) {
             />
           </div>
 
-          <TrafficCard clientId={clientId} />
+          <TrafficCard clientId={clientId} visibilityDeltaPp={matrix.data?.totalsDeltaPp ?? null} />
           <QueueCard clientId={clientId} />
         </div>
       </div>
