@@ -73,13 +73,25 @@ test("client screens are tabs: the current one is marked and the way back is the
   );
 
   // Уход на другой экран клиента переносит подсветку, а не теряет вкладки.
-  await tabs.getByRole("link", { name: "Diagnose" }).click();
-  await expect(page).toHaveURL(/\/diagnose$/);
-  await expect(tabs.getByRole("link", { name: "Diagnose" })).toHaveAttribute(
+  await tabs.getByRole("link", { name: "Opportunities" }).click();
+  await expect(page).toHaveURL(/\/opportunities$/);
+  await expect(tabs.getByRole("link", { name: "Opportunities" })).toHaveAttribute(
     "aria-current",
     "page",
   );
   await expect(tabs.getByRole("link", { name: "Overview" })).not.toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+
+  // Приборы — на втором уровне: измерения и источники живут внутри Analytics,
+  // а не в одном ряду с решениями.
+  await tabs.getByRole("link", { name: "Analytics" }).click();
+  await expect(page).toHaveURL(/\/measure$/);
+  const subtabs = page.getByTestId("client-subtabs");
+  await subtabs.getByRole("link", { name: "Sources" }).click();
+  await expect(page).toHaveURL(/\/diagnose$/);
+  await expect(tabs.getByRole("link", { name: "Analytics" })).toHaveAttribute(
     "aria-current",
     "page",
   );

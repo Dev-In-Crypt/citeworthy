@@ -1,0 +1,1 @@
+DROP TABLE "experiment_results" CASCADE;

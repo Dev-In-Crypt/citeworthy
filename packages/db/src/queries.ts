@@ -461,6 +461,11 @@ export interface PortfolioRow {
   staleActions: number;
   reportsAwaitingApproval: number;
   lastRunAt: Date | null;
+  /** Открытые возможности: то, ради чего агентство сюда заходит. */
+  openOpportunities: number;
+  highPriorityOpportunities: number;
+  newOpportunities: number;
+  topOpportunityScore: number | null;
 }
 
 /**
@@ -477,6 +482,8 @@ export async function listPortfolioRows(
   db: Database,
   agencyId: string,
   now: Date = new Date(),
+  /** Порог «высокого» приоритета — продуктовое решение, приходит снаружи. */
+  highPriorityScore = 70,
 ): Promise<PortfolioRow[]> {
   const agencyClients = await db
     .select()
@@ -533,6 +540,14 @@ export async function listPortfolioRows(
   /** Действие считается зависшим, если оно висит открытым дольше двух недель. */
   const staleBefore = new Date(now.getTime() - 14 * 86_400_000);
 
+  // Возможности приезжают одним сгруппированным запросом: экран портфеля
+  // открывается на каждом заходе, и запрос на клиента дал бы N+1.
+  const opportunityCounts = await listOpportunityCounts(db, ids, {
+    highPriorityScore,
+    since: new Date(now.getTime() - 7 * 86_400_000),
+  });
+  const countsByClient = new Map(opportunityCounts.map((row) => [row.clientId, row]));
+
   return agencyClients.map((client): PortfolioRow => {
     const series = byClient.get(client.id) ?? [];
     const latest = series.at(-1);
@@ -570,6 +585,10 @@ export async function listPortfolioRows(
       staleActions: open.filter((row) => row.createdAt.getTime() < staleBefore.getTime()).length,
       reportsAwaitingApproval: pendingApprovals.filter((row) => row.clientId === client.id).length,
       lastRunAt: lastRunAt ?? null,
+      openOpportunities: countsByClient.get(client.id)?.open ?? 0,
+      highPriorityOpportunities: countsByClient.get(client.id)?.highPriority ?? 0,
+      newOpportunities: countsByClient.get(client.id)?.newRecently ?? 0,
+      topOpportunityScore: countsByClient.get(client.id)?.topScore ?? null,
     };
   });
 }
@@ -2004,7 +2023,9 @@ export async function listOpportunityCounts(
       clientId: opportunities.clientId,
       open: sql<number>`count(*)::int`,
       highPriority: sql<number>`count(*) filter (where ${opportunities.score} >= ${options.highPriorityScore})::int`,
-      newRecently: sql<number>`count(*) filter (where ${opportunities.firstDetectedAt} >= ${options.since})::int`,
+      // Дата уходит строкой с явным приведением: внутри сырого выражения
+      // postgres-js не умеет сериализовать Date и падает на первом же запросе.
+      newRecently: sql<number>`count(*) filter (where ${opportunities.firstDetectedAt} >= ${options.since.toISOString()}::timestamptz)::int`,
       topScore: sql<number | null>`max(${opportunities.score})`,
     })
     .from(opportunities)

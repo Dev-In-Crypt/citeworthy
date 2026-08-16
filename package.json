@@ -16,7 +16,7 @@
     "e2e": "pnpm --filter @repo/web run e2e",
     "db:generate": "pnpm --filter @repo/db run generate",
     "db:migrate": "pnpm --filter @repo/db run migrate",
-    "db:seed": "pnpm --filter @repo/db run seed",
+    "db:seed": "pnpm --filter @repo/db run seed && pnpm --filter @repo/pipeline run seed:demo",
     "db:check": "pnpm --filter @repo/db run check",
     "db:studio": "pnpm --filter @repo/db run studio",
     "format": "prettier --write \"**/*.{ts,tsx,json,md,css}\"",

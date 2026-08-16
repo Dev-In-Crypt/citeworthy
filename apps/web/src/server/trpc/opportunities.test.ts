@@ -132,7 +132,7 @@ describe("opportunities", () => {
     const [first] = await caller(userId, agencyId).opportunities.list({ clientId });
     const detail = await caller(userId, agencyId).opportunities.get({ id: first!.id });
 
-    const breakdown = detail.scoreBreakdown as ReturnType<typeof scoreOpportunity>;
+    const breakdown = detail.scoreBreakdown as unknown as ReturnType<typeof scoreOpportunity>;
     expect(breakdown.factors.impact).toBeGreaterThanOrEqual(0);
     expect(breakdown.weights).toBeDefined();
     // Пересчёт по сохранённым входам обязан дать ту же оценку: иначе разбор

@@ -1,0 +1,428 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { OPPORTUNITY_COPY, recommendationSchema, type Recommendation } from "@repo/core";
+import { api, type RouterOutputs } from "@/trpc/react";
+import { EmptyState } from "@/components/page-header";
+import { ConfidenceBadge } from "@/components/stat";
+import { NotePanel } from "@/components/note-panel";
+import { cn } from "@/lib/utils";
+
+type Opportunity = RouterOutputs["opportunities"]["list"][number];
+
+const KIND_LABELS: Record<string, string> = {
+  competitor_gap: "Competitor ahead",
+  source_gap: "Missing from a cited source",
+  content_gap: "Own content",
+  cluster_gap: "Topic behind",
+};
+
+const PRIORITY_STYLE: Record<string, string> = {
+  high: "border-competitor/50 text-competitor",
+  medium: "border-input text-foreground",
+  low: "border-input text-muted-foreground",
+};
+
+function formatWindow(start: Date, end: Date): string {
+  const format = (date: Date) =>
+    date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  return `${format(new Date(start))} – ${format(new Date(end))}`;
+}
+
+export function OpportunitiesView({ clientId }: { clientId: string }) {
+  const router = useRouter();
+  const utils = api.useUtils();
+  const client = api.clients.get.useQuery({ id: clientId });
+  const opportunities = api.opportunities.list.useQuery({ clientId });
+  const [openId, setOpenId] = useState<string | null>(null);
+
+  const refresh = api.opportunities.refresh.useMutation({
+    onSuccess: () => utils.opportunities.list.invalidate({ clientId }),
+  });
+
+  if (client.error) {
+    return <p data-testid="form-error">Client not found. It may have been removed.</p>;
+  }
+
+  if (opportunities.isPending) {
+    return <p className="text-sm text-muted-foreground">Loading opportunities…</p>;
+  }
+
+  if (opportunities.error) {
+    return (
+      <NotePanel title="Could not load opportunities" testId="form-error">
+        {opportunities.error.message}{" "}
+        <button className="underline" onClick={() => opportunities.refetch()}>
+          Try again
+        </button>
+      </NotePanel>
+    );
+  }
+
+  const rows = opportunities.data ?? [];
+  const open = rows.filter((row) => row.status === "open");
+  const decided = rows.filter((row) => row.status !== "open");
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <p className="max-w-prose text-sm text-muted-foreground">{OPPORTUNITY_COPY.basis}</p>
+        <button
+          data-testid="refresh-opportunities"
+          onClick={() => refresh.mutate({ clientId })}
+          disabled={refresh.isPending}
+          className="h-10 shrink-0 rounded-md border border-input px-4 text-sm font-medium hover:bg-accent disabled:opacity-60"
+        >
+          {refresh.isPending ? "Recomputing…" : "Recompute"}
+        </button>
+      </div>
+
+      {rows.length === 0 ? (
+        <EmptyState
+          title={OPPORTUNITY_COPY.emptyTitle}
+          description={OPPORTUNITY_COPY.emptyBody}
+          action={
+            <Link
+              href={`/clients/${clientId}/measure`}
+              className="h-10 rounded-md bg-primary px-4 text-sm font-medium leading-10 text-primary-foreground"
+            >
+              Run measurement
+            </Link>
+          }
+        />
+      ) : (
+        <ul data-testid="opportunities-list" className="flex flex-col gap-3">
+          {open.map((row) => (
+            <OpportunityCard
+              key={row.id}
+              opportunity={row}
+              expanded={openId === row.id}
+              onToggle={() => setOpenId(openId === row.id ? null : row.id)}
+              clientId={clientId}
+              onConverted={() => {
+                utils.opportunities.list.invalidate({ clientId });
+                router.push(`/clients/${clientId}/actions`);
+              }}
+            />
+          ))}
+        </ul>
+      )}
+
+      {decided.length > 0 && (
+        <details data-testid="decided-opportunities" className="rounded-lg border p-4">
+          <summary className="cursor-pointer text-sm font-medium">
+            Already decided ({decided.length})
+          </summary>
+          <ul className="mt-3 flex flex-col gap-2 text-sm">
+            {decided.map((row) => (
+              <li key={row.id} className="flex flex-wrap items-baseline gap-2">
+                <span className="metric text-muted-foreground">{row.score}</span>
+                <span>{row.title}</span>
+                <span className="rounded-full border px-2 py-0.5 text-xs text-muted-foreground">
+                  {row.status}
+                </span>
+                {row.dismissedReason && (
+                  <span className="text-xs text-muted-foreground">— {row.dismissedReason}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-3 text-xs text-muted-foreground">{OPPORTUNITY_COPY.dismissReturns}</p>
+        </details>
+      )}
+    </div>
+  );
+}
+
+function OpportunityCard({
+  opportunity,
+  expanded,
+  onToggle,
+  clientId,
+  onConverted,
+}: {
+  opportunity: Opportunity;
+  expanded: boolean;
+  onToggle: () => void;
+  clientId: string;
+  onConverted: () => void;
+}) {
+  return (
+    <li data-testid="opportunity-card" className="rounded-lg border">
+      <button
+        onClick={onToggle}
+        aria-expanded={expanded}
+        className="flex w-full flex-col gap-2 p-4 text-left hover:bg-accent/40"
+      >
+        <div className="flex flex-wrap items-baseline gap-3">
+          <span
+            data-testid="opportunity-score"
+            className="metric text-2xl font-semibold tracking-tight"
+          >
+            {opportunity.score}
+          </span>
+          <span className="text-base font-medium">{opportunity.title}</span>
+        </div>
+
+        <p data-testid="opportunity-reason" className="max-w-prose text-sm text-muted-foreground">
+          {opportunity.reason}
+        </p>
+
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span
+            className={cn(
+              "rounded-full border px-2 py-0.5",
+              PRIORITY_STYLE[opportunity.priority] ?? "",
+            )}
+          >
+            {opportunity.priority} priority
+          </span>
+          <span className="rounded-full bg-secondary px-2 py-0.5 text-muted-foreground">
+            {KIND_LABELS[opportunity.kind] ?? opportunity.kind}
+          </span>
+          <span className="text-muted-foreground">
+            {opportunity.affectedPromptCount}{" "}
+            {opportunity.affectedPromptCount === 1 ? "question" : "questions"} ·{" "}
+            {opportunity.sampleCount} answers
+          </span>
+          <ConfidenceBadge level={opportunity.evidenceLevel} labelled />
+        </div>
+      </button>
+
+      {expanded && (
+        <OpportunityDetail
+          opportunityId={opportunity.id}
+          clientId={clientId}
+          onConverted={onConverted}
+        />
+      )}
+    </li>
+  );
+}
+
+function OpportunityDetail({
+  opportunityId,
+  clientId,
+  onConverted,
+}: {
+  opportunityId: string;
+  clientId: string;
+  onConverted: () => void;
+}) {
+  const utils = api.useUtils();
+  const detail = api.opportunities.get.useQuery({ id: opportunityId });
+  const evidence = api.opportunities.evidence.useQuery({ id: opportunityId });
+  const [dismissReason, setDismissReason] = useState("");
+
+  const convert = api.opportunities.convertToAction.useMutation({ onSuccess: onConverted });
+  const decide = api.opportunities.decide.useMutation({
+    onSuccess: () => utils.opportunities.list.invalidate({ clientId }),
+  });
+
+  if (detail.isPending) {
+    return <p className="border-t p-4 text-sm text-muted-foreground">Loading the evidence…</p>;
+  }
+  if (detail.error) {
+    return (
+      <p role="alert" className="border-t p-4 text-sm text-destructive">
+        {detail.error.message}
+      </p>
+    );
+  }
+
+  const breakdown = detail.data.scoreBreakdown as {
+    factors: Record<string, number>;
+    weights: Record<string, number>;
+    version: number;
+  };
+
+  const recommendations = recommendationSchema
+    .array()
+    .safeParse(detail.data.recommendedActions);
+
+  return (
+    <div data-testid="opportunity-detail" className="flex flex-col gap-5 border-t p-4">
+      <section className="flex flex-col gap-2">
+        <h3 className="text-sm font-medium">Why this score</h3>
+        <ul data-testid="score-breakdown" className="flex flex-col gap-1.5">
+          {(
+            [
+              ["impact", OPPORTUNITY_COPY.factorLabels.impact],
+              ["coverage", OPPORTUNITY_COPY.factorLabels.coverage],
+              ["commercialIntent", OPPORTUNITY_COPY.factorLabels.commercialIntent],
+              ["actionability", OPPORTUNITY_COPY.factorLabels.actionability],
+              ["confidence", OPPORTUNITY_COPY.factorLabels.confidence],
+            ] as const
+          ).map(([key, label]) => (
+            <li key={key} className="flex items-center gap-3 text-sm">
+              <span className="w-52 shrink-0 text-muted-foreground">{label}</span>
+              <span className="h-1.5 w-32 shrink-0 overflow-hidden rounded-full bg-secondary">
+                <span
+                  className="block h-full bg-primary"
+                  style={{ width: `${Math.round((breakdown.factors[key] ?? 0) * 100)}%` }}
+                />
+              </span>
+              <span className="metric text-xs text-muted-foreground">
+                {Math.round((breakdown.factors[key] ?? 0) * 100)}
+              </span>
+            </li>
+          ))}
+        </ul>
+        <p className="max-w-prose text-xs text-muted-foreground">
+          {OPPORTUNITY_COPY.scoreBasis} {OPPORTUNITY_COPY.coverageBasis}
+        </p>
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h3 className="text-sm font-medium">Why am I seeing this?</h3>
+
+        {evidence.isPending ? (
+          <p className="text-sm text-muted-foreground">Loading the answers behind it…</p>
+        ) : evidence.error ? (
+          <p role="alert" className="text-sm text-destructive">
+            {evidence.error.message}
+          </p>
+        ) : (
+          <div data-testid="opportunity-evidence" className="flex flex-col gap-3 text-sm">
+            <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div>
+                <dt className="text-xs text-muted-foreground">Window</dt>
+                <dd className="metric" data-testid="evidence-window">
+                  {formatWindow(evidence.data.window.start, evidence.data.window.end)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Answers measured</dt>
+                <dd className="metric">{evidence.data.totalResponsesInWindow}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Questions affected</dt>
+                <dd className="metric">{evidence.data.prompts.length}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Evidence</dt>
+                <dd>{evidence.data.evidenceLevel}</dd>
+              </div>
+            </dl>
+
+            {evidence.data.prompts.length > 0 && (
+              <ul data-testid="evidence-prompts" className="flex flex-col gap-1">
+                {evidence.data.prompts.map((prompt) => (
+                  <li key={prompt.id} className="text-muted-foreground">
+                    <span className="text-foreground">{prompt.text}</span> · {prompt.clusterName}
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {detail.data.competitorNames.length > 0 && (
+              <p className="text-muted-foreground">
+                Named in those answers: {detail.data.competitorNames.join(", ")}
+              </p>
+            )}
+
+            {evidence.data.responses.length > 0 && (
+              <details data-testid="evidence-answers">
+                <summary className="cursor-pointer text-muted-foreground">
+                  Example answers ({evidence.data.responses.length} of{" "}
+                  {evidence.data.totalResponsesInWindow})
+                </summary>
+                <ul className="mt-2 flex flex-col gap-1 text-xs text-muted-foreground">
+                  {evidence.data.responses.map((response) => (
+                    <li key={response.responseId}>
+                      {response.platform} ·{" "}
+                      {response.clientMentioned ? "client named" : "client not named"}
+                      {response.competitorsMentioned.length > 0 &&
+                        ` · ${response.competitorsMentioned.join(", ")}`}
+                      {response.citedDomains.length > 0 && ` · ${response.citedDomains.join(", ")}`}
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-xs text-muted-foreground">{evidence.data.basis}</p>
+              </details>
+            )}
+          </div>
+        )}
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h3 className="text-sm font-medium">What to do about it</h3>
+        {recommendations.success ? (
+          <ul data-testid="opportunity-actions" className="flex flex-col gap-2">
+            {recommendations.data.map((recommendation: Recommendation, index: number) => (
+              <li
+                key={`${recommendation.rule}-${index}`}
+                className="flex flex-col gap-2 rounded-lg border p-3"
+              >
+                <span className="font-medium">{recommendation.title}</span>
+                <span className="max-w-prose text-sm text-muted-foreground">
+                  {recommendation.reason}
+                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    data-testid="convert-opportunity"
+                    onClick={() =>
+                      convert.mutate({ id: opportunityId, recommendation })
+                    }
+                    disabled={convert.isPending}
+                    className="h-9 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground disabled:opacity-60"
+                  >
+                    {convert.isPending ? "Adding…" : "Create action"}
+                  </button>
+                  <span className="text-xs text-muted-foreground">
+                    impact: {recommendation.estimatedImpact} · effort: {recommendation.effort}
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            The stored recommendations could not be read. Recompute to rebuild them.
+          </p>
+        )}
+
+        {detail.data.actions.length > 0 && (
+          <p data-testid="opportunity-existing-actions" className="text-xs text-muted-foreground">
+            Already in the queue: {detail.data.actions.map((action) => action.title).join(", ")}
+          </p>
+        )}
+      </section>
+
+      <section className="flex flex-col gap-2 rounded-lg border border-dashed p-3">
+        <h3 className="text-sm font-medium">Not worth doing?</h3>
+        <p className="max-w-prose text-xs text-muted-foreground">
+          {OPPORTUNITY_COPY.dismissRequiresReason} {OPPORTUNITY_COPY.dismissReturns}
+        </p>
+        <textarea
+          data-testid="dismiss-reason"
+          value={dismissReason}
+          onChange={(event) => setDismissReason(event.target.value)}
+          rows={2}
+          className="rounded-md border border-input bg-background p-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        />
+        <button
+          data-testid="dismiss-opportunity"
+          disabled={dismissReason.trim().length === 0 || decide.isPending}
+          onClick={() =>
+            decide.mutate({
+              id: opportunityId,
+              status: "dismissed",
+              dismissedReason: dismissReason.trim(),
+            })
+          }
+          className="h-9 self-start rounded-md border border-input px-3 text-sm font-medium hover:bg-accent disabled:opacity-60"
+        >
+          Dismiss
+        </button>
+        {decide.error && (
+          <p role="alert" data-testid="form-error" className="text-sm text-destructive">
+            {decide.error.message}
+          </p>
+        )}
+      </section>
+    </div>
+  );
+}

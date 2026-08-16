@@ -68,6 +68,116 @@ function renderWeekDot(props: unknown) {
   );
 }
 
+/**
+ * Что требует человека прямо сейчас.
+ *
+ * Экран клиента до этого начинался с приборов, и владелец агентства читал
+ * графики, чтобы понять, надо ли ему что-то делать. Здесь тот же вывод стоит
+ * первым и в одну строку на пункт.
+ */
+function NeedsAttention({ clientId }: { clientId: string }) {
+  const opportunities = api.opportunities.list.useQuery({ clientId });
+  const actions = api.actions.list.useQuery({ clientId });
+  const experiments = api.experiments.list.useQuery({ clientId });
+
+  if (opportunities.isPending || actions.isPending) return null;
+
+  const open = (opportunities.data ?? []).filter((row) => row.status === "open");
+  const highPriority = open.filter((row) => row.priority === "high");
+  const stalled = (actions.data ?? []).filter(
+    (action) =>
+      (action.status === "backlog" || action.status === "in_progress") &&
+      Date.now() - new Date(action.createdAt).getTime() > 14 * 86_400_000,
+  );
+  const readyExperiments = (experiments.data ?? []).filter(
+    (experiment) => experiment.status === "ready",
+  );
+
+  const nothingWaiting =
+    highPriority.length === 0 && stalled.length === 0 && readyExperiments.length === 0;
+
+  return (
+    <section data-testid="needs-attention" className="flex flex-col gap-2 rounded-lg border p-4">
+      <h2 className="text-sm font-medium">What needs attention</h2>
+      {nothingWaiting ? (
+        <p className="text-sm text-muted-foreground">Nothing is waiting on a person right now.</p>
+      ) : (
+        <ul className="flex flex-col gap-1.5 text-sm">
+          {highPriority.length > 0 && (
+            <li>
+              <Link
+                href={`/clients/${clientId}/opportunities`}
+                className="text-primary hover:underline"
+              >
+                {highPriority.length} high-priority{" "}
+                {highPriority.length === 1 ? "opportunity" : "opportunities"} →
+              </Link>
+            </li>
+          )}
+          {stalled.length > 0 && (
+            <li>
+              <Link href={`/clients/${clientId}/actions`} className="text-primary hover:underline">
+                {stalled.length} {stalled.length === 1 ? "action has" : "actions have"} been open
+                over two weeks →
+              </Link>
+            </li>
+          )}
+          {readyExperiments.length > 0 && (
+            <li>
+              <Link
+                href={`/clients/${clientId}/experiments`}
+                className="text-primary hover:underline"
+              >
+                {readyExperiments.length}{" "}
+                {readyExperiments.length === 1 ? "experiment is" : "experiments are"} ready to
+                review →
+              </Link>
+            </li>
+          )}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+/** Три самые весомые возможности — то, с чего начинается работа. */
+function TopOpportunities({ clientId }: { clientId: string }) {
+  const opportunities = api.opportunities.list.useQuery({ clientId });
+  const top = (opportunities.data ?? []).filter((row) => row.status === "open").slice(0, 3);
+
+  if (opportunities.isPending || top.length === 0) return null;
+
+  return (
+    <section data-testid="top-opportunities" className="flex flex-col gap-3">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="text-sm font-medium">Highest priority opportunities</h2>
+        <Link
+          href={`/clients/${clientId}/opportunities`}
+          className="text-sm text-primary hover:underline"
+        >
+          All opportunities →
+        </Link>
+      </div>
+
+      <ul className="grid gap-3 md:grid-cols-3">
+        {top.map((row) => (
+          <li key={row.id} className="flex flex-col gap-2 rounded-lg border p-4">
+            <span className="metric text-2xl font-semibold tracking-tight">{row.score}</span>
+            <span className="text-sm font-medium">{row.title}</span>
+            <span className="line-clamp-3 text-xs text-muted-foreground">{row.reason}</span>
+            <Link
+              href={`/clients/${clientId}/opportunities`}
+              className="mt-auto text-sm text-primary hover:underline"
+            >
+              Review opportunity →
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 /** Одна фраза, которую агентство перескажет своему клиенту. */
 function OneLineRead({ matrix }: { matrix: RouterOutputs["measurement"]["matrix"] }) {
   const { totals, rows } = matrix;
@@ -252,6 +362,11 @@ export function ClientOverview({ clientId }: { clientId: string }) {
         <span aria-hidden className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary" />
         {MEASUREMENT_COPY.methodNote}
       </p>
+
+      {/* Решения идут раньше приборов: сначала что требует человека и за что
+          браться, и только потом — измерения, из которых это выведено. */}
+      <NeedsAttention clientId={clientId} />
+      <TopOpportunities clientId={clientId} />
 
       <div className="grid items-start gap-4 lg:grid-cols-[1.55fr_1fr]">
         {matrix.data ? (

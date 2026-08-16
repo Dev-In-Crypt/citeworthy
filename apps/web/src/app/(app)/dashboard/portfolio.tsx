@@ -32,6 +32,30 @@ export function Portfolio() {
     return <p className="text-sm text-muted-foreground">Loading…</p>;
   }
 
+  /**
+   * Ошибка не должна выглядеть как «клиентов нет».
+   * Пустое состояние — утверждение о данных; показывать его вместо сбоя
+   * значит врать о состоянии портфеля, и агентство решит, что всё потеряно.
+   */
+  if (portfolio.error) {
+    return (
+      <div
+        role="alert"
+        data-testid="form-error"
+        className="flex flex-col items-start gap-3 rounded-lg border border-dashed p-8"
+      >
+        <h2 className="text-base font-medium">The portfolio could not be loaded</h2>
+        <p className="max-w-prose text-sm text-muted-foreground">{portfolio.error.message}</p>
+        <button
+          onClick={() => portfolio.refetch()}
+          className="h-10 rounded-md border border-input px-4 text-sm font-medium hover:bg-accent"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
+
   if (rows.length === 0) {
     return (
       <EmptyState
@@ -50,9 +74,39 @@ export function Portfolio() {
   }
 
   const thin = rows.filter((row) => !row.sufficient).length;
+  const waiting = rows.filter((row) => row.needs.length > 0);
+  const newOpportunities = rows.reduce((total, row) => total + row.newOpportunities, 0);
+  const highPriority = rows.reduce((total, row) => total + row.highPriorityOpportunities, 0);
+  const reportsDue = rows.filter((row) => row.needs.some((need) => need.includes("approve"))).length;
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Первый вопрос агентства утром — не «какой средний процент», а «кем
+          заняться сегодня». Ответ стоит над таблицей, а не выводится из неё. */}
+      <section data-testid="attention-summary" className="flex flex-col gap-2 rounded-lg border p-4">
+        <h2 className="text-sm font-medium">
+          {waiting.length === 0
+            ? `Nothing is waiting across ${rows.length} ${rows.length === 1 ? "client" : "clients"}`
+            : `${waiting.length} of ${rows.length} ${rows.length === 1 ? "client" : "clients"} need you`}
+        </h2>
+        <dl className="flex flex-wrap gap-x-8 gap-y-2 text-sm">
+          <div className="flex items-baseline gap-2">
+            <dt className="text-muted-foreground">High-priority opportunities</dt>
+            <dd data-testid="summary-high-priority" className="metric font-medium">
+              {highPriority}
+            </dd>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <dt className="text-muted-foreground">New this week</dt>
+            <dd className="metric font-medium">{newOpportunities}</dd>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <dt className="text-muted-foreground">Reports awaiting approval</dt>
+            <dd className="metric font-medium">{reportsDue}</dd>
+          </div>
+        </dl>
+      </section>
+
       <div className="overflow-x-auto">
         <table data-testid="portfolio-table" className="w-full min-w-[720px] text-sm">
           <thead className="text-left text-muted-foreground">

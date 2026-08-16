@@ -1,6 +1,12 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { canAddClient, competitorGapPp, confidenceFor, normalizeDomain } from "@repo/core";
+import {
+  canAddClient,
+  competitorGapPp,
+  confidenceFor,
+  normalizeDomain,
+  PRIORITY_THRESHOLDS,
+} from "@repo/core";
 import {
   countClientsByAgency,
   createClient,
@@ -48,9 +54,14 @@ export const clientsRouter = router({
    * показывает только проценты, не отвечает на вопрос «чем мне заняться».
    */
   portfolio: protectedProcedure.query(async ({ ctx }) => {
-    const rows = await listPortfolioRows(ctx.db, ctx.user.agencyId);
+    const rows = await listPortfolioRows(
+      ctx.db,
+      ctx.user.agencyId,
+      new Date(),
+      PRIORITY_THRESHOLDS.high,
+    );
 
-    return rows.map((row) => {
+    const mapped = rows.map((row) => {
       const gapPp =
         row.visibilityPct === null
           ? null
@@ -66,6 +77,15 @@ export const clientsRouter = router({
             });
 
       const needs: string[] = [];
+      // Возможности идут первыми: агентство приходит сюда за вопросом «за что
+      // взяться», а не «какой у клиента средний процент».
+      if (row.highPriorityOpportunities > 0) {
+        needs.push(
+          row.highPriorityOpportunities === 1
+            ? "1 high-priority opportunity"
+            : `${row.highPriorityOpportunities} high-priority opportunities`,
+        );
+      }
       if (row.reportsAwaitingApproval > 0) {
         needs.push(
           row.reportsAwaitingApproval === 1
@@ -93,8 +113,23 @@ export const clientsRouter = router({
         confidence: confidenceFor(row.sampleCount),
         openActions: row.openActions,
         lastRunAt: row.lastRunAt,
+        openOpportunities: row.openOpportunities,
+        highPriorityOpportunities: row.highPriorityOpportunities,
+        newOpportunities: row.newOpportunities,
+        topOpportunityScore: row.topOpportunityScore,
         needs,
       };
+    });
+
+    /**
+     * Порядок отвечает на вопрос «кем заняться сегодня», а не «у кого выше
+     * процент». Сначала те, где что-то ждёт человека, среди них — по самой
+     * весомой возможности; остальные следом в исходном порядке.
+     */
+    return [...mapped].sort((a, b) => {
+      const waiting = Number(b.needs.length > 0) - Number(a.needs.length > 0);
+      if (waiting !== 0) return waiting;
+      return (b.topOpportunityScore ?? -1) - (a.topOpportunityScore ?? -1);
     });
   }),
 

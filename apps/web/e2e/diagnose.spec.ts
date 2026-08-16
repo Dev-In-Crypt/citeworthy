@@ -79,9 +79,23 @@ test("diagnose screen shows source mix, presence matrix and reasoned recommendat
   // Сводка разрыва совпадает по формату с данными диагностики.
   await expect(page.getByTestId("gap-summary")).toContainText(/Client in \d+ of \d+/);
 
-  // У этого клиента бренд звучит почти во всех ответах, разрыва нет —
-  // и продукт честно не выдумывает работу.
-  await expect(page.getByText("Nothing to recommend from the current data")).toBeVisible();
+  /**
+   * Рекомендации по этим данным есть — и каждая обязана объяснять себя.
+   *
+   * Раньше здесь проверялось обратное: на прежних фикстурах клиент звучал
+   * почти в каждом ответе, и рекомендовать было нечего. Набор ответов с тех
+   * пор пополнился случаем, ради которого продукт и существует — модель
+   * отвечает по чужим площадкам и клиента не называет, — так что проверять
+   * надо не отсутствие работы, а то, что каждая предложенная работа
+   * обоснована. Случай «рекомендовать нечего» остался выше: до прогона экран
+   * честно говорит, что цитат ещё нет.
+   */
+  const reasons = await page.getByTestId("recommendation-reason").allInnerTexts();
+  expect(reasons.length).toBeGreaterThan(0);
+  for (const reason of reasons) {
+    expect(reason.trim().length).toBeGreaterThan(0);
+    expect(reason).not.toMatch(/proof|proven|guarantee|caused/i);
+  }
 });
 
 test("a client missing from the answers gets reasoned recommendations", async ({ page }) => {

@@ -1,4 +1,4 @@
-import { index, jsonb, numeric, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { index, jsonb, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { clients } from "./tenancy";
 import { actions } from "./actions";
 
@@ -67,27 +67,19 @@ export const experimentEvents = pgTable(
   (table) => [index("experiment_events_experiment_idx").on(table.experimentId)],
 );
 
-export const experimentResults = pgTable("experiment_results", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  experimentId: uuid("experiment_id")
-    .notNull()
-    .references(() => experiments.id, { onDelete: "cascade" })
-    .unique(),
-  treatmentBefore: numeric("treatment_before", { precision: 5, scale: 1 }),
-  treatmentAfter: numeric("treatment_after", { precision: 5, scale: 1 }),
-  controlBefore: numeric("control_before", { precision: 5, scale: 1 }),
-  controlAfter: numeric("control_after", { precision: 5, scale: 1 }),
-  /** Оценка вклада в процентных пунктах. Именно оценка — см. комментарий выше. */
-  incrementalPp: numeric("incremental_pp", { precision: 5, scale: 1 }),
-  confidence: confidenceEnum("confidence").notNull().default("low"),
-  /** Перечень наблюдений, на которых основана оценка. */
-  evidence: jsonb("evidence").$type<string[]>().notNull().default([]),
-  computedAt: timestamp("computed_at", { withTimezone: true }).notNull().defaultNow(),
-});
+/**
+ * Таблицы `experiment_results` здесь больше нет.
+ *
+ * Она существовала с самого начала и не получила ни одной строки: оценка
+ * эксперимента — чистая математика над visibility_snapshots, а срезы меняются
+ * с каждым новым прогоном. Замороженная строка результата молча расходилась бы
+ * с тем, что показывает экран, — это хуже, чем её отсутствие. Единственное
+ * место, где результат обязан быть заморожен, — payload отчёта: там он и
+ * замораживается. Тот же разбор уже приводил к удалению `source_presence`
+ * в миграции 0017.
+ */
 
 export type Experiment = typeof experiments.$inferSelect;
 export type NewExperiment = typeof experiments.$inferInsert;
 export type ExperimentEvent = typeof experimentEvents.$inferSelect;
 export type NewExperimentEvent = typeof experimentEvents.$inferInsert;
-export type ExperimentResult = typeof experimentResults.$inferSelect;
-export type NewExperimentResult = typeof experimentResults.$inferInsert;

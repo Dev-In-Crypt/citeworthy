@@ -6,22 +6,53 @@ import { api } from "@/trpc/react";
 import { cn } from "@/lib/utils";
 
 /**
- * Вкладки клиента.
+ * Навигация по клиенту — в два уровня.
  *
- * Раньше это был ряд кнопок на обзоре, который уводил на отдельные страницы
- * без пути назад: экраны выглядели вкладками, но ими не были. Теперь они
- * рядом на каждом экране клиента, и видно, где ты находишься.
+ * Первый уровень — решения: что происходит, что делать, что делаем, что
+ * показать клиенту. Второй — приборы: измерения, источники, сырые ответы.
+ * Раньше всё лежало в один ряд, и владелец агентства жил внутри
+ * измерительного инструмента вместо того, чтобы принимать решения.
+ *
+ * Адреса при этом не переименованы. Двадцать из двадцати трёх сквозных
+ * тестов ходят по ним напрямую, и агентство — тоже, по памяти.
  */
 
+/**
+ * `as const` здесь обязателен: типизированные роуты Next проверяют literal
+ * type ссылки, и без него `/clients/${id}/${segment}` перестаёт быть известным
+ * адресом и становится просто строкой.
+ */
 const TABS = [
   { segment: "", label: "Overview" },
-  { segment: "measure", label: "Measure" },
-  { segment: "diagnose", label: "Diagnose" },
-  { segment: "actions", label: "Actions" },
-  { segment: "experiments", label: "Experiments" },
-  { segment: "reports", label: "Reports" },
+  { segment: "opportunities", label: "Opportunities" },
+  { segment: "actions", label: "Work" },
+  { segment: "reports", label: "Report" },
+  { segment: "measure", label: "Analytics" },
   { segment: "settings", label: "Settings" },
 ] as const;
+
+/** Второй уровень: приборы внутри своего раздела. */
+const SUBTABS = {
+  actions: [
+    { segment: "actions", label: "Actions" },
+    { segment: "experiments", label: "Experiments" },
+  ],
+  measure: [
+    { segment: "measure", label: "Visibility" },
+    { segment: "diagnose", label: "Sources" },
+  ],
+} as const;
+
+/**
+ * Какому разделу принадлежит адрес. Вложенные экраны подсвечивают свой
+ * раздел: отдельный промпт живёт внутри измерений, эксперименты — внутри
+ * работы.
+ */
+const SEGMENT_TO_TAB: Record<string, string> = {
+  prompts: "measure",
+  diagnose: "measure",
+  experiments: "actions",
+};
 
 export function ClientTabs({ clientId }: { clientId: string }) {
   const pathname = usePathname();
@@ -29,11 +60,11 @@ export function ClientTabs({ clientId }: { clientId: string }) {
 
   const base = `/clients/${clientId}`;
   const current = pathname.startsWith(base) ? pathname.slice(base.length).replace(/^\//, "") : "";
-  // Вложенные экраны подсвечивают свой раздел: отдельный промпт живёт внутри Measure.
   const segment = current.split("/")[0] ?? "";
-  const activeSegment = segment === "prompts" ? "measure" : segment;
+  const activeTab = SEGMENT_TO_TAB[segment] ?? segment;
 
   const isProspect = client.data?.status === "prospect";
+  const children = SUBTABS[activeTab as keyof typeof SUBTABS] ?? null;
 
   return (
     <div className="mb-6 flex flex-col gap-3 border-b pb-3">
@@ -62,10 +93,10 @@ export function ClientTabs({ clientId }: { clientId: string }) {
           <Link
             href={`/clients/${clientId}/audit`}
             data-testid="audit-link"
-            aria-current={activeSegment === "audit" ? "page" : undefined}
+            aria-current={activeTab === "audit" ? "page" : undefined}
             className={cn(
               "rounded-md px-3 py-1.5",
-              activeSegment === "audit"
+              activeTab === "audit"
                 ? "bg-primary font-medium text-primary-foreground"
                 : "text-primary hover:bg-accent",
             )}
@@ -75,7 +106,7 @@ export function ClientTabs({ clientId }: { clientId: string }) {
         )}
 
         {TABS.map((tab) => {
-          const active = activeSegment === tab.segment;
+          const isActive = activeTab === tab.segment;
 
           return (
             <Link
@@ -83,13 +114,11 @@ export function ClientTabs({ clientId }: { clientId: string }) {
               // Ссылка собирается прямо здесь: типизированные роуты Next
               // проверяют только литерал, склейка из переменной для них
               // уже просто строка.
-              href={
-                tab.segment ? `/clients/${clientId}/${tab.segment}` : `/clients/${clientId}`
-              }
-              aria-current={active ? "page" : undefined}
+              href={tab.segment ? `/clients/${clientId}/${tab.segment}` : `/clients/${clientId}`}
+              aria-current={isActive ? "page" : undefined}
               className={cn(
                 "rounded-md px-3 py-1.5",
-                active
+                isActive
                   ? "bg-secondary font-medium text-foreground"
                   : "text-muted-foreground hover:bg-accent hover:text-foreground",
               )}
@@ -99,6 +128,30 @@ export function ClientTabs({ clientId }: { clientId: string }) {
           );
         })}
       </nav>
+
+      {children && (
+        <nav data-testid="client-subtabs" className="flex flex-wrap gap-4 text-sm">
+          {children.map((child) => {
+            const isActive = segment === child.segment;
+
+            return (
+              <Link
+                key={child.segment}
+                href={`/clients/${clientId}/${child.segment}`}
+                aria-current={isActive ? "page" : undefined}
+                className={cn(
+                  "border-b-2 pb-1",
+                  isActive
+                    ? "border-primary font-medium text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {child.label}
+              </Link>
+            );
+          })}
+        </nav>
+      )}
     </div>
   );
 }
