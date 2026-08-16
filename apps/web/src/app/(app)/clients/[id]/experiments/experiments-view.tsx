@@ -15,6 +15,7 @@ import { EXPERIMENT_COPY } from "@repo/core";
 import { api } from "@/trpc/react";
 import { EmptyState } from "@/components/page-header";
 import { ConfidenceBadge, type ConfidenceLevel } from "@/components/stat";
+import { NotePanel } from "@/components/note-panel";
 
 /** Строка группы. Прочерк вместо числа — там, где выборка его не набрала. */
 function GroupRow({
@@ -206,15 +207,9 @@ function ExperimentDetail({ experimentId }: { experimentId: string }) {
 
         {/* Отдельным блоком, а не припиской: то, чего цифра не значит, читают
             ровно тогда, когда это выделено так же, как сама цифра. */}
-        <div
-          data-testid="not-attribution"
-          className="flex flex-col gap-1.5 rounded-lg border border-dashed p-3"
-        >
-          <h3 className="text-sm font-medium">What this does not say</h3>
-          <p className="max-w-prose text-sm text-muted-foreground">
-            {EXPERIMENT_COPY.attributionLimits}
-          </p>
-        </div>
+        <NotePanel testId="not-attribution" title="What this does not say" className="p-3">
+          {EXPERIMENT_COPY.attributionLimits}
+        </NotePanel>
       </section>
 
       <section className="flex flex-col gap-2 rounded-lg border p-4">
