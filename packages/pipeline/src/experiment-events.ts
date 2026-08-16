@@ -1,4 +1,9 @@
-import { averageVisibility, findFirstNewCitation, findVisibilityChange } from "@repo/core";
+import {
+  averageVisibility,
+  findFirstNewCitation,
+  findVisibilityChange,
+  MIN_SAMPLES_AFTER,
+} from "@repo/core";
 import type { SnapshotPoint } from "@repo/core";
 import {
   addExperimentEvent,
@@ -6,6 +11,7 @@ import {
   listAllSnapshots,
   listCitationObservations,
   listCollectingExperiments,
+  setExperimentStatus,
 } from "@repo/db";
 import type { Database } from "@repo/db";
 
@@ -16,6 +22,8 @@ export interface DetectedEvents {
   experimentId: string;
   firstNewCitation: boolean;
   visibilityChange: boolean;
+  /** Данных после действия набралось достаточно, чтобы оценивать результат. */
+  becameReady: boolean;
 }
 
 /**
@@ -47,6 +55,7 @@ export async function detectExperimentEvents(
       experimentId: experiment.id,
       firstNewCitation: false,
       visibilityChange: false,
+      becameReady: false,
     };
 
     // 1. Источник, которого до действия в измерениях не было.
@@ -96,6 +105,24 @@ export async function detectExperimentEvents(
         });
         detected.visibilityChange = true;
       }
+    }
+
+    /**
+     * 3. Эксперимент готов к оценке.
+     *
+     * Не «прошло столько-то недель», а «после действия набралось достаточно
+     * ответов»: время само по себе ничего не измеряет. Порог — тот же, по
+     * которому математика эксперимента начисляет уверенность, иначе экран
+     * звал бы смотреть результат, который сама оценка считает недостоверным.
+     */
+    const afterAll = averageVisibility(snapshots, experiment.treatmentClusterIds, {
+      start: experiment.actionDate,
+      end: OPEN_ENDED,
+    });
+
+    if (afterAll.samples >= MIN_SAMPLES_AFTER) {
+      await setExperimentStatus(db, experiment.id, "ready");
+      detected.becameReady = true;
     }
 
     results.push(detected);

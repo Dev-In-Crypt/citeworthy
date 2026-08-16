@@ -2172,3 +2172,18 @@ export async function listActionsForOpportunity(
 ): Promise<Action[]> {
   return db.select().from(actions).where(eq(actions.originOpportunityId, opportunityId));
 }
+
+/**
+ * Переводит эксперимент в другое состояние.
+ *
+ * `ready` ставит конвейер, когда после действия набралось достаточно ответов,
+ * чтобы вообще что-то оценивать. Раньше статус не менялся никогда, и «готовые
+ * к оценке» на экране агентства были бы обещанием, которого никто не держит.
+ */
+export async function setExperimentStatus(
+  db: Database,
+  experimentId: string,
+  status: Experiment["status"],
+): Promise<void> {
+  await db.update(experiments).set({ status }).where(eq(experiments.id, experimentId));
+}
