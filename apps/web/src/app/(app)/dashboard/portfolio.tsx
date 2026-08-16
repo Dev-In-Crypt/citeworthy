@@ -26,6 +26,8 @@ function formatPp(value: number | null): string {
 
 export function Portfolio() {
   const portfolio = api.clients.portfolio.useQuery();
+  // Сводка приходит готовой: экран и будущее письмо читают одно и то же.
+  const brief = api.clients.weeklyBrief.useQuery();
   const rows = portfolio.data ?? [];
 
   if (portfolio.isPending) {
@@ -74,47 +76,56 @@ export function Portfolio() {
   }
 
   const thin = rows.filter((row) => !row.sufficient).length;
-  const waiting = rows.filter((row) => row.needs.length > 0);
-  const newOpportunities = rows.reduce((total, row) => total + row.newOpportunities, 0);
-  const highPriority = rows.reduce((total, row) => total + row.highPriorityOpportunities, 0);
-  const reportsDue = rows.filter((row) => row.needs.some((need) => need.includes("approve"))).length;
 
   return (
     <div className="flex flex-col gap-4">
       {/* Первый вопрос агентства утром — не «какой средний процент», а «кем
           заняться сегодня». Ответ стоит над таблицей, а не выводится из неё. */}
-      <section data-testid="attention-summary" className="flex flex-col gap-2 rounded-lg border p-4">
-        <h2 className="text-sm font-medium">
-          {waiting.length === 0
-            ? `Nothing is waiting across ${rows.length} ${rows.length === 1 ? "client" : "clients"}`
-            : `${waiting.length} of ${rows.length} ${rows.length === 1 ? "client" : "clients"} need you`}
-        </h2>
-        <dl className="flex flex-wrap gap-x-8 gap-y-2 text-sm">
-          <div className="flex items-baseline gap-2">
-            <dt className="text-muted-foreground">High-priority opportunities</dt>
-            <dd data-testid="summary-high-priority" className="metric font-medium">
-              {highPriority}
-            </dd>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <dt className="text-muted-foreground">New this week</dt>
-            <dd className="metric font-medium">{newOpportunities}</dd>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <dt className="text-muted-foreground">Reports awaiting approval</dt>
-            <dd className="metric font-medium">{reportsDue}</dd>
-          </div>
-        </dl>
-      </section>
+      {brief.data && (
+        <section
+          data-testid="attention-summary"
+          className="flex flex-col gap-2 rounded-lg border p-4"
+        >
+          <h2 className="text-sm font-medium">
+            {brief.data.clientsNeedingAttention === 0
+              ? `Nothing is waiting across ${brief.data.clients} ${
+                  brief.data.clients === 1 ? "client" : "clients"
+                }`
+              : `${brief.data.clientsNeedingAttention} of ${brief.data.clients} ${
+                  brief.data.clients === 1 ? "client" : "clients"
+                } need you`}
+          </h2>
+          <dl className="flex flex-wrap gap-x-8 gap-y-2 text-sm">
+            <div className="flex items-baseline gap-2">
+              <dt className="text-muted-foreground">High-priority opportunities</dt>
+              <dd data-testid="summary-high-priority" className="metric font-medium">
+                {brief.data.highPriorityOpportunities}
+              </dd>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <dt className="text-muted-foreground">New this week</dt>
+              <dd className="metric font-medium">{brief.data.newOpportunities}</dd>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <dt className="text-muted-foreground">Reports awaiting approval</dt>
+              <dd className="metric font-medium">{brief.data.reportsAwaitingApproval}</dd>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <dt className="text-muted-foreground">Actions stalled</dt>
+              <dd className="metric font-medium">{brief.data.staleActions}</dd>
+            </div>
+          </dl>
+        </section>
+      )}
 
       {/* Список того, что требует человека, — прежде таблицы со всеми цифрами.
           Агентство ведёт десяток клиентов и не должно вычитывать таблицу,
           чтобы понять, где сегодня нужно его участие. */}
-      {waiting.length > 0 && (
+      {brief.data && brief.data.highlights.length > 0 && (
         <section data-testid="needs-attention-list" className="flex flex-col gap-2">
           <h2 className="text-sm font-medium">Needs attention</h2>
           <ul className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-            {waiting.slice(0, 6).map((row) => (
+            {brief.data.highlights.map((row) => (
               <li key={row.clientId} className="flex flex-col gap-1 rounded-lg border p-4">
                 <Link
                   href={`/clients/${row.clientId}`}
@@ -122,10 +133,10 @@ export function Portfolio() {
                 >
                   {row.name}
                 </Link>
-                <span className="text-sm text-muted-foreground">{row.needs[0]}</span>
-                {row.needs.length > 1 && (
+                <span className="text-sm text-muted-foreground">{row.headline}</span>
+                {row.alsoWaiting > 0 && (
                   <span className="text-xs text-muted-foreground">
-                    and {row.needs.length - 1} more
+                    and {row.alsoWaiting} more
                   </span>
                 )}
                 <Link
