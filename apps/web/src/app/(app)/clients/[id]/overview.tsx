@@ -14,6 +14,7 @@ import {
 import { CONFIDENCE_LABELS, MEASUREMENT_COPY, shareOfNamed } from "@repo/core";
 import { api, type RouterOutputs } from "@/trpc/react";
 import { EmptyState } from "@/components/page-header";
+import { StatCard } from "@/components/stat";
 import { MatrixSection } from "./matrix-view";
 import { TrafficCard } from "./traffic";
 
@@ -64,28 +65,6 @@ function renderWeekDot(props: unknown) {
       strokeWidth={sufficient ? 0 : 1.5}
       strokeDasharray={sufficient ? undefined : "2 2"}
     />
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  hint,
-  testId,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  testId?: string;
-}) {
-  return (
-    <div className="flex flex-col gap-1 rounded-lg border p-4">
-      <span className="text-sm text-muted-foreground">{label}</span>
-      <span data-testid={testId} className="metric text-2xl font-semibold tracking-tight">
-        {value}
-      </span>
-      {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
-    </div>
   );
 }
 

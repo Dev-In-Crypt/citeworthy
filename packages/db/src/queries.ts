@@ -11,6 +11,8 @@ import { citationSources, sources } from "./schema/sources";
 import { actions } from "./schema/actions";
 import { activityLog } from "./schema/activity";
 import { experimentEvents, experiments } from "./schema/experiments";
+import { opportunities } from "./schema/opportunities";
+import type { Opportunity } from "./schema/opportunities";
 import { reportShares, reports } from "./schema/reports";
 import type { NewReport, Report, ReportShare } from "./schema/reports";
 import type { Experiment, ExperimentEvent, NewExperiment, NewExperimentEvent } from "./schema/experiments";
@@ -1076,6 +1078,13 @@ export async function listCitationFacts(
       entityName: mentions.entityName,
       isClient: mentions.isClient,
       isCompetitor: mentions.isCompetitor,
+      /**
+       * Промпт и кластер идут в тот же запрос, чтобы диагноз по каждой теме
+       * не стоил отдельного полного прохода по цитированиям. Существующие
+       * читатели их игнорируют — `toCitationFacts` собирает только нужные поля.
+       */
+      promptId: responses.promptId,
+      clusterId: prompts.clusterId,
     })
     .from(citations)
     .innerJoin(responses, eq(citations.responseId, responses.id))
@@ -1717,4 +1726,428 @@ export async function listInvitationsByAgency(db: Database, agencyId: string) {
 
 export async function markInvitationAccepted(db: Database, token: string): Promise<void> {
   await db.update(invitations).set({ accepted: true }).where(eq(invitations.token, token));
+}
+
+/* ------------------------------------------------------------------ */
+/* Возможности                                                         */
+/* ------------------------------------------------------------------ */
+
+export interface NewOpportunityInput {
+  dedupeKey: string;
+  kind: Opportunity["kind"];
+  title: string;
+  reason: string;
+  score: number;
+  scoreVersion: number;
+  scoreBreakdown: Record<string, unknown>;
+  evidenceLevel: "low" | "medium" | "high";
+  evidence: Record<string, unknown>;
+  recommendedActions: Record<string, unknown>[];
+  affectedPromptIds: string[];
+  affectedClusterIds: string[];
+  competitorNames: string[];
+  sourceDomain: string | null;
+  sampleCount: number;
+}
+
+export interface UpsertOpportunitiesResult {
+  inserted: number;
+  updated: number;
+}
+
+/**
+ * Записывает результат пересчёта, не трогая решений человека.
+ *
+ * Список полей в `set` — несущая конструкция всей функции. В нём только
+ * машинные колонки. Человеческих там нет и быть не должно: status,
+ * dismissedReason, snoozedUntil, decisionScore, decidedByUserId, decidedAt,
+ * firstDetectedAt. Если они туда попадут, ночной прогон вернёт всё, что
+ * агентство вчера отклонило, — и функция станет вреднее своего отсутствия.
+ *
+ * Ровно два исключения, оба записаны в SQL явно:
+ *  • отложенное возвращается, когда срок вышел;
+ *  • отклонённое возвращается, когда выросло на `reopenDeltaPoints` —
+ *    отклонение было суждением о фактах на тот момент, а не навсегда.
+ */
+export async function upsertOpportunities(
+  db: Database,
+  params: {
+    clientId: string;
+    generationId: string;
+    windowStart: Date;
+    windowEnd: Date;
+    rows: NewOpportunityInput[];
+    reopenDeltaPoints: number;
+    now?: Date;
+  },
+): Promise<UpsertOpportunitiesResult> {
+  const now = params.now ?? new Date();
+  if (params.rows.length === 0) return { inserted: 0, updated: 0 };
+
+  const keys = params.rows.map((row) => row.dedupeKey);
+  const existing = await db
+    .select({ dedupeKey: opportunities.dedupeKey })
+    .from(opportunities)
+    .where(and(eq(opportunities.clientId, params.clientId), inArray(opportunities.dedupeKey, keys)));
+  const known = new Set(existing.map((row) => row.dedupeKey));
+
+  await db
+    .insert(opportunities)
+    .values(
+      params.rows.map((row) => ({
+        clientId: params.clientId,
+        dedupeKey: row.dedupeKey,
+        kind: row.kind,
+        title: row.title,
+        reason: row.reason,
+        score: row.score,
+        scoreVersion: row.scoreVersion,
+        scoreBreakdown: row.scoreBreakdown,
+        evidenceLevel: row.evidenceLevel,
+        evidence: row.evidence,
+        recommendedActions: row.recommendedActions,
+        affectedPromptIds: row.affectedPromptIds,
+        affectedClusterIds: row.affectedClusterIds,
+        competitorNames: row.competitorNames,
+        sourceDomain: row.sourceDomain,
+        sampleCount: row.sampleCount,
+        windowStart: params.windowStart,
+        windowEnd: params.windowEnd,
+        generationId: params.generationId,
+        firstDetectedAt: now,
+        lastDetectedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      })),
+    )
+    .onConflictDoUpdate({
+      target: [opportunities.clientId, opportunities.dedupeKey],
+      set: {
+        kind: sql`excluded.kind`,
+        title: sql`excluded.title`,
+        reason: sql`excluded.reason`,
+        score: sql`excluded.score`,
+        scoreVersion: sql`excluded.score_version`,
+        scoreBreakdown: sql`excluded.score_breakdown`,
+        evidenceLevel: sql`excluded.evidence_level`,
+        evidence: sql`excluded.evidence`,
+        recommendedActions: sql`excluded.recommended_actions`,
+        affectedPromptIds: sql`excluded.affected_prompt_ids`,
+        affectedClusterIds: sql`excluded.affected_cluster_ids`,
+        competitorNames: sql`excluded.competitor_names`,
+        sourceDomain: sql`excluded.source_domain`,
+        sampleCount: sql`excluded.sample_count`,
+        windowStart: sql`excluded.window_start`,
+        windowEnd: sql`excluded.window_end`,
+        lastDetectedAt: sql`excluded.last_detected_at`,
+        generationId: sql`excluded.generation_id`,
+        resolvedAt: sql`null`,
+        updatedAt: sql`excluded.updated_at`,
+        status: sql`case
+          when ${opportunities.status} = 'snoozed'
+               and ${opportunities.snoozedUntil} is not null
+               and ${opportunities.snoozedUntil} <= excluded.last_detected_at then 'open'
+          when ${opportunities.status} = 'dismissed'
+               and excluded.score >= coalesce(${opportunities.decisionScore}, 100) + ${params.reopenDeltaPoints} then 'open'
+          else ${opportunities.status}
+        end`,
+        decisionScore: sql`case
+          when ${opportunities.status} = 'dismissed'
+               and excluded.score >= coalesce(${opportunities.decisionScore}, 100) + ${params.reopenDeltaPoints} then null
+          else ${opportunities.decisionScore}
+        end`,
+      },
+    });
+
+  const inserted = params.rows.filter((row) => !known.has(row.dedupeKey)).length;
+  return { inserted, updated: params.rows.length - inserted };
+}
+
+/**
+ * Закрывает то, что в этом пересчёте не обнаружилось.
+ *
+ * Строки не удаляются: закрытая возможность рядом с выполненным действием —
+ * это и есть запись о том, что изменилось, и она нужна отчёту. Сравнение идёт
+ * по партии пересчёта, а не по списку ключей: так корректно даже если детектор
+ * упал на середине — строки просто останутся с прошлой партией.
+ */
+export async function resolveOpportunitiesNotIn(
+  db: Database,
+  clientId: string,
+  generationId: string,
+  now: Date = new Date(),
+): Promise<number> {
+  const rows = await db
+    .update(opportunities)
+    .set({ resolvedAt: now, updatedAt: now })
+    .where(
+      and(
+        eq(opportunities.clientId, clientId),
+        sql`${opportunities.generationId} <> ${generationId}`,
+        isNull(opportunities.resolvedAt),
+      ),
+    )
+    .returning({ id: opportunities.id });
+
+  return rows.length;
+}
+
+export async function listOpportunities(
+  db: Database,
+  clientId: string,
+  options: { includeResolved?: boolean } = {},
+): Promise<Opportunity[]> {
+  const conditions = [eq(opportunities.clientId, clientId)];
+  if (!options.includeResolved) {
+    conditions.push(isNull(opportunities.resolvedAt));
+  }
+
+  return db
+    .select()
+    .from(opportunities)
+    .where(and(...conditions))
+    .orderBy(desc(opportunities.score), opportunities.dedupeKey);
+}
+
+export async function getOpportunityById(
+  db: Database,
+  id: string,
+): Promise<Opportunity | undefined> {
+  const rows = await db.select().from(opportunities).where(eq(opportunities.id, id)).limit(1);
+  return rows[0];
+}
+
+/** Клиент возможности — для tenancy guard на стороне API. */
+export async function getClientForOpportunity(
+  db: Database,
+  opportunityId: string,
+): Promise<Client | undefined> {
+  const rows = await db
+    .select({ client: clients })
+    .from(opportunities)
+    .innerJoin(clients, eq(clients.id, opportunities.clientId))
+    .where(eq(opportunities.id, opportunityId))
+    .limit(1);
+
+  return rows[0]?.client;
+}
+
+/** Решение человека: оценка на момент решения записывается вместе с ним. */
+export async function setOpportunityDecision(
+  db: Database,
+  id: string,
+  decision: {
+    status: Opportunity["status"];
+    dismissedReason?: string | null;
+    snoozedUntil?: Date | null;
+    decidedByUserId?: string | null;
+    decisionScore: number | null;
+    now?: Date;
+  },
+): Promise<Opportunity | undefined> {
+  const now = decision.now ?? new Date();
+  const rows = await db
+    .update(opportunities)
+    .set({
+      status: decision.status,
+      dismissedReason: decision.dismissedReason ?? null,
+      snoozedUntil: decision.snoozedUntil ?? null,
+      decidedByUserId: decision.decidedByUserId ?? null,
+      decisionScore: decision.decisionScore,
+      decidedAt: now,
+      updatedAt: now,
+    })
+    .where(eq(opportunities.id, id))
+    .returning();
+
+  return rows[0];
+}
+
+/** Когда по клиенту последний раз считались возможности. */
+export async function lastOpportunityGenerationAt(
+  db: Database,
+  clientId: string,
+): Promise<Date | null> {
+  const rows = await db
+    // Агрегат идёт мимо разбора типов drizzle и приходит строкой — приводим
+    // здесь, иначе вызывающий код получит строку под видом даты.
+    .select({ at: sql<string | null>`max(${opportunities.lastDetectedAt})` })
+    .from(opportunities)
+    .where(eq(opportunities.clientId, clientId));
+
+  const at = rows[0]?.at;
+  return at ? new Date(at) : null;
+}
+
+export interface OpportunityCounts {
+  clientId: string;
+  open: number;
+  highPriority: number;
+  newRecently: number;
+  topScore: number | null;
+}
+
+/**
+ * Счётчики по клиентам одним запросом — для портфеля агентства.
+ * Порог «высокого» приоритета приходит снаружи: это продуктовое решение, и
+ * единственное его определение живёт рядом с формулой оценки.
+ */
+export async function listOpportunityCounts(
+  db: Database,
+  clientIds: string[],
+  options: { highPriorityScore: number; since: Date },
+): Promise<OpportunityCounts[]> {
+  if (clientIds.length === 0) return [];
+
+  return db
+    .select({
+      clientId: opportunities.clientId,
+      open: sql<number>`count(*)::int`,
+      highPriority: sql<number>`count(*) filter (where ${opportunities.score} >= ${options.highPriorityScore})::int`,
+      newRecently: sql<number>`count(*) filter (where ${opportunities.firstDetectedAt} >= ${options.since})::int`,
+      topScore: sql<number | null>`max(${opportunities.score})`,
+    })
+    .from(opportunities)
+    .where(
+      and(
+        inArray(opportunities.clientId, clientIds),
+        isNull(opportunities.resolvedAt),
+        eq(opportunities.status, "open"),
+      ),
+    )
+    .groupBy(opportunities.clientId);
+}
+
+export interface OpportunityEvidenceRows {
+  prompts: { id: string; text: string; clusterId: string; clusterName: string }[];
+  responses: {
+    responseId: string;
+    promptId: string;
+    platform: string;
+    createdAt: Date;
+    clientMentioned: boolean;
+    competitorsMentioned: string[];
+    citedDomains: string[];
+  }[];
+  totalResponsesInWindow: number;
+}
+
+/**
+ * Доказательство под возможностью: те самые ответы, по которым она посчитана.
+ *
+ * Окно берётся из самой строки, а не «последние 28 дней»: окно скользящее, и
+ * выборка по сегодняшнему дала бы ответ из других данных, чем те, что дали
+ * оценку. Фильтр по режиму адаптеров обязателен — показать здесь фикстуры
+ * вместо живых ответов было бы худшим местом для такой ошибки.
+ */
+export async function listOpportunityEvidence(
+  db: Database,
+  opportunity: Opportunity,
+  limit = 20,
+): Promise<OpportunityEvidenceRows> {
+  const promptIds = opportunity.affectedPromptIds;
+  if (promptIds.length === 0) {
+    return { prompts: [], responses: [], totalResponsesInWindow: 0 };
+  }
+
+  const promptRows = await db
+    .select({
+      id: prompts.id,
+      text: prompts.text,
+      clusterId: prompts.clusterId,
+      clusterName: promptClusters.name,
+    })
+    .from(prompts)
+    .innerJoin(promptClusters, eq(promptClusters.id, prompts.clusterId))
+    .where(inArray(prompts.id, promptIds));
+
+  const mode = await effectiveAdaptersMode(db, opportunity.clientId);
+  const conditions = [
+    eq(runs.clientId, opportunity.clientId),
+    eq(runs.adaptersMode, mode),
+    inArray(responses.promptId, promptIds),
+    gte(responses.createdAt, opportunity.windowStart),
+    lte(responses.createdAt, opportunity.windowEnd),
+  ];
+
+  const totals = await db
+    .select({ total: sql<number>`count(*)::int` })
+    .from(responses)
+    .innerJoin(runs, eq(responses.runId, runs.id))
+    .where(and(...conditions));
+
+  const responseRows = await db
+    .select({
+      responseId: responses.id,
+      promptId: responses.promptId,
+      platform: responses.platform,
+      createdAt: responses.createdAt,
+    })
+    .from(responses)
+    .innerJoin(runs, eq(responses.runId, runs.id))
+    .where(and(...conditions))
+    .orderBy(desc(responses.createdAt))
+    .limit(limit);
+
+  const responseIds = responseRows.map((row) => row.responseId);
+  if (responseIds.length === 0) {
+    return { prompts: promptRows, responses: [], totalResponsesInWindow: totals[0]?.total ?? 0 };
+  }
+
+  const [mentionRows, citationRows] = await Promise.all([
+    db
+      .select({
+        responseId: mentions.responseId,
+        entityName: mentions.entityName,
+        isClient: mentions.isClient,
+        isCompetitor: mentions.isCompetitor,
+      })
+      .from(mentions)
+      .where(inArray(mentions.responseId, responseIds)),
+    db
+      .select({ responseId: citations.responseId, domain: citations.domain })
+      .from(citations)
+      .where(inArray(citations.responseId, responseIds)),
+  ]);
+
+  const byResponse = new Map(
+    responseRows.map((row) => [
+      row.responseId,
+      {
+        ...row,
+        clientMentioned: false,
+        competitorsMentioned: [] as string[],
+        citedDomains: [] as string[],
+      },
+    ]),
+  );
+
+  for (const mention of mentionRows) {
+    const entry = byResponse.get(mention.responseId);
+    if (!entry) continue;
+    if (mention.isClient) entry.clientMentioned = true;
+    if (mention.isCompetitor && mention.entityName) {
+      entry.competitorsMentioned.push(mention.entityName);
+    }
+  }
+
+  for (const citation of citationRows) {
+    const entry = byResponse.get(citation.responseId);
+    if (!entry || entry.citedDomains.includes(citation.domain)) continue;
+    entry.citedDomains.push(citation.domain);
+  }
+
+  return {
+    prompts: promptRows,
+    responses: [...byResponse.values()],
+    totalResponsesInWindow: totals[0]?.total ?? 0,
+  };
+}
+
+/** Действия, выросшие из возможности. */
+export async function listActionsForOpportunity(
+  db: Database,
+  opportunityId: string,
+): Promise<Action[]> {
+  return db.select().from(actions).where(eq(actions.originOpportunityId, opportunityId));
 }

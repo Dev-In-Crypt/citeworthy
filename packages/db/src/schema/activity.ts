@@ -10,6 +10,10 @@ export const activityEventEnum = pgEnum("activity_event", [
   /** Отчёт отправлен клиенту агентства письмом — по явному действию человека. */
   "report_shared",
   "report_approved",
+  /** Решения человека по возможностям — они не восстанавливаются пересчётом. */
+  "opportunity_dismissed",
+  "opportunity_converted",
+  "opportunities_refreshed",
 ]);
 
 /**

@@ -20,3 +20,7 @@ export { completeRun } from "./complete-run";
 export type { CompleteRunOutcome } from "./complete-run";
 export { finalizeRun } from "./finalize-run";
 export type { FinalizeRunOutcome } from "./finalize-run";
+export { generateOpportunities } from "./opportunity-job";
+export type { GenerateOpportunitiesOutcome } from "./opportunity-job";
+export { refreshOpportunities } from "./refresh-opportunities";
+export { clientVisibility, clientSources, toCitationFacts, PRESENCE_CAVEAT } from "./read-models";

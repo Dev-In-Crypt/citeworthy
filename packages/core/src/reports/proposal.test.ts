@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildOpportunity,
+  buildAuditProposal,
   competitorAverage,
   estimateMarginPct,
-  OPPORTUNITY_CAVEATS,
-  OPPORTUNITY_DEFAULTS,
-} from "./opportunity";
+  PROPOSAL_CAVEATS,
+  PROPOSAL_DEFAULTS,
+} from "./proposal";
 import { buildReportPayload } from "./build";
 import { reportPayloadSchema } from "./schema";
 
@@ -58,9 +58,9 @@ describe("competitorAverage", () => {
   });
 });
 
-describe("buildOpportunity", () => {
+describe("buildAuditProposal", () => {
   it("разрыв считается к средней по конкурентам", () => {
-    const opportunity = buildOpportunity({
+    const opportunity = buildAuditProposal({
       currentVisibilityPct: 22,
       competitorVisibility: { HubSpot: 60, Pipedrive: 40 },
       rankedActions: ACTIONS,
@@ -71,14 +71,14 @@ describe("buildOpportunity", () => {
   });
 
   it("дефолты берутся из спека", () => {
-    const opportunity = buildOpportunity({
+    const opportunity = buildAuditProposal({
       currentVisibilityPct: 10,
       competitorVisibility: {},
       rankedActions: ACTIONS,
     });
 
-    expect(opportunity.suggestedRetainerUsd).toBe(OPPORTUNITY_DEFAULTS.retainerUsd);
-    expect(opportunity.estimatedEffortHours).toEqual(OPPORTUNITY_DEFAULTS.effortHours);
+    expect(opportunity.suggestedRetainerUsd).toBe(PROPOSAL_DEFAULTS.retainerUsd);
+    expect(opportunity.estimatedEffortHours).toEqual(PROPOSAL_DEFAULTS.effortHours);
     expect(opportunity.scopeDays).toBe(90);
   });
 
@@ -90,7 +90,7 @@ describe("buildOpportunity", () => {
       effort: "low" as const,
     }));
 
-    expect(buildOpportunity({
+    expect(buildAuditProposal({
       currentVisibilityPct: 10,
       competitorVisibility: {},
       rankedActions: many,
@@ -99,7 +99,7 @@ describe("buildOpportunity", () => {
 
   it("перевёрнутый диапазон часов — ошибка", () => {
     expect(() =>
-      buildOpportunity({
+      buildAuditProposal({
         currentVisibilityPct: 10,
         competitorVisibility: {},
         rankedActions: ACTIONS,
@@ -131,8 +131,8 @@ describe("payload аудита", () => {
     newBrandMentions: 4,
     highestImpact: null,
     nextSprint: [],
-    caveats: OPPORTUNITY_CAVEATS,
-    opportunity: buildOpportunity({
+    caveats: PROPOSAL_CAVEATS,
+    opportunity: buildAuditProposal({
       currentVisibilityPct: 22,
       competitorVisibility: { HubSpot: 60, Pipedrive: 40 },
       rankedActions: ACTIONS,
@@ -156,7 +156,7 @@ describe("payload аудита", () => {
   });
 
   it("оговорки аудита доезжают до клиента вместе с цифрами", () => {
-    for (const caveat of OPPORTUNITY_CAVEATS) {
+    for (const caveat of PROPOSAL_CAVEATS) {
       expect(payload.caveats).toContain(caveat);
     }
   });

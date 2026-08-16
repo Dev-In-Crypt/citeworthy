@@ -4,6 +4,7 @@ import { parseRun } from "./parse-job";
 import { classifyRunSources } from "./classify-sources";
 import { aggregateClient } from "./aggregate-job";
 import { detectExperimentEvents } from "./experiment-events";
+import { refreshOpportunities } from "./refresh-opportunities";
 
 /**
  * Хвост прогона: когда все ответы доехали.
@@ -21,11 +22,18 @@ export interface FinalizeRunOutcome {
   parsedResponses: number;
   classifiedDomains: number;
   snapshots: number;
+  opportunities: number;
 }
 
 export async function finalizeRun(
   db: Database,
-  input: { runId: string; clientId: string; expected: number },
+  input: {
+    runId: string;
+    clientId: string;
+    expected: number;
+    /** Куда сообщить, если пересчёт возможностей упал: прогон при этом цел. */
+    onError?: (error: unknown) => void;
+  },
 ): Promise<FinalizeRunOutcome> {
   const written = await countResponsesByRun(db, input.runId);
 
@@ -40,6 +48,7 @@ export async function finalizeRun(
   const classified = await classifyRunSources(db, input.runId);
   const snapshots = await aggregateClient(db, input.clientId);
   await detectExperimentEvents(db, input.clientId);
+  const opportunities = await refreshOpportunities(db, input.clientId, input.onError);
 
   const agencyId = await getAgencyIdForRun(db, input.runId);
   if (agencyId) {
@@ -66,5 +75,6 @@ export async function finalizeRun(
     parsedResponses: parsed.length,
     classifiedDomains: classified.domains,
     snapshots,
+    opportunities,
   };
 }

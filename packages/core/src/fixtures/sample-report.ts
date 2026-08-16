@@ -1,6 +1,6 @@
 import { REPORT_COPY } from "../copy";
 import { buildReportPayload } from "../reports/build";
-import { buildOpportunity } from "../reports/opportunity";
+import { buildAuditProposal } from "../reports/proposal";
 import type { ReportPayload } from "../reports/schema";
 import type { VisibilitySnapshot } from "../metrics/visibility";
 
@@ -116,7 +116,7 @@ export const SAMPLE_AUDIT_REPORT: ReportPayload = buildReportPayload({
   highestImpact: null,
   nextSprint: RANKED_ACTIONS.slice(0, 3).map((action) => action.title),
   caveats: [REPORT_COPY.opportunityBasis, REPORT_COPY.scopeEstimate],
-  opportunity: buildOpportunity({
+  opportunity: buildAuditProposal({
     currentVisibilityPct: 11.5,
     competitorVisibility: COMPETITORS_AT_AUDIT,
     rankedActions: RANKED_ACTIONS,

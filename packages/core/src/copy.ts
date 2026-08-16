@@ -70,6 +70,13 @@ export const DIAGNOSIS_COPY = {
     "Not enough cited sources yet to say where the gap comes from. More runs will make this readable.",
   /** Приписка к любому выводу. */
   evidenceNote: "Based on the sources models actually cited in the measured period.",
+  /**
+   * Предел вывода о присутствии. Мы не открываем саму страницу — мы видим, что
+   * источник процитирован, и упомянут ли бренд в том же ответе. Без этой
+   * оговорки «клиента нет на g2.com» читается как проверенный факт о странице.
+   */
+  presenceCaveat:
+    "Presence is inferred from answers where the source was cited, not from checking the page itself.",
 } as const;
 
 export const REPORT_COPY = {
@@ -125,6 +132,45 @@ export function measurementBasisFor(platforms: readonly string[]): string {
     PLATFORM_LABELS[platform] ?? platform,
   );
 }
+
+export const OPPORTUNITY_COPY = {
+  /** Что это за экран. Стоит над списком, а не в подсказке. */
+  basis:
+    "Each opportunity is derived from measured answers: where the client is losing, on which questions, and what the cited sources suggest doing about it. Ranked by an internal score, not by certainty of outcome.",
+  /** Пояснение к оценке. Никакого обещания результата. */
+  scoreBasis:
+    "The score ranks work against work for this client. It is not a rating of the site and not a forecast — it combines how large the gap is, how much of the tracked question set it touches, how commercial those questions are, and how well it was measured.",
+  /** Подписи множителей — ровно то, чем они являются. */
+  factorLabels: {
+    impact: "Size of the gap",
+    coverage: "Share of tracked questions",
+    commercialIntent: "Commercial intent",
+    actionability: "How much of it you control",
+    confidence: "How well it is measured",
+  },
+  /**
+   * Coverage — доля отслеживаемых вопросов, а не частотность запросов.
+   * Данных о спросе у продукта нет, и подпись обязана это показывать.
+   */
+  coverageBasis:
+    "Share of the questions this client tracks, not search demand — the product does not measure how often people ask them.",
+  /** Оговорка над примерами ответов в доказательстве. */
+  evidenceBasis:
+    "Examples from the sample, shown after the aggregate. A single answer is never a result on its own.",
+  /** Окно, за которое посчитана возможность. */
+  windowBasis: "Measured over the window shown; the score is fixed to that window, not to today.",
+  /** Возможность больше не обнаруживается. */
+  resolvedNote:
+    "No longer detected in the latest measurement. This is a record of what changed, not attribution of cause.",
+  /** Пустой экран. */
+  emptyTitle: "No opportunities yet",
+  emptyBody:
+    "We need enough measured answers to tell a real gap from a small sample. Run a measurement and this fills in.",
+  /** Отклонение обязано иметь причину — как и снятие задачи. */
+  dismissRequiresReason: "Say why this is not worth doing, so the next person does not re-open it.",
+  dismissReturns:
+    "A dismissed opportunity comes back only if it grows noticeably larger than it was when you dismissed it.",
+} as const;
 
 export const EXPERIMENT_COPY = {
   /** Заголовок оценки эффекта: всегда «estimated» — см. инвариант 2. */

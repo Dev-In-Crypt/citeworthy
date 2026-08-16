@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { OPPORTUNITY_DEFAULTS } from "@repo/core";
+import { PROPOSAL_DEFAULTS } from "@repo/core";
 import { api } from "@/trpc/react";
 import { EmptyState } from "@/components/page-header";
 
@@ -155,10 +155,10 @@ function OpportunityForm({
   clientId: string;
   onGenerated: () => Promise<void> | void;
 }) {
-  const [retainer, setRetainer] = useState<number>(OPPORTUNITY_DEFAULTS.retainerUsd);
-  const [effortMin, setEffortMin] = useState<number>(OPPORTUNITY_DEFAULTS.effortHours.min);
-  const [effortMax, setEffortMax] = useState<number>(OPPORTUNITY_DEFAULTS.effortHours.max);
-  const [hourlyCost, setHourlyCost] = useState<number>(OPPORTUNITY_DEFAULTS.hourlyCostUsd);
+  const [retainer, setRetainer] = useState<number>(PROPOSAL_DEFAULTS.retainerUsd);
+  const [effortMin, setEffortMin] = useState<number>(PROPOSAL_DEFAULTS.effortHours.min);
+  const [effortMax, setEffortMax] = useState<number>(PROPOSAL_DEFAULTS.effortHours.max);
+  const [hourlyCost, setHourlyCost] = useState<number>(PROPOSAL_DEFAULTS.hourlyCostUsd);
 
   const generate = api.reports.generateOpportunity.useMutation({
     onSuccess: async () => {

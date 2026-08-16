@@ -1,15 +1,15 @@
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import {
-  buildOpportunity,
+  buildAuditProposal,
   buildRecommendations,
   buildReportPayload,
   collapsePromptFacts,
   computeMovement,
   computePromptMatrix,
   diagnose,
-  OPPORTUNITY_CAVEATS,
-  OPPORTUNITY_DEFAULTS,
+  PROPOSAL_CAVEATS,
+  PROPOSAL_DEFAULTS,
   REPORT_COPY,
   reportReadyEmail,
   summariseTraffic,
@@ -356,11 +356,11 @@ export const reportsRouter = router({
       const recommendations = buildRecommendations(diagnose(toFacts(citationRows)));
 
       const effortHours = {
-        min: input.effortHoursMin ?? OPPORTUNITY_DEFAULTS.effortHours.min,
-        max: input.effortHoursMax ?? OPPORTUNITY_DEFAULTS.effortHours.max,
+        min: input.effortHoursMin ?? PROPOSAL_DEFAULTS.effortHours.min,
+        max: input.effortHoursMax ?? PROPOSAL_DEFAULTS.effortHours.max,
       };
 
-      const opportunity = buildOpportunity({
+      const opportunity = buildAuditProposal({
         currentVisibilityPct: latest ? Number(latest.clientVisibilityPct) : 0,
         competitorVisibility: latest?.competitorVisibility ?? {},
         rankedActions: recommendations.map((recommendation) => ({
@@ -374,7 +374,7 @@ export const reportsRouter = router({
         ...(input.hourlyCostUsd !== undefined ? { hourlyCostUsd: input.hourlyCostUsd } : {}),
       });
 
-      const caveats: string[] = [...OPPORTUNITY_CAVEATS];
+      const caveats: string[] = [...PROPOSAL_CAVEATS];
       // Недобор сэмплов в аудите — обычное дело: прогон один.
       if (latest && !latest.sufficient) {
         caveats.push(REPORT_COPY.shortPeriod);

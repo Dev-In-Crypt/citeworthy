@@ -1,6 +1,7 @@
 import { index, jsonb, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { clients, users } from "./tenancy";
 import { sources } from "./sources";
+import { opportunities } from "./opportunities";
 
 export const actionTypeEnum = pgEnum("action_type", [
   "refresh_page",
@@ -53,6 +54,14 @@ export const actions = pgTable(
     status: actionStatusEnum("status").notNull().default("backlog"),
     /** Правило-источник рекомендации; null — действие заведено вручную. */
     originRule: text("origin_rule"),
+    /**
+     * Возможность, из которой действие выросло. Связь «многие к одному»:
+     * один разрыв по источнику может превратиться и в заявку на площадку,
+     * и в кампанию отзывов — это две разные работы с одной причиной.
+     */
+    originOpportunityId: uuid("origin_opportunity_id").references(() => opportunities.id, {
+      onDelete: "set null",
+    }),
     /**
      * Числа, на которых стояла рекомендация: доля цитирований источника,
      * сколько раз он процитирован, кто из конкурентов там присутствует.

@@ -14,6 +14,7 @@ import {
 import { EXPERIMENT_COPY } from "@repo/core";
 import { api } from "@/trpc/react";
 import { EmptyState } from "@/components/page-header";
+import { ConfidenceBadge, type ConfidenceLevel } from "@/components/stat";
 
 const EVENT_LABELS: Record<string, string> = {
   action_shipped: "Action shipped",
@@ -21,12 +22,6 @@ const EVENT_LABELS: Record<string, string> = {
   first_new_citation: "New cited source appeared",
   visibility_change: "Visibility moved",
   note: "Note",
-};
-
-const CONFIDENCE_STYLE: Record<string, string> = {
-  high: "border-client text-foreground",
-  medium: "border-input text-muted-foreground",
-  low: "border-input text-muted-foreground",
 };
 
 export function ExperimentsView({ clientId }: { clientId: string }) {
@@ -95,12 +90,12 @@ function ExperimentDetail({ experimentId }: { experimentId: string }) {
           <h2 data-testid="estimate-headline" className="metric text-xl font-semibold">
             {formattedEstimate}
           </h2>
-          <span
-            data-testid="confidence-badge"
-            className={`rounded-full border px-3 py-1 text-sm ${CONFIDENCE_STYLE[estimate.confidence] ?? ""}`}
-          >
-            Confidence: {estimate.confidence}
-          </span>
+          <ConfidenceBadge
+            level={estimate.confidence as ConfidenceLevel}
+            labelled
+            testId="confidence-badge"
+            className="px-3 py-1 text-sm"
+          />
         </div>
 
         <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">

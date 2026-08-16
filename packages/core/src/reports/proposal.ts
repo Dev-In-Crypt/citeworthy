@@ -7,9 +7,15 @@ import type { ReportPayload } from "./schema";
  * Ретейнер и часы вводит агентство: их знает только оно, и подставлять сюда
  * «рыночную» цифру значило бы придумывать её за него. Дефолты взяты из спека
  * ($3,500 и 8–12 ч) и служат отправной точкой, а не рекомендацией.
+ *
+ * Модуль назывался opportunity.ts, но речь здесь о коммерческом предложении,
+ * а не о доменной сущности Opportunity (`packages/core/src/opportunities/`).
+ * Два разных смысла одного слова в одном пакете читались бы как одно.
+ * Ключ `opportunity` в payload отчёта остался прежним: это контракт C4,
+ * и уже сохранённые payload'ы должны продолжать разбираться.
  */
 
-export const OPPORTUNITY_DEFAULTS = {
+export const PROPOSAL_DEFAULTS = {
   retainerUsd: 3500,
   effortHours: { min: 8, max: 12 },
   /** Во что агентству обходится час работы — вторая половина маржи. */
@@ -54,7 +60,7 @@ export function competitorAverage(competitorVisibility: Record<string, number>):
   return Math.round((sum / values.length) * 10) / 10;
 }
 
-export interface OpportunityInputs {
+export interface AuditProposalInputs {
   currentVisibilityPct: number;
   competitorVisibility: Record<string, number>;
   rankedActions: {
@@ -69,12 +75,12 @@ export interface OpportunityInputs {
   scopeDays?: number;
 }
 
-type Opportunity = NonNullable<ReportPayload["opportunity"]>;
+type ProposalBlock = NonNullable<ReportPayload["opportunity"]>;
 
-export function buildOpportunity(inputs: OpportunityInputs): Opportunity {
-  const retainerUsd = inputs.retainerUsd ?? OPPORTUNITY_DEFAULTS.retainerUsd;
-  const effortHours = inputs.effortHours ?? OPPORTUNITY_DEFAULTS.effortHours;
-  const hourlyCostUsd = inputs.hourlyCostUsd ?? OPPORTUNITY_DEFAULTS.hourlyCostUsd;
+export function buildAuditProposal(inputs: AuditProposalInputs): ProposalBlock {
+  const retainerUsd = inputs.retainerUsd ?? PROPOSAL_DEFAULTS.retainerUsd;
+  const effortHours = inputs.effortHours ?? PROPOSAL_DEFAULTS.effortHours;
+  const hourlyCostUsd = inputs.hourlyCostUsd ?? PROPOSAL_DEFAULTS.hourlyCostUsd;
 
   if (effortHours.min > effortHours.max) {
     throw new Error("Effort range is inverted: min hours exceed max hours");
@@ -89,7 +95,7 @@ export function buildOpportunity(inputs: OpportunityInputs): Opportunity {
     // Двадцать пунктов — это уже не предложение, а список задач; спек
     // ограничивает верх, а не требует его добрать.
     rankedActions: inputs.rankedActions.slice(0, 20),
-    scopeDays: inputs.scopeDays ?? OPPORTUNITY_DEFAULTS.scopeDays,
+    scopeDays: inputs.scopeDays ?? PROPOSAL_DEFAULTS.scopeDays,
     suggestedRetainerUsd: retainerUsd,
     estimatedEffortHours: effortHours,
     estimatedMarginPct: estimateMarginPct(retainerUsd, effortHours, hourlyCostUsd),
@@ -97,4 +103,4 @@ export function buildOpportunity(inputs: OpportunityInputs): Opportunity {
 }
 
 /** Оговорки, без которых аудит читается как обещание. */
-export const OPPORTUNITY_CAVEATS = [REPORT_COPY.opportunityBasis, REPORT_COPY.scopeEstimate];
+export const PROPOSAL_CAVEATS = [REPORT_COPY.opportunityBasis, REPORT_COPY.scopeEstimate];

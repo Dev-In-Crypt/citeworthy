@@ -4,6 +4,7 @@ import { orchestrateRun } from "./run-orchestration";
 import { parseRun } from "./parse-job";
 import { classifyRunSources } from "./classify-sources";
 import { aggregateClient } from "./aggregate-job";
+import { refreshOpportunities } from "./refresh-opportunities";
 
 /**
  * Полная цепочка от прогона до готовой диагностики.
@@ -20,6 +21,7 @@ export interface CompleteRunOutcome {
   parsedResponses: number;
   classifiedDomains: number;
   snapshots: number;
+  opportunities: number;
 }
 
 export async function completeRun(
@@ -27,11 +29,13 @@ export async function completeRun(
   runId: string,
   clientId: string,
   mode: AdaptersMode = "mock",
+  onError?: (error: unknown) => void,
 ): Promise<CompleteRunOutcome> {
   const run = await orchestrateRun(db, runId, mode);
   const parsed = await parseRun(db, runId);
   const classified = await classifyRunSources(db, runId);
   const snapshots = await aggregateClient(db, clientId);
+  const opportunities = await refreshOpportunities(db, clientId, onError);
 
   return {
     status: run.status,
@@ -40,5 +44,6 @@ export async function completeRun(
     parsedResponses: parsed.length,
     classifiedDomains: classified.domains,
     snapshots,
+    opportunities,
   };
 }

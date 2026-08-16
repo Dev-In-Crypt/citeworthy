@@ -9,7 +9,6 @@ import {
 import {
   createAction,
   deleteAction,
-  findExistingAction,
   getActionById,
   getClientById,
   getSourceByDomain,
@@ -22,6 +21,7 @@ import {
 } from "@repo/db";
 import { TRPCError } from "@trpc/server";
 import { assertTenant, protectedProcedure, roleProcedure, router } from "../trpc";
+import { convertRecommendationToAction } from "../../convert-recommendation";
 
 const IMPACT = ["low", "medium", "high"] as const;
 const STATUS = ["backlog", "in_progress", "done", "dropped"] as const;
@@ -165,63 +165,11 @@ export const actionsRouter = router({
       const client = await getClientById(ctx.db, input.clientId);
       assertTenant(client, ctx.user.agencyId);
 
-      const { recommendation } = input;
-
-      // Повторный клик по той же рекомендации не должен плодить дубли:
-      // очередь действий — рабочий инструмент, а не журнал нажатий.
-      const existing = await findExistingAction(
-        ctx.db,
-        input.clientId,
-        recommendation.rule,
-        recommendation.sourceDomain ?? null,
-      );
-      if (existing) {
-        // Тот же источник, но другой кластер — это не дубль, а расширение
-        // охвата. Массив кластеров задаёт treatment-группу эксперимента:
-        // потеряв кластер здесь, мы измеряли бы потом не то, что делали.
-        const clusterId = recommendation.clusterId;
-        if (clusterId && !existing.affectedClusterIds.includes(clusterId)) {
-          const updated = await updateAction(ctx.db, existing.id, {
-            affectedClusterIds: [...existing.affectedClusterIds, clusterId],
-          });
-          return { action: updated ?? existing, created: false };
-        }
-
-        return { action: existing, created: false };
-      }
-
-      const source = recommendation.sourceDomain
-        ? await getSourceByDomain(ctx.db, recommendation.sourceDomain)
-        : undefined;
-
-      const action = await createAction(ctx.db, {
+      return convertRecommendationToAction(ctx.db, {
         clientId: input.clientId,
-        title: recommendation.title,
-        reason: recommendation.reason,
-        actionType: recommendation.actionType,
-        estimatedImpact: recommendation.estimatedImpact,
-        effort: recommendation.effort,
-        affectedClusterIds: recommendation.clusterId ? [recommendation.clusterId] : [],
-        sourceDomain: recommendation.sourceDomain ?? null,
-        sourceId: source?.id ?? null,
-        originRule: recommendation.rule,
-        evidence: recommendation.evidence ?? null,
-      });
-
-      await logActivity(ctx.db, {
         agencyId: ctx.user.agencyId,
-        clientId: input.clientId,
-        actorUserId: null,
-        eventType: "action_created",
-        payload: {
-          actionId: action.id,
-          title: action.title,
-          actionType: action.actionType,
-          fromRule: recommendation.rule,
-        },
+        recommendation: input.recommendation,
       });
-
-      return { action, created: true };
     }),
 
   update: roleProcedure("member")
