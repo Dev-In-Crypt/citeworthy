@@ -43,6 +43,18 @@ const clientInput = z.object({
   status: z.enum(["active", "paused", "prospect"]).optional(),
 });
 
+/**
+ * Входные данные обновления: те же поля, но без умолчаний. Отсутствующий ключ
+ * обязан означать «не трогай», а не «поставь пустое».
+ */
+const clientPatch = clientInput
+  .omit({ brandNames: true, competitorNames: true })
+  .partial()
+  .extend({
+    brandNames: z.array(z.string().min(1)).optional(),
+    competitorNames: z.array(z.string().min(1)).optional(),
+  });
+
 export const clientsRouter = router({
   list: protectedProcedure.query(({ ctx }) => listClientsByAgency(ctx.db, ctx.user.agencyId)),
 
@@ -160,8 +172,15 @@ export const clientsRouter = router({
       return createClient(ctx.db, { ...input, agencyId: ctx.user.agencyId });
     }),
 
+  /**
+   * Частичное обновление. `clientPatch`, а не `clientInput.partial()`:
+   * у списков в `clientInput` стоит `.default([])`, и zod подставляет его даже
+   * тогда, когда ключа во входе не было. Обновление одного статуса стирало бы
+   * бренды и конкурентов — молча и необратимо, а по списку конкурентов
+   * считается всё, что продукт вообще измеряет.
+   */
   update: roleProcedure("admin")
-    .input(clientInput.partial().extend({ id: z.uuid() }))
+    .input(clientPatch.extend({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       const existing = await getClientById(ctx.db, input.id);
       assertTenant(existing, ctx.user.agencyId);
