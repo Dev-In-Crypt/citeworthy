@@ -162,7 +162,10 @@ function TopOpportunities({ clientId }: { clientId: string }) {
       <ul className="grid gap-3 md:grid-cols-3">
         {top.map((row) => (
           <li key={row.id} className="flex flex-col gap-2 rounded-lg border p-4">
-            <span className="metric text-2xl font-semibold tracking-tight">{row.score}</span>
+            <span className="flex items-baseline gap-0.5">
+              <span className="metric text-2xl font-semibold tracking-tight">{row.score}</span>
+              <span className="metric text-xs text-muted-foreground">/100</span>
+            </span>
             <span className="text-sm font-medium">{row.title}</span>
             <span className="line-clamp-3 text-xs text-muted-foreground">{row.reason}</span>
             <Link

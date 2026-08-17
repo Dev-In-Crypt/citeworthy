@@ -45,7 +45,7 @@ export type OpportunityStatus = (typeof OPPORTUNITY_STATUSES)[number];
  * попадание на g2.com — одна работа, даже если разрыв виден в трёх кластерах.
  */
 export type DedupeKeyInput =
-  | { kind: "competitor_gap"; promptId: string }
+  | { kind: "competitor_gap"; clusterId: string; competitor: string }
   | { kind: "source_gap"; domain: string }
   | { kind: "content_gap"; clusterId: string }
   | { kind: "content_gap"; domain: string }
@@ -54,7 +54,10 @@ export type DedupeKeyInput =
 export function dedupeKeyFor(input: DedupeKeyInput): string {
   switch (input.kind) {
     case "competitor_gap":
-      return `competitor_gap:prompt:${input.promptId}`;
+      // Ключуется парой «тема + конкурент», а не отдельным вопросом. Один и
+      // тот же конкурент, обходящий клиента на трёх вопросах одной темы, —
+      // это одна работа и одна строка, а не три одинаковых с разной оценкой.
+      return `competitor_gap:cluster:${input.clusterId}:vs:${input.competitor}`;
     case "source_gap":
       return `source_gap:domain:${input.domain}`;
     case "cluster_gap":
@@ -83,19 +86,27 @@ const assistantCellSchema = z.object({
 export const opportunityEvidenceSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("competitor_gap"),
-    promptId: z.string().min(1),
-    promptText: z.string().min(1),
     clusterId: z.string().min(1),
     clusterName: z.string().min(1),
-    clientPct: z.number().nullable(),
-    intervalLowPct: z.number().nullable(),
-    intervalHighPct: z.number().nullable(),
     competitorName: z.string().min(1),
+    /** Доли по группе целиком, взвешенные по числу ответов. */
+    clientPct: z.number(),
     competitorPct: z.number(),
     gapPp: z.number(),
     samples: z.number().int().nonnegative(),
-    deltaPp: z.number().nullable(),
-    distinguishable: z.boolean(),
+    /** Каждый вопрос группы со своими числами: агрегат сверху, детали ниже. */
+    prompts: z.array(
+      z.object({
+        promptId: z.string().min(1),
+        promptText: z.string().min(1),
+        clientPct: z.number().nullable(),
+        competitorPct: z.number(),
+        gapPp: z.number(),
+        samples: z.number().int().nonnegative(),
+        deltaPp: z.number().nullable(),
+        distinguishable: z.boolean(),
+      }),
+    ),
     assistants: z.array(assistantCellSchema),
   }),
   z.object({

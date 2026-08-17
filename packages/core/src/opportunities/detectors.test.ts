@@ -112,6 +112,8 @@ describe("разрыв против конкурента", () => {
     expect(found[0]?.kind).toBe("competitor_gap");
     expect(found[0]?.evidence).toMatchObject({ competitorName: "Rival", samples: 12 });
     expect(found[0]?.affectedPromptIds).toEqual(["p1"]);
+    // На одном вопросе заголовок остаётся конкретным, а не превращается в тему.
+    expect(found[0]?.title).toContain("question p1");
   });
 
   it("молчит, когда отставание меньше порога", () => {
@@ -361,7 +363,10 @@ describe("полный набор", () => {
       }),
     );
 
-    expect(found.filter((item) => item.kind === "competitor_gap").length).toBe(2);
+    // Два вопроса одной темы против одного конкурента — одна находка, а не две.
+    const competitorGaps = found.filter((item) => item.kind === "competitor_gap");
+    expect(competitorGaps).toHaveLength(1);
+    expect(competitorGaps[0]?.affectedPromptIds).toEqual(["p1", "p2"]);
     expect(found.filter((item) => item.kind === "cluster_gap")).toEqual([]);
   });
 });

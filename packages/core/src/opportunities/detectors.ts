@@ -132,83 +132,137 @@ function assemble(params: {
 }
 
 /**
- * Правило 1. Конкурента называют заметно чаще клиента на конкретном вопросе.
+ * Правило 1. Конкурента называют заметно чаще клиента.
  *
- * Это самая прямая формулировка разрыва: не «видимость упала», а «вот вопрос,
- * который задают вашему покупателю, и вот кого на него называют вместо вас».
+ * Группируется парой «тема + конкурент», а не отдельным вопросом. Один
+ * конкурент, обходящий клиента на трёх вопросах одной темы, — это одна работа;
+ * тремя строками с разной оценкой список превращается в поток одинаковых
+ * заголовков, который перестают читать после второго.
  */
 export function detectCompetitorGaps(input: DetectorInput): DetectedOpportunity[] {
   const byCluster = new Map(input.clusters.map((cluster) => [cluster.clusterId, cluster]));
   const movementByPrompt = new Map(input.movement.map((entry) => [entry.promptId, entry]));
 
-  const found: DetectedOpportunity[] = [];
+  /** Строки, прошедшие порог, сложенные по паре «тема + конкурент». */
+  const groups = new Map<string, { cluster: ClusterFacts; competitor: string; rows: MatrixRow[] }>();
 
   for (const row of input.matrix.rows) {
     if (!row.sufficient || row.competitorTop === null) continue;
 
-    const clientPct = row.ratePct ?? 0;
-    const gapPp = round1(row.competitorTop.pct - clientPct);
+    const gapPp = round1(row.competitorTop.pct - (row.ratePct ?? 0));
     if (gapPp < COMPETITOR_GAP_MIN_PP) continue;
 
     const cluster = byCluster.get(row.clusterId);
     if (!cluster) continue;
 
+    const key = `${cluster.clusterId}:${row.competitorTop.name}`;
+    const group = groups.get(key);
+    if (group) group.rows.push(row);
+    else groups.set(key, { cluster, competitor: row.competitorTop.name, rows: [row] });
+  }
+
+  const found: DetectedOpportunity[] = [];
+
+  for (const { cluster, competitor, rows } of groups.values()) {
+    // Доли по группе — взвешенные по числу ответов: вопрос, спрошенный трижды,
+    // не весит столько же, сколько спрошенный тридцать раз.
+    const samples = rows.reduce((total, row) => total + row.samples, 0);
+    const clientPct = round1(
+      (rows.reduce((total, row) => total + ((row.ratePct ?? 0) / 100) * row.samples, 0) / samples) *
+        100,
+    );
+    const competitorPct = round1(
+      (rows.reduce(
+        (total, row) => total + ((row.competitorTop?.pct ?? 0) / 100) * row.samples,
+        0,
+      ) /
+        samples) *
+        100,
+    );
+    const gapPp = round1(competitorPct - clientPct);
+
+    const questions = rows.length === 1 ? "question" : "questions";
     const recommendation =
       strongest(clusterRecommendations(cluster)) ??
       makeRecommendation({
         actionType: "create_page",
-        title: "Publish a page that answers this question directly",
-        reason: `${row.competitorTop.name} is named in ${row.competitorTop.pct}% of answers to this question; the client in ${clientPct}%.`,
+        title: `Answer "${cluster.clusterName}" on a page of your own`,
+        reason: `${competitor} is named in ${competitorPct}% of answers to ${rows.length} ${questions} in this topic; the client in ${clientPct}%.`,
         estimatedImpact: gapPp >= 30 ? "high" : "medium",
         effort: "medium",
         rule: "competitor-ahead-on-prompt",
         clusterId: cluster.clusterId,
-        evidence: { competitorsPresent: [row.competitorTop.name] },
+        evidence: { competitorsPresent: [competitor] },
       });
 
-    const move = movementByPrompt.get(row.promptId);
+    // Ячейки ассистентов складываются по группе: иначе «на чём измерено»
+    // отвечало бы за один вопрос, а число сверху — за все.
+    const cells = new Map<string, { samples: number; named: number; competitorOnly: boolean }>();
+    for (const row of rows) {
+      for (const cell of row.cells) {
+        if (!cell.measurable) continue;
+        const entry = cells.get(cell.assistantId) ?? { samples: 0, named: 0, competitorOnly: false };
+        entry.samples += cell.samples;
+        entry.named += ((cell.ratePct ?? 0) / 100) * cell.samples;
+        entry.competitorOnly = entry.competitorOnly || cell.competitorOnly;
+        cells.set(cell.assistantId, entry);
+      }
+    }
+
+    const title =
+      rows.length === 1
+        ? `Losing "${rows[0]!.promptText}" to ${competitor}`
+        : `Losing ${rows.length} ${questions} in "${cluster.clusterName}" to ${competitor}`;
 
     found.push(
       assemble({
         kind: "competitor_gap",
-        dedupeKey: dedupeKeyFor({ kind: "competitor_gap", promptId: row.promptId }),
-        title: `Losing "${row.promptText}" to ${row.competitorTop.name}`,
-        reason: `${row.competitorTop.name} is named in ${row.competitorTop.pct}% of sampled answers to this question, the client in ${clientPct}% — ${gapPp} pp behind across ${row.samples} answers.`,
+        dedupeKey: dedupeKeyFor({
+          kind: "competitor_gap",
+          clusterId: cluster.clusterId,
+          competitor,
+        }),
+        title,
+        reason: `${competitor} is named in ${competitorPct}% of sampled answers to ${rows.length} tracked ${questions} here, the client in ${clientPct}% — ${gapPp} pp behind across ${samples} answers.`,
         evidence: {
           kind: "competitor_gap",
-          promptId: row.promptId,
-          promptText: row.promptText,
           clusterId: cluster.clusterId,
           clusterName: cluster.clusterName,
-          clientPct: row.ratePct,
-          intervalLowPct: row.interval?.low ?? null,
-          intervalHighPct: row.interval?.high ?? null,
-          competitorName: row.competitorTop.name,
-          competitorPct: row.competitorTop.pct,
+          competitorName: competitor,
+          clientPct,
+          competitorPct,
           gapPp,
-          samples: row.samples,
-          deltaPp: move?.deltaPp ?? null,
-          distinguishable: move?.distinguishable ?? false,
-          assistants: row.cells
-            .filter((cell) => cell.measurable)
-            .map((cell) => ({
-              assistantId: cell.assistantId,
-              samples: cell.samples,
-              ratePct: cell.ratePct,
-              competitorOnly: cell.competitorOnly,
-            })),
+          samples,
+          prompts: rows.map((row) => ({
+            promptId: row.promptId,
+            promptText: row.promptText,
+            clientPct: row.ratePct,
+            competitorPct: row.competitorTop?.pct ?? 0,
+            gapPp: round1((row.competitorTop?.pct ?? 0) - (row.ratePct ?? 0)),
+            samples: row.samples,
+            deltaPp: movementByPrompt.get(row.promptId)?.deltaPp ?? null,
+            distinguishable: movementByPrompt.get(row.promptId)?.distinguishable ?? false,
+          })),
+          assistants: [...cells.entries()]
+            .map(([assistantId, entry]) => ({
+              assistantId,
+              samples: entry.samples,
+              ratePct: entry.samples > 0 ? round1((entry.named / entry.samples) * 100) : null,
+              competitorOnly: entry.competitorOnly,
+            }))
+            .sort((a, b) => a.assistantId.localeCompare(b.assistantId)),
         },
         recommendations: [recommendation],
-        affectedPromptIds: [row.promptId],
+        affectedPromptIds: rows.map((row) => row.promptId),
         affectedClusterIds: [cluster.clusterId],
-        competitorNames: [row.competitorTop.name],
+        competitorNames: [competitor],
         sourceDomain: recommendation.sourceDomain ?? null,
         scoreInputs: {
           gapPp,
-          affectedPromptCount: 1,
+          affectedPromptCount: rows.length,
           totalActivePromptCount: input.matrix.rows.length,
           intent: cluster.intent,
-          samples: row.samples,
+          samples,
           actionType: recommendation.actionType,
         },
       }),
@@ -533,10 +587,14 @@ export function detectOpportunities(input: DetectorInput): DetectedOpportunity[]
   const competitorGaps = detectCompetitorGaps(input);
   const clusterGaps = detectClusterGaps(input);
 
-  const gapsPerCluster = new Map<string, number>();
+  // Считаются охваченные вопросы, а не число находок: после группировки одна
+  // находка может закрывать всю тему целиком.
+  const coveredPrompts = new Map<string, Set<string>>();
   for (const gap of competitorGaps) {
     for (const clusterId of gap.affectedClusterIds) {
-      gapsPerCluster.set(clusterId, (gapsPerCluster.get(clusterId) ?? 0) + 1);
+      const set = coveredPrompts.get(clusterId) ?? new Set<string>();
+      for (const promptId of gap.affectedPromptIds) set.add(promptId);
+      coveredPrompts.set(clusterId, set);
     }
   }
 
@@ -550,7 +608,7 @@ export function detectOpportunities(input: DetectorInput): DetectedOpportunity[]
   const keptClusterGaps = clusterGaps.filter((gap) => {
     const clusterId = gap.affectedClusterIds[0];
     if (!clusterId) return true;
-    const covered = gapsPerCluster.get(clusterId) ?? 0;
+    const covered = coveredPrompts.get(clusterId)?.size ?? 0;
     const total = promptsPerCluster.get(clusterId) ?? 0;
     return total === 0 || covered * 2 < total;
   });

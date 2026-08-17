@@ -74,7 +74,11 @@ export function OpportunitiesView({ clientId }: { clientId: string }) {
       <ProspectPanel clientId={clientId} />
 
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <p className="max-w-prose text-sm text-muted-foreground">{OPPORTUNITY_COPY.basis}</p>
+        <p className="text-sm text-muted-foreground">
+          {rows.length === 0
+            ? ""
+            : `${open.length} open · ranked by an internal score, not by certainty of outcome`}
+        </p>
         <button
           data-testid="refresh-opportunities"
           onClick={() => refresh.mutate({ clientId })}
@@ -164,19 +168,38 @@ function OpportunityCard({
         aria-expanded={expanded}
         className="flex w-full flex-col gap-2 p-4 text-left hover:bg-accent/40"
       >
-        <div className="flex flex-wrap items-baseline gap-3">
-          <span
-            data-testid="opportunity-score"
-            className="metric text-2xl font-semibold tracking-tight"
-          >
-            {opportunity.score}
+        <div className="flex items-start gap-4">
+          {/* Голое число не говорит ничего: 64 — это много или мало? Рядом
+              стоит шкала и полоса, чтобы масштаб читался без объяснений. */}
+          <span className="flex w-14 shrink-0 flex-col gap-1 pt-0.5">
+            <span className="flex items-baseline gap-0.5">
+              <span
+                data-testid="opportunity-score"
+                className="metric text-2xl leading-none font-semibold tracking-tight"
+              >
+                {opportunity.score}
+              </span>
+              <span className="metric text-xs text-muted-foreground">/100</span>
+            </span>
+            <span className="h-1 w-full overflow-hidden rounded-full bg-secondary">
+              <span
+                className="block h-full bg-primary"
+                style={{ width: `${opportunity.score}%` }}
+              />
+            </span>
           </span>
-          <span className="break-words text-base font-medium">{opportunity.title}</span>
-        </div>
 
-        <p data-testid="opportunity-reason" className="max-w-prose text-sm text-muted-foreground">
-          {opportunity.reason}
-        </p>
+          <span className="flex min-w-0 flex-col gap-2">
+            <span className="break-words text-base font-medium">{opportunity.title}</span>
+
+            <span
+              data-testid="opportunity-reason"
+              className="max-w-prose text-sm text-muted-foreground"
+            >
+              {opportunity.reason}
+            </span>
+          </span>
+        </div>
 
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <span
