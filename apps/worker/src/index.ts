@@ -79,7 +79,22 @@ async function main(): Promise<void> {
   const finalizeWorker = new Worker<FinalizeJobData>(
     QUEUE_NAMES.finalize,
     async (job) => {
-      const outcome = await finalizeRun(db, job.data);
+      const outcome = await finalizeRun(db, {
+        ...job.data,
+        /**
+         * Пересчёт возможностей не роняет прогон — но и не должен падать
+         * молча. Без этого ошибка в детекторе выглядела бы как «сегодня
+         * ничего не нашли», и заметили бы её через недели.
+         */
+        onError: (error) => {
+          logger.error("run.opportunities_failed", { runId: job.data.runId });
+          errorReporter.captureError(error, {
+            scope: "run.opportunities",
+            runId: job.data.runId,
+            clientId: job.data.clientId,
+          });
+        },
+      });
       logger.info("run.finalized", { runId: job.data.runId, ...outcome });
       return outcome;
     },
