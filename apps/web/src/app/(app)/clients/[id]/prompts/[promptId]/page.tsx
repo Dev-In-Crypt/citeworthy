@@ -7,6 +7,7 @@ import { api } from "@/trpc/react";
 import { EmptyState, PageHeader } from "@/components/page-header";
 import { buttonClass } from "@/components/ui/button";
 import { SkeletonCards } from "@/components/ui/skeleton";
+import { MessageSquare } from "lucide-react";
 
 /** «2nd», «3rd» — порядковый суффикс для места среди названных брендов. */
 function ordinal(rank: number | null): string {
@@ -104,6 +105,7 @@ export default function PromptResponsesPage({
       {responses.length === 0 ? (
         <EmptyState
           title="No answers yet"
+        icon={MessageSquare}
           description="Run a check from the Measure screen. Answers appear here in full, so you can see exactly what the number is built from."
         />
       ) : (

@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/page-header";
 import { buttonClass } from "@/components/ui/button";
 import { controlClass, inputClass } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
+import { FileText } from "lucide-react";
 
 
 export function ReportsView({ clientId }: { clientId: string }) {
@@ -56,6 +57,7 @@ export function ReportsView({ clientId }: { clientId: string }) {
       {rows.length === 0 ? (
         <EmptyState
           title="No reports yet"
+        icon={FileText}
           description="A report gathers the period's measurements, the work completed and what is planned next, in a page you can send to the client as-is."
         />
       ) : (

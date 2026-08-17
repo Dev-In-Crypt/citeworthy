@@ -77,12 +77,14 @@ export function OpportunitiesView({ clientId }: { clientId: string }) {
           и как превратить в клиента, ничего не пересобирая. */}
       <ProspectPanel clientId={clientId} />
 
+      {/* Пока находок нет, этой строки нет вовсе: пустое состояние ниже само
+          зовёт запустить измерение, а кнопка пересчёта над ним висела бы
+          сиротой рядом с пустым местом. */}
+      {rows.length > 0 && (
       <div className="flex flex-wrap items-start justify-between gap-3">
         {/* Только счёт. «Ранжировано внутренней оценкой» уже сказано в
             описании страницы, и второй раз это просто шум. */}
-        <p className="text-sm text-muted-foreground">
-          {rows.length === 0 ? "" : `${open.length} open`}
-        </p>
+        <p className="text-sm text-muted-foreground">{open.length} open</p>
         <button
           data-testid="refresh-opportunities"
           onClick={() => refresh.mutate({ clientId })}
@@ -92,6 +94,7 @@ export function OpportunitiesView({ clientId }: { clientId: string }) {
           {refresh.isPending ? "Recomputing…" : "Recompute"}
         </button>
       </div>
+      )}
 
       {rows.length === 0 ? (
         <EmptyState

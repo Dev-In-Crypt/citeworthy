@@ -21,6 +21,7 @@ import { TrafficCard } from "./traffic";
 import { controlClass } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
 import { SkeletonCards } from "@/components/ui/skeleton";
+import { TrendingUp } from "lucide-react";
 
 const PLATFORMS = [
   { value: null, label: "All platforms" },
@@ -459,6 +460,7 @@ export function ClientOverview({ clientId }: { clientId: string }) {
         {chartData.length === 0 ? (
           <EmptyState
             title="No visibility data yet"
+        icon={TrendingUp}
             description="Run a check from the Measure screen. Visibility is read from the share of answers across a week, so the first useful reading appears once a run completes."
           />
         ) : (

@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/page-header";
 import { cn } from "@/lib/utils";
 import { buttonClass } from "@/components/ui/button";
 import { SkeletonRows } from "@/components/ui/skeleton";
+import { Users } from "lucide-react";
 
 /**
  * Портфель — первый экран агентства.
@@ -64,6 +65,7 @@ export function Portfolio() {
     return (
       <EmptyState
         title="No clients yet"
+        icon={Users}
         description="Add your first client to start measuring how often AI assistants mention them, and where competitors show up instead."
         action={
           <Link

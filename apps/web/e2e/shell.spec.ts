@@ -51,3 +51,21 @@ test("protected routes redirect anonymous visitors to login", async ({ page }) =
     await expect(page).toHaveURL(/\/login$/);
   }
 });
+
+test("the product has an icon and a name on the tab", async ({ page }) => {
+  /**
+   * До этого у продукта не было ни иконки, ни знака: во вкладке браузера он
+   * был безымянным прямоугольником. Проверяется именно доставка файла, а не
+   * наличие тега: путь, который Next выводит из соглашения, легко потерять
+   * при переносе каталога.
+   */
+  const response = await page.goto("/");
+  expect(response?.ok()).toBe(true);
+  await expect(page).toHaveTitle(/Citeworthy/);
+
+  const href = await page.locator('link[rel~="icon"]').first().getAttribute("href");
+  expect(href, "no favicon is declared").toBeTruthy();
+
+  const icon = await page.request.get(href!);
+  expect(icon.ok(), `favicon at ${href} does not load`).toBe(true);
+});

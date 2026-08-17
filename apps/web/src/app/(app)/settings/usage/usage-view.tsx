@@ -6,6 +6,7 @@ import { api } from "@/trpc/react";
 import { EmptyState } from "@/components/page-header";
 import { controlClass } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
+import { Wallet } from "lucide-react";
 
 const PLATFORM_LABELS: Record<string, string> = {
   chatgpt: "ChatGPT",
@@ -61,6 +62,7 @@ export function UsageView() {
       {data && data.rows.length === 0 ? (
         <EmptyState
           title="No measurement cost in this period"
+        icon={Wallet}
           description="Cost appears once checks have run against the live assistants. Every answer stores what it cost, so this page always matches the raw responses."
         />
       ) : (

@@ -5,6 +5,7 @@ import { api } from "@/trpc/react";
 import { EmptyState } from "@/components/page-header";
 import { buttonClass } from "@/components/ui/button";
 import { SkeletonCards } from "@/components/ui/skeleton";
+import { Users } from "lucide-react";
 
 export function ClientsView() {
   const clients = api.clients.list.useQuery();
@@ -25,6 +26,7 @@ export function ClientsView() {
     return (
       <EmptyState
         title="No clients yet"
+        icon={Users}
         description="Add your first client to start measuring how often AI assistants mention them, and where competitors show up instead."
         action={
           <Link

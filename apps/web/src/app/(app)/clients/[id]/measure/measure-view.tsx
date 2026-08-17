@@ -9,6 +9,7 @@ import { GeneratePrompts } from "./generate-prompts";
 import { buttonClass } from "@/components/ui/button";
 import { inputClass } from "@/components/ui/field";
 import { SkeletonCards } from "@/components/ui/skeleton";
+import { MessageSquare } from "lucide-react";
 
 const INTENTS = ["comparison", "learning", "purchase", "other"] as const;
 
@@ -104,6 +105,7 @@ export function MeasureView({ clientId }: { clientId: string }) {
       {(clusters.data ?? []).length === 0 ? (
         <EmptyState
           title="No prompt clusters yet"
+        icon={MessageSquare}
           description="Add a cluster or import a CSV. Clusters group the buyer questions you track, so movement can be read per topic instead of one blended number."
         />
       ) : (

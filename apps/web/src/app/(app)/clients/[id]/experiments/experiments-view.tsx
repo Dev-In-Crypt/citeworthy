@@ -17,6 +17,7 @@ import { EmptyState } from "@/components/page-header";
 import { ConfidenceBadge, type ConfidenceLevel } from "@/components/ui/stat";
 import { NotePanel } from "@/components/ui/note-panel";
 import { SkeletonCards } from "@/components/ui/skeleton";
+import { FlaskConical } from "lucide-react";
 
 /** Строка группы. Прочерк вместо числа — там, где выборка его не набрала. */
 function GroupRow({
@@ -78,6 +79,7 @@ export function ExperimentsView({ clientId }: { clientId: string }) {
     return (
       <EmptyState
         title="No experiments yet"
+        icon={FlaskConical}
         description="An experiment starts when you complete an action. It records the baseline at that moment, so what follows can be read against it."
       />
     );

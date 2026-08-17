@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Mark } from "@/components/ui/mark";
 
 /**
  * Шапка и подвал публичных страниц: лендинга и примера отчёта.
@@ -11,7 +12,11 @@ export function MarketingHeader() {
   return (
     <header className="border-b">
       <div className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between gap-4 px-6">
-        <Link href="/" className="text-sm font-semibold tracking-tight">
+        <Link
+          href="/"
+          className="flex items-center gap-2 text-sm font-semibold tracking-tight"
+        >
+          <Mark className="size-5" />
           Citeworthy
         </Link>
 

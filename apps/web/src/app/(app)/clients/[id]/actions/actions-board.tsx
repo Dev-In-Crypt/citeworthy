@@ -8,6 +8,7 @@ import { buttonClass } from "@/components/ui/button";
 import { controlClass } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
 import { SkeletonCards, SkeletonText } from "@/components/ui/skeleton";
+import { ListChecks } from "lucide-react";
 
 const COLUMNS = [
   { status: "backlog", label: "Backlog" },
@@ -128,6 +129,7 @@ export function ActionsBoard({ clientId }: { clientId: string }) {
       <>
         <EmptyState
           title="No actions yet"
+        icon={ListChecks}
           description="Actions come from the Diagnose screen, where each recommendation carries the reason it exists. You can also add one by hand."
           action={addButton}
         />

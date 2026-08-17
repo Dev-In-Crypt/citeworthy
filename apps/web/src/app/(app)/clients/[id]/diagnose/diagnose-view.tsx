@@ -6,6 +6,7 @@ import { api } from "@/trpc/react";
 import { EmptyState } from "@/components/page-header";
 import { buttonClass } from "@/components/ui/button";
 import { SkeletonCards } from "@/components/ui/skeleton";
+import { Quote } from "lucide-react";
 
 /** Цвета типов источников: собственные — зелёным, всё стороннее — оттенками оранжевого. */
 const TYPE_COLORS: Record<string, string> = {
@@ -99,6 +100,7 @@ export function DiagnoseView({ clientId }: { clientId: string }) {
     return (
       <EmptyState
         title="No cited sources yet"
+        icon={Quote}
         description="Run a check from the Measure screen. Diagnosis reads the sources models actually cited, so it needs at least one completed run."
       />
     );

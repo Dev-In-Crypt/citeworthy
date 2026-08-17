@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { api } from "@/trpc/react";
 import { EmptyState } from "@/components/page-header";
 import { buttonClass } from "@/components/ui/button";
+import { MessageSquare } from "lucide-react";
 
 /**
  * Разовый аудит: одна кнопка — и до диагностики без ручных шагов.
@@ -63,6 +64,7 @@ export function AuditView({ clientId }: { clientId: string }) {
     return (
       <EmptyState
         title="No prompts to audit yet"
+        icon={MessageSquare}
         description="An audit measures the questions buyers actually ask. Generate a starting set on the measure screen, edit it, then come back."
         action={
           <Link
