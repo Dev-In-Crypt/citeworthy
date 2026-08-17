@@ -74,10 +74,10 @@ export function OpportunitiesView({ clientId }: { clientId: string }) {
       <ProspectPanel clientId={clientId} />
 
       <div className="flex flex-wrap items-start justify-between gap-3">
+        {/* Только счёт. «Ранжировано внутренней оценкой» уже сказано в
+            описании страницы, и второй раз это просто шум. */}
         <p className="text-sm text-muted-foreground">
-          {rows.length === 0
-            ? ""
-            : `${open.length} open · ranked by an internal score, not by certainty of outcome`}
+          {rows.length === 0 ? "" : `${open.length} open`}
         </p>
         <button
           data-testid="refresh-opportunities"
