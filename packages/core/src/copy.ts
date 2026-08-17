@@ -53,7 +53,6 @@ export const MEASUREMENT_COPY = {
    */
   trafficUndercount:
     "Referred sessions are undercounted: in-app browsers drop the source, and many people type the brand instead of clicking. Read this beside visibility, not as its result.",
-  /** Почему в разделе движения не все вопросы. */
   /**
    * Видимость и переходы стоят рядом — и это всё, что о них можно сказать.
    * «Выросло вместе» и «одно вызвало другое» — разные утверждения, и второе
@@ -61,6 +60,7 @@ export const MEASUREMENT_COPY = {
    */
   observedTogether:
     "Observed during the same period. Shown side by side because both moved, not because one produced the other.",
+  /** Почему в разделе движения не все вопросы. */
   movementBasis:
     "Only questions where the change is larger than this sample size can explain on its own. Anything smaller is left out rather than shown as a result.",
 } as const;
@@ -177,6 +177,10 @@ export const OPPORTUNITY_COPY = {
   dismissRequiresReason: "Say why this is not worth doing, so the next person does not re-open it.",
   dismissReturns:
     "A dismissed opportunity comes back only if it grows noticeably larger than it was when you dismissed it.",
+  /** Отложить — не то же самое, что отказаться: срок выйдет, и пункт вернётся. */
+  snoozeLabel: "Not this month",
+  snoozeNote:
+    "Kept out of the list until the date passes, then shown again with whatever the measurements say by then.",
 } as const;
 
 export const EXPERIMENT_COPY = {

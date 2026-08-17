@@ -38,6 +38,7 @@ import {
   setReportStatus,
 } from "@repo/db";
 import { assertTenant, protectedProcedure, roleProcedure, router } from "../trpc";
+import { experimentOutcomes } from "../../experiment-results";
 import { appUrl, getEmailSender } from "../../email";
 
 /** Та же схлопка, что в роутере диагностики: один факт на пару (ответ, домен). */
@@ -165,6 +166,29 @@ export const reportsRouter = router({
           sufficient: row.sufficient,
         }));
 
+      /**
+       * Результаты экспериментов считает та же функция, что и экран: отчёт
+       * клиенту и экран агентства не имеют права расходиться в цифрах.
+       */
+      const outcomes = (await experimentOutcomes(ctx.db, input.clientId, experiments)).filter(
+        (outcome) => outcome.readable,
+      );
+
+      const actionTitles = new Map(allActions.map((action) => [action.id, action.title]));
+
+      const learned = outcomes.slice(0, 5).map((outcome) => ({
+        title: actionTitles.get(outcome.experiment.actionId) ?? "Completed work",
+        observed: outcome.formatted,
+        confidence: outcome.estimate.confidence,
+      }));
+
+      // «Самое влиятельное» — с наибольшим наблюдавшимся движением, а не с
+      // самой крупной задачей: размер работы ничего не измеряет.
+      const leading = [...outcomes].sort(
+        (a, b) => (b.estimate.incrementalPp ?? 0) - (a.estimate.incrementalPp ?? 0),
+      )[0];
+      const leadingTitle = leading ? actionTitles.get(leading.experiment.actionId) : undefined;
+
       const caveats: string[] = [];
       if (experiments.some((experiment) => experiment.controlClusterIds.length === 0)) {
         caveats.push(REPORT_COPY.noComparisonGroup);
@@ -289,9 +313,26 @@ export const reportsRouter = router({
         })),
         newCitedUrls,
         newBrandMentions,
-        // Самое влиятельное действие определяется позже, когда у экспериментов
-        // появятся результаты; пока раздел честно пуст.
-        highestImpact: null,
+        /**
+         * Самое влиятельное действие — из экспериментов, у которых после
+         * работы набралось достаточно ответов. Раздел был пуст всегда, пока
+         * эксперименты не научились доходить до готовности; выдумывать в него
+         * «главное действие» по размеру задачи было бы обратным продукту.
+         */
+        highestImpact: leading
+          ? {
+              title: leadingTitle ?? "Completed work",
+              // Диапазон вместо точки строит сам сборщик отчёта: точность,
+              // которой нет, не должна выглядеть как точность.
+              incrementalPp: leading.estimate.incrementalPp,
+              confidence: leading.estimate.confidence,
+            }
+          : null,
+        /**
+         * Чему научились: что запускали и что за этим наблюдалось. Только
+         * читаемые эксперименты — «данных не хватило» это не урок, а пробел.
+         */
+        whatWeLearned: learned,
         nextSprint: allActions
           .filter((action) => action.status === "backlog" || action.status === "in_progress")
           .slice(0, 3)

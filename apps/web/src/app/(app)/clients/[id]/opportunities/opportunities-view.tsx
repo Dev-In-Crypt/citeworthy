@@ -437,20 +437,41 @@ function OpportunityDetail({
           rows={2}
           className="rounded-md border border-input bg-background p-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
-        <button
-          data-testid="dismiss-opportunity"
-          disabled={dismissReason.trim().length === 0 || decide.isPending}
-          onClick={() =>
-            decide.mutate({
-              id: opportunityId,
-              status: "dismissed",
-              dismissedReason: dismissReason.trim(),
-            })
-          }
-          className="h-9 self-start rounded-md border border-input px-3 text-sm font-medium hover:bg-accent disabled:opacity-60"
-        >
-          Dismiss
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            data-testid="dismiss-opportunity"
+            disabled={dismissReason.trim().length === 0 || decide.isPending}
+            onClick={() =>
+              decide.mutate({
+                id: opportunityId,
+                status: "dismissed",
+                dismissedReason: dismissReason.trim(),
+              })
+            }
+            className="h-9 rounded-md border border-input px-3 text-sm font-medium hover:bg-accent disabled:opacity-60"
+          >
+            Dismiss
+          </button>
+
+          {/* Отложить — отдельное решение и без причины: «сейчас не до этого»
+              не то же самое, что «этого мы не делаем», и через месяц пункт
+              вернётся сам. */}
+          <button
+            data-testid="snooze-opportunity"
+            disabled={decide.isPending}
+            onClick={() =>
+              decide.mutate({
+                id: opportunityId,
+                status: "snoozed",
+                snoozedUntil: new Date(Date.now() + 30 * 86_400_000),
+              })
+            }
+            className="h-9 rounded-md px-3 text-sm text-muted-foreground hover:bg-accent disabled:opacity-60"
+          >
+            {OPPORTUNITY_COPY.snoozeLabel}
+          </button>
+        </div>
+        <p className="text-xs text-muted-foreground">{OPPORTUNITY_COPY.snoozeNote}</p>
         {decide.error && (
           <p role="alert" data-testid="form-error" className="text-sm text-destructive">
             {decide.error.message}
