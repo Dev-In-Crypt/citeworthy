@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { api } from "@/trpc/react";
 import { PageHeader } from "@/components/page-header";
 import { ClientForm } from "../../client-form";
+import { buttonClass } from "@/components/ui/button";
 
 export default function EditClientPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -55,7 +56,7 @@ export default function EditClientPage({ params }: { params: Promise<{ id: strin
             type="button"
             onClick={() => remove.mutate({ id })}
             disabled={remove.isPending}
-            className="h-10 rounded-md border border-input px-4 text-sm font-medium hover:bg-accent disabled:opacity-60"
+            className={buttonClass("outline", "lg")}
           >
             Delete
           </button>

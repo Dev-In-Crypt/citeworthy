@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { api } from "@/trpc/react";
 import { cn } from "@/lib/utils";
+import { buttonClass } from "@/components/ui/button";
 
 const PLAN_NAMES: Record<string, string> = {
   starter: "Starter",
@@ -106,7 +107,7 @@ export function BillingView() {
                     checkout.mutate({ plan: plan.id });
                   }}
                   disabled={checkout.isPending}
-                  className="mt-2 h-10 rounded-md bg-primary text-sm font-medium text-primary-foreground disabled:opacity-60"
+                  className={buttonClass("primary", "lg", "mt-2 w-full")}
                 >
                   Choose {PLAN_NAMES[plan.id] ?? plan.id}
                 </button>
@@ -130,7 +131,7 @@ export function BillingView() {
               portal.mutate();
             }}
             disabled={portal.isPending}
-            className="h-10 self-start rounded-md border border-input px-4 text-sm font-medium hover:bg-accent disabled:opacity-60"
+            className={buttonClass("outline", "lg", "self-start")}
           >
             Manage billing
           </button>

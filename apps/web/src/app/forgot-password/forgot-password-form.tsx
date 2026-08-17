@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { authClient } from "@/lib/auth-client";
+import { buttonClass } from "@/components/ui/button";
+import { controlClass } from "@/components/ui/field";
+import { cn } from "@/lib/utils";
 
 export function ForgotPasswordForm() {
   const [email, setEmail] = useState("");
@@ -53,7 +56,7 @@ export function ForgotPasswordForm() {
           onChange={(e) => setEmail(e.target.value)}
           required
           autoComplete="email"
-          className="h-10 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className={cn(controlClass, "h-10 px-3")}
         />
       </label>
 
@@ -66,7 +69,7 @@ export function ForgotPasswordForm() {
       <button
         type="submit"
         disabled={pending}
-        className="h-10 rounded-md bg-primary text-sm font-medium text-primary-foreground disabled:opacity-60"
+        className={buttonClass("primary", "lg", "w-full")}
       >
         {pending ? "Sending…" : "Send reset link"}
       </button>

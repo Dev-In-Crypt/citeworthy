@@ -53,6 +53,7 @@ export function ReportView({
     // Переопределяется именно `--primary`: тема собрана как `@theme inline`,
     // и утилиты подставляют этот токен напрямую, минуя `--color-primary`.
     <div
+      data-surface="report"
       className="mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-8 px-6 py-10"
       style={{ ["--primary" as string]: agency.brandColor }}
     >

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { signOut } from "@/lib/auth-client";
+import { buttonClass } from "@/components/ui/button";
 
 export function SignOutButton() {
   const router = useRouter();
@@ -14,7 +15,7 @@ export function SignOutButton() {
         router.push("/login");
         router.refresh();
       }}
-      className="h-9 rounded-md border border-input px-3 text-sm font-medium hover:bg-accent"
+      className={buttonClass("outline", "md")}
     >
       Sign out
     </button>

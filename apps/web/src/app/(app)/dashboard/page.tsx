@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { Portfolio } from "./portfolio";
+import { buttonClass } from "@/components/ui/button";
 
 export default function DashboardPage() {
   return (
@@ -11,7 +12,7 @@ export default function DashboardPage() {
         action={
           <Link
             href="/clients/new"
-            className="h-10 rounded-md bg-primary px-4 text-sm font-medium leading-10 text-primary-foreground"
+            className={buttonClass("primary", "lg")}
           >
             Add client
           </Link>

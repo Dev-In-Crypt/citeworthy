@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { api } from "@/trpc/react";
 import { EmptyState } from "@/components/page-header";
+import { buttonClass } from "@/components/ui/button";
 
 /** Цвета типов источников: собственные — зелёным, всё стороннее — оттенками оранжевого. */
 const TYPE_COLORS: Record<string, string> = {
@@ -61,7 +62,7 @@ function CreateActionButton({
       data-testid="create-action"
       disabled={convert.isPending || done}
       onClick={() => convert.mutate({ clientId, recommendation })}
-      className="h-9 shrink-0 rounded-md border border-input px-3 text-sm font-medium hover:bg-accent disabled:opacity-60"
+      className={buttonClass("outline", "md", "shrink-0")}
     >
       {done ? "Added to actions" : convert.isPending ? "Adding…" : "Create action"}
     </button>

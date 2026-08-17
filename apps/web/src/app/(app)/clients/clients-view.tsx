@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { api } from "@/trpc/react";
 import { EmptyState } from "@/components/page-header";
+import { buttonClass } from "@/components/ui/button";
 
 export function ClientsView() {
   const clients = api.clients.list.useQuery();
@@ -27,7 +28,7 @@ export function ClientsView() {
         action={
           <Link
             href="/clients/new"
-            className="h-10 rounded-md bg-primary px-4 text-sm font-medium leading-10 text-primary-foreground"
+            className={buttonClass("primary", "lg")}
           >
             Add client
           </Link>

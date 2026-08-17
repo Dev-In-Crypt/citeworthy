@@ -3,6 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { signIn, signUp } from "@/lib/auth-client";
+import { buttonClass } from "@/components/ui/button";
+import { controlClass } from "@/components/ui/field";
+import { cn } from "@/lib/utils";
 
 type Mode = "login" | "signup";
 
@@ -46,7 +49,7 @@ export function AuthForm({ mode, lockedEmail }: { mode: Mode; lockedEmail?: stri
             onChange={(e) => setName(e.target.value)}
             required
             autoComplete="name"
-            className="h-10 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className={cn(controlClass, "h-10 px-3")}
           />
         </label>
       )}
@@ -61,7 +64,7 @@ export function AuthForm({ mode, lockedEmail }: { mode: Mode; lockedEmail?: stri
           required
           readOnly={Boolean(lockedEmail)}
           autoComplete="email"
-          className="h-10 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className={cn(controlClass, "h-10 px-3")}
         />
       </label>
 
@@ -75,7 +78,7 @@ export function AuthForm({ mode, lockedEmail }: { mode: Mode; lockedEmail?: stri
           required
           minLength={8}
           autoComplete={mode === "signup" ? "new-password" : "current-password"}
-          className="h-10 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className={cn(controlClass, "h-10 px-3")}
         />
       </label>
 
@@ -88,7 +91,7 @@ export function AuthForm({ mode, lockedEmail }: { mode: Mode; lockedEmail?: stri
       <button
         type="submit"
         disabled={pending}
-        className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60"
+        className={buttonClass("primary", "lg")}
       >
         {pending ? "Please wait…" : mode === "signup" ? "Create account" : "Sign in"}
       </button>

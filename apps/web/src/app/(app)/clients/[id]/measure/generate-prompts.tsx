@@ -4,6 +4,8 @@ import { useState } from "react";
 import { DEFAULT_GENERATED_PROMPT_COUNT, GENERATED_PROMPT_RANGE } from "@repo/core";
 import type { GeneratedPrompt } from "@repo/core";
 import { api } from "@/trpc/react";
+import { buttonClass } from "@/components/ui/button";
+import { inputClass } from "@/components/ui/field";
 
 /**
  * Черновик набора промптов для аудита.
@@ -13,8 +15,6 @@ import { api } from "@/trpc/react";
  * знающий клиента, правит её быстрее, чем потом читает измерения не по делу.
  */
 
-const inputClass =
-  "h-10 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 export function GeneratePrompts({
   clientId,
@@ -99,7 +99,7 @@ export function GeneratePrompts({
               count,
             })
           }
-          className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60"
+          className={buttonClass("primary", "lg")}
         >
           {generate.isPending ? "Generating…" : "Generate buyer prompts"}
         </button>
@@ -161,14 +161,14 @@ export function GeneratePrompts({
                   prompts: draft.filter((prompt) => prompt.text.trim().length > 0),
                 })
               }
-              className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60"
+              className={buttonClass("primary", "lg")}
             >
               {save.isPending ? "Saving…" : `Save ${draft.length} prompts`}
             </button>
             <button
               type="button"
               onClick={() => setDraft(null)}
-              className="h-10 rounded-md border border-input px-3 text-sm font-medium"
+              className={buttonClass("outline", "lg")}
             >
               Discard
             </button>

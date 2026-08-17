@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { api } from "@/trpc/react";
 import { cn } from "@/lib/utils";
+import { buttonClass } from "@/components/ui/button";
+import { controlClass } from "@/components/ui/field";
 
 /**
  * Ключи API.
@@ -66,7 +68,7 @@ export function ApiKeysView() {
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder="Looker Studio"
-              className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+              className={cn(controlClass, "h-10 px-3")}
             />
           </label>
           <button
@@ -77,7 +79,7 @@ export function ApiKeysView() {
               setError(null);
               create.mutate({ name });
             }}
-            className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60"
+            className={buttonClass("primary", "lg")}
           >
             Create key
           </button>
@@ -131,7 +133,7 @@ export function ApiKeysView() {
                         type="button"
                         data-testid={`revoke-${key.id}`}
                         onClick={() => revoke.mutate({ id: key.id })}
-                        className="rounded-md border px-2.5 py-1 text-xs font-medium hover:bg-accent"
+                        className={buttonClass("outline", "sm")}
                       >
                         Revoke
                       </button>

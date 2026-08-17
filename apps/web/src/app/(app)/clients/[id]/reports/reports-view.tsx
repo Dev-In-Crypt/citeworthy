@@ -4,9 +4,10 @@ import { useState } from "react";
 import { PROPOSAL_DEFAULTS } from "@repo/core";
 import { api } from "@/trpc/react";
 import { EmptyState } from "@/components/page-header";
+import { buttonClass } from "@/components/ui/button";
+import { controlClass, inputClass } from "@/components/ui/field";
+import { cn } from "@/lib/utils";
 
-const inputClass =
-  "h-10 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 export function ReportsView({ clientId }: { clientId: string }) {
   const utils = api.useUtils();
@@ -39,7 +40,7 @@ export function ReportsView({ clientId }: { clientId: string }) {
           data-testid="generate-report"
           disabled={generate.isPending}
           onClick={() => generate.mutate({ clientId })}
-          className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60"
+          className={buttonClass("primary", "lg")}
         >
           {generate.isPending ? "Generating…" : "Generate report"}
         </button>
@@ -76,7 +77,7 @@ export function ReportsView({ clientId }: { clientId: string }) {
                     <a
                       href={`/api/reports/${report.id}/pdf`}
                       data-testid={`pdf-${report.id}`}
-                      className="h-9 rounded-md border border-input px-3 text-sm font-medium leading-9 hover:bg-accent"
+                      className={buttonClass("outline", "md")}
                     >
                       Download PDF
                     </a>
@@ -85,7 +86,7 @@ export function ReportsView({ clientId }: { clientId: string }) {
                       data-testid={`share-${report.id}`}
                       disabled={share.isPending}
                       onClick={() => share.mutate({ reportId: report.id })}
-                      className="h-9 rounded-md border border-input px-3 text-sm font-medium hover:bg-accent disabled:opacity-60"
+                      className={buttonClass("outline", "md")}
                     >
                       Get client link
                     </button>
@@ -93,7 +94,7 @@ export function ReportsView({ clientId }: { clientId: string }) {
                       type="button"
                       data-testid={`send-${report.id}`}
                       onClick={() => setSending(sending === report.id ? null : report.id)}
-                      className="h-9 rounded-md border border-input px-3 text-sm font-medium hover:bg-accent"
+                      className={buttonClass("outline", "md")}
                     >
                       Send to client
                     </button>
@@ -240,7 +241,7 @@ function OpportunityForm({
               hourlyCostUsd: hourlyCost,
             })
           }
-          className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60"
+          className={buttonClass("primary", "lg")}
         >
           {generate.isPending ? "Generating…" : "Generate opportunity report"}
         </button>
@@ -313,7 +314,7 @@ function SendReport({
           onChange={(event) => setNote(event.target.value)}
           rows={2}
           placeholder="Anything you want to say in your own words"
-          className="rounded-md border border-input bg-background p-2 text-sm"
+          className={cn(controlClass, "p-2.5")}
         />
       </label>
 
@@ -331,14 +332,14 @@ function SendReport({
           onClick={() =>
             send.mutate({ reportId, to: to.trim(), ...(note.trim() ? { note: note.trim() } : {}) })
           }
-          className="h-9 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground disabled:opacity-60"
+          className={buttonClass("primary", "md")}
         >
           {send.isPending ? "Sending…" : "Send"}
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="h-9 rounded-md border border-input px-3 text-sm font-medium hover:bg-accent"
+          className={buttonClass("outline", "md")}
         >
           Cancel
         </button>

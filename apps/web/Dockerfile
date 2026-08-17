@@ -54,9 +54,11 @@ ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0
 # Непривилегированный пользователь: процессу приложения root не нужен.
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 
-# Каталога public в проекте нет: шрифты и стили собираются в бандл, а файлы
-# агентств живут в хранилище, а не в образе.
+# В public лежит только шрифт: он обязан ехать в образ, иначе продукт в бою
+# нарисуется системным и будет выглядеть иначе, чем всё, что мы проверяли.
+# Файлы агентств туда не попадают — они живут в хранилище.
 COPY --from=build --chown=nextjs:nodejs /repo/apps/web/.next/standalone ./
+COPY --from=build --chown=nextjs:nodejs /repo/apps/web/public ./apps/web/public
 COPY --from=build --chown=nextjs:nodejs /repo/apps/web/.next/static ./apps/web/.next/static
 
 # Каталог хранилища создаётся до монтирования тома и с нужным владельцем:

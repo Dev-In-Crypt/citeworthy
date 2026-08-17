@@ -3,6 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { api } from "@/trpc/react";
+import { buttonClass } from "@/components/ui/button";
+import { controlClass } from "@/components/ui/field";
+import { cn } from "@/lib/utils";
 
 export function SettingsForm({
   initialName,
@@ -62,7 +65,7 @@ export function SettingsForm({
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+            className={cn(controlClass, "h-10 px-3")}
           />
         </label>
 
@@ -113,7 +116,7 @@ export function SettingsForm({
             type="button"
             onClick={() => update.mutate({ name, brandColor })}
             disabled={update.isPending}
-            className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60"
+            className={buttonClass("primary", "lg")}
           >
             {update.isPending ? "Saving…" : "Save changes"}
           </button>
@@ -171,14 +174,14 @@ function TeamSection() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="teammate@agency.com"
-            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+            className={cn(controlClass, "h-10 px-3")}
           />
         </label>
         <button
           type="button"
           onClick={() => invite.mutate({ email, role: "member" })}
           disabled={!email || invite.isPending}
-          className="h-10 rounded-md border border-input px-4 text-sm font-medium disabled:opacity-60"
+          className={buttonClass("outline", "lg")}
         >
           Send invite
         </button>

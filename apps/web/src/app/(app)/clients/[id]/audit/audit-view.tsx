@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/trpc/react";
 import { EmptyState } from "@/components/page-header";
+import { buttonClass } from "@/components/ui/button";
 
 /**
  * Разовый аудит: одна кнопка — и до диагностики без ручных шагов.
@@ -66,7 +67,7 @@ export function AuditView({ clientId }: { clientId: string }) {
         action={
           <Link
             href={`/clients/${clientId}/measure`}
-            className="h-10 rounded-md bg-primary px-4 text-sm font-medium leading-10 text-primary-foreground"
+            className={buttonClass("primary", "lg")}
           >
             Generate prompts
           </Link>
@@ -83,7 +84,7 @@ export function AuditView({ clientId }: { clientId: string }) {
           data-testid="run-audit"
           disabled={audit.isPending}
           onClick={() => audit.mutate({ clientId })}
-          className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60"
+          className={buttonClass("primary", "lg")}
         >
           {audit.isPending ? "Running audit…" : "Run audit"}
         </button>

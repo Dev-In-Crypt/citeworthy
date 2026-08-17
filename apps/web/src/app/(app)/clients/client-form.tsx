@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { buttonClass } from "@/components/ui/button";
+import { inputClass } from "@/components/ui/field";
 
 export interface ClientFormValues {
   name: string;
@@ -19,8 +21,6 @@ export function parseList(value: string): string[] {
     .filter(Boolean);
 }
 
-const inputClass =
-  "h-10 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 export function ClientForm({
   initial,
@@ -137,7 +137,7 @@ export function ClientForm({
       <button
         type="submit"
         disabled={pending}
-        className="h-10 w-fit rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60"
+        className={buttonClass("primary", "lg", "w-fit")}
       >
         {pending ? "Saving…" : submitLabel}
       </button>

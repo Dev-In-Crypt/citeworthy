@@ -5,6 +5,7 @@ import Link from "next/link";
 import { api } from "@/trpc/react";
 import { PageHeader } from "@/components/page-header";
 import { ClientOverview } from "./overview";
+import { buttonClass } from "@/components/ui/button";
 
 export default function ClientOverviewPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -34,7 +35,7 @@ export default function ClientOverviewPage({ params }: { params: Promise<{ id: s
         action={
           <Link
             href={`/clients/${id}/measure`}
-            className="h-10 rounded-md bg-primary px-4 text-sm font-medium leading-10 text-primary-foreground"
+            className={buttonClass("primary", "lg")}
           >
             Measure
           </Link>

@@ -6,11 +6,13 @@ import { useRouter } from "next/navigation";
 import { OPPORTUNITY_COPY, recommendationSchema, type Recommendation } from "@repo/core";
 import { api, type RouterOutputs } from "@/trpc/react";
 import { EmptyState } from "@/components/page-header";
-import { ConfidenceBadge } from "@/components/stat";
-import { NotePanel } from "@/components/note-panel";
+import { ConfidenceBadge } from "@/components/ui/stat";
+import { NotePanel } from "@/components/ui/note-panel";
 import { ProspectPanel } from "./prospect-panel";
 import { PlanPanel } from "./plan-panel";
 import { cn } from "@/lib/utils";
+import { buttonClass } from "@/components/ui/button";
+import { controlClass } from "@/components/ui/field";
 
 type Opportunity = RouterOutputs["opportunities"]["list"][number];
 
@@ -83,7 +85,7 @@ export function OpportunitiesView({ clientId }: { clientId: string }) {
           data-testid="refresh-opportunities"
           onClick={() => refresh.mutate({ clientId })}
           disabled={refresh.isPending}
-          className="h-10 shrink-0 rounded-md border border-input px-4 text-sm font-medium hover:bg-accent disabled:opacity-60"
+          className={buttonClass("outline", "lg", "shrink-0")}
         >
           {refresh.isPending ? "Recomputing…" : "Recompute"}
         </button>
@@ -96,7 +98,7 @@ export function OpportunitiesView({ clientId }: { clientId: string }) {
           action={
             <Link
               href={`/clients/${clientId}/measure`}
-              className="h-10 rounded-md bg-primary px-4 text-sm font-medium leading-10 text-primary-foreground"
+              className={buttonClass("primary", "lg")}
             >
               Run measurement
             </Link>
@@ -401,7 +403,7 @@ function OpportunityDetail({
                       convert.mutate({ id: opportunityId, recommendation })
                     }
                     disabled={convert.isPending}
-                    className="h-9 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground disabled:opacity-60"
+                    className={buttonClass("primary", "md")}
                   >
                     {convert.isPending ? "Adding…" : "Create action"}
                   </button>
@@ -435,7 +437,7 @@ function OpportunityDetail({
           value={dismissReason}
           onChange={(event) => setDismissReason(event.target.value)}
           rows={2}
-          className="rounded-md border border-input bg-background p-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className={cn(controlClass, "p-2.5")}
         />
         <div className="flex flex-wrap items-center gap-2">
           <button
@@ -448,7 +450,7 @@ function OpportunityDetail({
                 dismissedReason: dismissReason.trim(),
               })
             }
-            className="h-9 rounded-md border border-input px-3 text-sm font-medium hover:bg-accent disabled:opacity-60"
+            className={buttonClass("outline", "md")}
           >
             Dismiss
           </button>
@@ -466,7 +468,7 @@ function OpportunityDetail({
                 snoozedUntil: new Date(Date.now() + 30 * 86_400_000),
               })
             }
-            className="h-9 rounded-md px-3 text-sm text-muted-foreground hover:bg-accent disabled:opacity-60"
+            className={buttonClass("ghost", "md")}
           >
             {OPPORTUNITY_COPY.snoozeLabel}
           </button>

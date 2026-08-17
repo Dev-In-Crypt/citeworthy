@@ -5,6 +5,7 @@ import Link from "next/link";
 import { highlightMentions } from "@repo/core";
 import { api } from "@/trpc/react";
 import { EmptyState, PageHeader } from "@/components/page-header";
+import { buttonClass } from "@/components/ui/button";
 
 /** «2nd», «3rd» — порядковый суффикс для места среди названных брендов. */
 function ordinal(rank: number | null): string {
@@ -74,7 +75,7 @@ export default function PromptResponsesPage({
         action={
           <Link
             href={`/clients/${id}/measure`}
-            className="h-10 rounded-md border border-input px-4 text-sm font-medium leading-10 hover:bg-accent"
+            className={buttonClass("outline", "lg")}
           >
             Back to prompts
           </Link>

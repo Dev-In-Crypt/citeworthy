@@ -7,6 +7,7 @@ import { api } from "@/trpc/react";
 import { PageHeader } from "@/components/page-header";
 import { GeneratePrompts } from "../measure/generate-prompts";
 import { OnboardingSteps, SamplingCost } from "./steps";
+import { buttonClass } from "@/components/ui/button";
 
 /**
  * Шаг 2 онбординга: что именно спрашивать за этого клиента.
@@ -97,7 +98,7 @@ export default function OnboardingPage({ params }: { params: Promise<{ id: strin
             data-testid="onboarding-continue"
             disabled={savedPrompts === 0}
             onClick={() => router.push(`/clients/${id}/measure?step=3`)}
-            className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60"
+            className={buttonClass("primary", "lg")}
           >
             Continue to schedule
           </button>

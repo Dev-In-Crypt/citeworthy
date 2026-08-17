@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { buttonClass } from "@/components/ui/button";
 
 /**
  * Последний рубеж: ошибка, до которой не добрался ни один локальный boundary.
@@ -34,7 +35,7 @@ export default function GlobalError({
           <button
             type="button"
             onClick={reset}
-            className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
+            className={buttonClass("primary", "lg")}
           >
             Try again
           </button>

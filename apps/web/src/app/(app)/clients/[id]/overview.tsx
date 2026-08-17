@@ -14,9 +14,11 @@ import {
 import { CONFIDENCE_LABELS, MEASUREMENT_COPY, shareOfNamed } from "@repo/core";
 import { api, type RouterOutputs } from "@/trpc/react";
 import { EmptyState } from "@/components/page-header";
-import { StatCard } from "@/components/stat";
+import { StatCard } from "@/components/ui/stat";
 import { MatrixSection } from "./matrix-view";
 import { TrafficCard } from "./traffic";
+import { controlClass } from "@/components/ui/field";
+import { cn } from "@/lib/utils";
 
 const PLATFORMS = [
   { value: null, label: "All platforms" },
@@ -431,7 +433,7 @@ export function ClientOverview({ clientId }: { clientId: string }) {
               aria-label="Platform"
               value={platform ?? ""}
               onChange={(e) => setPlatform((e.target.value || null) as PlatformFilter)}
-              className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+              className={cn(controlClass, "h-10 px-2.5")}
             >
               {PLATFORMS.map((option) => (
                 <option key={option.label} value={option.value ?? ""}>
@@ -443,7 +445,7 @@ export function ClientOverview({ clientId }: { clientId: string }) {
               aria-label="Cluster"
               value={clusterId ?? ""}
               onChange={(e) => setClusterId(e.target.value || null)}
-              className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+              className={cn(controlClass, "h-10 px-2.5")}
             >
               <option value="">All clusters</option>
               {(clusters.data ?? []).map((cluster) => (

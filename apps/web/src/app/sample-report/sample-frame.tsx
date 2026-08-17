@@ -3,6 +3,7 @@ import type { ReportPayload } from "@repo/core";
 import { SAMPLE_AGENCY } from "@repo/core";
 import { ReportView } from "@/components/report-view";
 import { MarketingFooter, MarketingHeader } from "@/components/marketing-chrome";
+import { buttonClass } from "@/components/ui/button";
 
 /**
  * Обрамление публичного примера.
@@ -55,7 +56,7 @@ export function SampleFrame({
           </p>
           <Link
             href="/signup"
-            className="h-10 rounded-md bg-primary px-4 text-sm font-medium leading-10 text-primary-foreground"
+            className={buttonClass("primary", "lg")}
           >
             Start a free audit
           </Link>

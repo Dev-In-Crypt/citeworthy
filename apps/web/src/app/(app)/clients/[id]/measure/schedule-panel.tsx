@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { api } from "@/trpc/react";
+import { buttonClass } from "@/components/ui/button";
+import { inputClass } from "@/components/ui/field";
 
 const PLATFORMS = ["chatgpt", "perplexity", "gemini"] as const;
 type Platform = (typeof PLATFORMS)[number];
@@ -14,8 +16,6 @@ const PLATFORM_LABELS: Record<Platform, string> = {
   gemini: "Gemini",
 };
 
-const inputClass =
-  "h-10 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 export function SchedulePanel({ clientId }: { clientId: string }) {
   const utils = api.useUtils();
@@ -129,7 +129,7 @@ export function SchedulePanel({ clientId }: { clientId: string }) {
           onClick={() =>
             save.mutate({ clientId, cadence, platforms, samplesPerPrompt: samples, active: true })
           }
-          className="h-10 rounded-md border border-input px-4 text-sm font-medium disabled:opacity-60"
+          className={buttonClass("outline", "lg")}
         >
           {save.isPending ? "Saving…" : "Save schedule"}
         </button>
@@ -138,7 +138,7 @@ export function SchedulePanel({ clientId }: { clientId: string }) {
           type="button"
           disabled={trigger.isPending}
           onClick={() => trigger.mutate({ clientId })}
-          className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60"
+          className={buttonClass("primary", "lg")}
         >
           {trigger.isPending ? "Running…" : "Run now"}
         </button>

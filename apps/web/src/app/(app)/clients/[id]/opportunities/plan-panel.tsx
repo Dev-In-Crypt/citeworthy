@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { api } from "@/trpc/react";
+import { buttonClass } from "@/components/ui/button";
 
 /**
  * План на 90 дней.
@@ -27,7 +28,7 @@ export function PlanPanel({ clientId }: { clientId: string }) {
         <button
           data-testid="generate-plan"
           onClick={() => setOpen((current) => !current)}
-          className="h-10 shrink-0 rounded-md border border-input px-4 text-sm font-medium hover:bg-accent"
+          className={buttonClass("outline", "lg", "shrink-0")}
         >
           {open ? "Hide plan" : "Generate 90-day plan"}
         </button>

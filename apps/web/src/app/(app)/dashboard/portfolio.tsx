@@ -5,6 +5,7 @@ import { CONFIDENCE_LABELS, MEASUREMENT_COPY } from "@repo/core";
 import { api } from "@/trpc/react";
 import { EmptyState } from "@/components/page-header";
 import { cn } from "@/lib/utils";
+import { buttonClass } from "@/components/ui/button";
 
 /**
  * Портфель — первый экран агентства.
@@ -50,7 +51,7 @@ export function Portfolio() {
         <p className="max-w-prose text-sm text-muted-foreground">{portfolio.error.message}</p>
         <button
           onClick={() => portfolio.refetch()}
-          className="h-10 rounded-md border border-input px-4 text-sm font-medium hover:bg-accent"
+          className={buttonClass("outline", "lg")}
         >
           Try again
         </button>
@@ -66,7 +67,7 @@ export function Portfolio() {
         action={
           <Link
             href="/clients/new"
-            className="h-10 rounded-md bg-primary px-4 text-sm font-medium leading-10 text-primary-foreground"
+            className={buttonClass("primary", "lg")}
           >
             Add client
           </Link>

@@ -12,6 +12,7 @@ import {
   VISIBILITY_BASIS,
 } from "./content";
 import { VisibilityGap } from "./visibility-gap";
+import { buttonClass } from "@/components/ui/button";
 
 /** Секции лендинга. Данные и тексты — в ./content.ts, здесь только разметка. */
 
@@ -44,13 +45,13 @@ export function Hero() {
         <Link
           href="/signup"
           data-testid="landing-cta-audit"
-          className="h-11 rounded-md bg-primary px-5 text-sm font-medium leading-[2.75rem] text-primary-foreground"
+          className={buttonClass("primary", "lg", "h-11 px-5")}
         >
           Run a free audit on one of your clients
         </Link>
         <Link
           href="/sample-report"
-          className="h-11 rounded-md border border-input px-5 text-sm font-medium leading-[2.75rem] hover:bg-accent"
+          className={buttonClass("outline", "lg", "h-11 px-5")}
         >
           See an example report
         </Link>
@@ -90,7 +91,7 @@ export function ReportIsTheProduct() {
 
       <Link
         href="/sample-report"
-        className="h-10 w-fit rounded-md border border-input px-4 text-sm font-medium leading-10 hover:bg-accent"
+        className={buttonClass("outline", "lg", "w-fit")}
       >
         Open the full example
       </Link>
@@ -170,13 +171,13 @@ export function FreeAudit() {
       <div className="flex flex-wrap items-center gap-3">
         <Link
           href="/signup"
-          className="h-11 rounded-md bg-primary px-5 text-sm font-medium leading-[2.75rem] text-primary-foreground"
+          className={buttonClass("primary", "lg", "h-11 px-5")}
         >
           Start a free audit
         </Link>
         <Link
           href="/sample-report/audit"
-          className="h-11 rounded-md border border-input px-5 text-sm font-medium leading-[2.75rem] hover:bg-accent"
+          className={buttonClass("outline", "lg", "h-11 px-5")}
         >
           See what the audit produces
         </Link>
@@ -223,7 +224,7 @@ export function Pricing() {
 
             <Link
               href="/signup"
-              className="mt-auto h-10 rounded-md bg-primary px-4 text-center text-sm font-medium leading-10 text-primary-foreground"
+              className={buttonClass("primary", "lg", "mt-auto w-full")}
             >
               Start with the free audit
             </Link>
@@ -318,7 +319,7 @@ export function ClosingCta() {
       </p>
       <Link
         href="/signup"
-        className="h-11 rounded-md bg-primary px-5 text-sm font-medium leading-[2.75rem] text-primary-foreground"
+        className={buttonClass("primary", "lg", "h-11 px-5")}
       >
         Create your agency account
       </Link>

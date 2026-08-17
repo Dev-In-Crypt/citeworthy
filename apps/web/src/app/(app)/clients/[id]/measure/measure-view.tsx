@@ -6,11 +6,11 @@ import { api } from "@/trpc/react";
 import { EmptyState } from "@/components/page-header";
 import { SchedulePanel } from "./schedule-panel";
 import { GeneratePrompts } from "./generate-prompts";
+import { buttonClass } from "@/components/ui/button";
+import { inputClass } from "@/components/ui/field";
 
 const INTENTS = ["comparison", "learning", "purchase", "other"] as const;
 
-const inputClass =
-  "h-10 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 export function MeasureView({ clientId }: { clientId: string }) {
   const utils = api.useUtils();
@@ -90,7 +90,7 @@ export function MeasureView({ clientId }: { clientId: string }) {
             onClick={() =>
               createCluster.mutate({ clientId, name: clusterName, intent: clusterIntent })
             }
-            className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60"
+            className={buttonClass("primary", "lg")}
           >
             Add cluster
           </button>
@@ -229,7 +229,7 @@ function PromptList({
           type="button"
           disabled={!text || create.isPending}
           onClick={() => create.mutate({ clusterId, text, isControl })}
-          className="h-10 rounded-md border border-input px-3 text-sm font-medium disabled:opacity-60"
+          className={buttonClass("outline", "lg")}
         >
           Add prompt
         </button>

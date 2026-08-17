@@ -4,6 +4,8 @@ import { useState } from "react";
 import { billingPeriod, formatUsd } from "@repo/core";
 import { api } from "@/trpc/react";
 import { EmptyState } from "@/components/page-header";
+import { controlClass } from "@/components/ui/field";
+import { cn } from "@/lib/utils";
 
 const PLATFORM_LABELS: Record<string, string> = {
   chatgpt: "ChatGPT",
@@ -36,7 +38,7 @@ export function UsageView() {
           data-testid="usage-period"
           value={period}
           onChange={(event) => setPeriod(event.target.value)}
-          className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+          className={cn(controlClass, "h-10 px-2.5")}
         >
           {recentPeriods().map((value) => (
             <option key={value} value={value}>

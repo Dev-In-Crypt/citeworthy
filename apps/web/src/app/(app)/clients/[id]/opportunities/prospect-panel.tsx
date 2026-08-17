@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { api } from "@/trpc/react";
+import { buttonClass } from "@/components/ui/button";
 
 /**
  * Что делать с проспектом после аудита.
@@ -75,7 +76,7 @@ export function ProspectPanel({ clientId }: { clientId: string }) {
                       competitorNames: [...(client.data?.competitorNames ?? []), name],
                     });
                   }}
-                  className="rounded-full border border-input px-3 py-1 text-sm hover:bg-accent disabled:opacity-60"
+                  className={buttonClass("outline", "md", "rounded-full")}
                 >
                   + {row.domain}
                   <span className="ml-2 text-xs text-muted-foreground">{row.citations} cited</span>
@@ -91,7 +92,7 @@ export function ProspectPanel({ clientId }: { clientId: string }) {
           data-testid="convert-prospect"
           disabled={update.isPending}
           onClick={() => update.mutate({ id: clientId, status: "active" })}
-          className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60"
+          className={buttonClass("primary", "lg")}
         >
           {update.isPending ? "Converting…" : "Convert to client"}
         </button>

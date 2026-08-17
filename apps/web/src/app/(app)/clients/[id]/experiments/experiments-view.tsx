@@ -14,8 +14,8 @@ import {
 import { EXPERIMENT_COPY } from "@repo/core";
 import { api } from "@/trpc/react";
 import { EmptyState } from "@/components/page-header";
-import { ConfidenceBadge, type ConfidenceLevel } from "@/components/stat";
-import { NotePanel } from "@/components/note-panel";
+import { ConfidenceBadge, type ConfidenceLevel } from "@/components/ui/stat";
+import { NotePanel } from "@/components/ui/note-panel";
 
 /** Строка группы. Прочерк вместо числа — там, где выборка его не набрала. */
 function GroupRow({

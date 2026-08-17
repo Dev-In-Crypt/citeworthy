@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ResetPasswordForm } from "./reset-password-form";
+import { buttonClass } from "@/components/ui/button";
 
 export default async function ResetPasswordPage({
   searchParams,
@@ -25,7 +26,7 @@ export default async function ResetPasswordPage({
       ) : (
         <Link
           href="/forgot-password"
-          className="h-10 rounded-md bg-primary text-center text-sm font-medium leading-10 text-primary-foreground"
+          className={buttonClass("primary", "lg", "w-full")}
         >
           Request a new link
         </Link>

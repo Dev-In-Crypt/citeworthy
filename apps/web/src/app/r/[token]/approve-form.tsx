@@ -3,6 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { api } from "@/trpc/react";
+import { buttonClass } from "@/components/ui/button";
+import { controlClass } from "@/components/ui/field";
+import { cn } from "@/lib/utils";
 
 /**
  * Подтверждение отчёта клиентом агентства. Без регистрации: аккаунт ради
@@ -37,14 +40,14 @@ export function ApproveForm({ token }: { token: string }) {
             required
             placeholder="Your name"
             aria-label="Your name"
-            className="h-10 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className={cn(controlClass, "h-10 px-3")}
           />
         </label>
 
         <button
           type="submit"
           disabled={!name.trim() || approve.isPending}
-          className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60"
+          className={buttonClass("primary", "lg")}
         >
           {approve.isPending ? "Recording…" : "Approve"}
         </button>

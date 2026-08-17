@@ -4,6 +4,9 @@ import { useState } from "react";
 import { ACTION_TYPES } from "@repo/core";
 import { api } from "@/trpc/react";
 import { EmptyState } from "@/components/page-header";
+import { buttonClass } from "@/components/ui/button";
+import { controlClass } from "@/components/ui/field";
+import { cn } from "@/lib/utils";
 
 const COLUMNS = [
   { status: "backlog", label: "Backlog" },
@@ -113,7 +116,7 @@ export function ActionsBoard({ clientId }: { clientId: string }) {
       type="button"
       data-testid="add-action"
       onClick={() => setAdding(true)}
-      className="h-9 rounded-md border border-input px-3 text-sm font-medium hover:bg-accent"
+      className={buttonClass("outline", "md")}
     >
       Add action
     </button>
@@ -358,7 +361,7 @@ export function ActionsBoard({ clientId }: { clientId: string }) {
                 setSelected({ ...selected, ownerUserId });
                 update.mutate({ id: selected.id, ownerUserId });
               }}
-              className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+              className={cn(controlClass, "h-10 px-2.5")}
             >
               <option value="">Unassigned</option>
               {(members.data ?? []).map((member) => (
@@ -380,7 +383,7 @@ export function ActionsBoard({ clientId }: { clientId: string }) {
                 onChange={(event) => setDropReason(event.target.value)}
                 placeholder="Why this is not worth doing"
                 rows={2}
-                className="rounded-md border border-input bg-background p-2 text-sm"
+                className={cn(controlClass, "p-2.5")}
               />
               <button
                 type="button"
@@ -426,7 +429,7 @@ export function ActionsBoard({ clientId }: { clientId: string }) {
                 data-testid="create-experiment"
                 disabled={createExperiment.isPending}
                 onClick={() => createExperiment.mutate({ actionId: experimentPrompt.id })}
-                className="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60"
+                className={buttonClass("primary", "md")}
               >
                 {createExperiment.isPending ? "Creating…" : "Create experiment"}
               </button>
@@ -436,7 +439,7 @@ export function ActionsBoard({ clientId }: { clientId: string }) {
                   setExperimentPrompt(null);
                   setExperimentWarnings([]);
                 }}
-                className="h-9 rounded-md border border-input px-4 text-sm font-medium hover:bg-accent"
+                className={buttonClass("outline", "md")}
               >
                 {createExperiment.isSuccess ? "Close" : "Not now"}
               </button>
@@ -504,7 +507,7 @@ function ActionBriefPanel({ actionId }: { actionId: string }) {
           type="button"
           data-testid="copy-brief"
           onClick={() => void navigator.clipboard?.writeText(asText)}
-          className="h-8 shrink-0 rounded-md border px-2.5 text-xs font-medium hover:bg-accent"
+          className={buttonClass("outline", "sm", "shrink-0")}
         >
           Copy brief
         </button>
@@ -639,7 +642,7 @@ function NewActionDialog({
           <input
             value={title}
             onChange={(event) => setTitle(event.target.value)}
-            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+            className={cn(controlClass, "h-10 px-3")}
           />
         </label>
 
@@ -650,7 +653,7 @@ function NewActionDialog({
             onChange={(event) => setReason(event.target.value)}
             rows={3}
             placeholder="What in the measurements makes this worth doing"
-            className="rounded-md border border-input bg-background p-2 text-sm"
+            className={cn(controlClass, "p-2.5")}
           />
         </label>
 
@@ -661,7 +664,7 @@ function NewActionDialog({
               aria-label="Type"
               value={actionType}
               onChange={(event) => setActionType(event.target.value)}
-              className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+              className={cn(controlClass, "h-10 px-2.5")}
             >
               {ACTION_TYPES.map((type) => (
                 <option key={type} value={type}>
@@ -677,7 +680,7 @@ function NewActionDialog({
               aria-label="Impact"
               value={estimatedImpact}
               onChange={(event) => setEstimatedImpact(event.target.value)}
-              className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+              className={cn(controlClass, "h-10 px-2.5")}
             >
               {["low", "medium", "high"].map((level) => (
                 <option key={level} value={level}>
@@ -693,7 +696,7 @@ function NewActionDialog({
               aria-label="Effort"
               value={effort}
               onChange={(event) => setEffort(event.target.value)}
-              className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+              className={cn(controlClass, "h-10 px-2.5")}
             >
               {["low", "medium", "high"].map((level) => (
                 <option key={level} value={level}>
@@ -726,14 +729,14 @@ function NewActionDialog({
                 affectedClusterIds: [],
               })
             }
-            className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60"
+            className={buttonClass("primary", "lg")}
           >
             Create action
           </button>
           <button
             type="button"
             onClick={onClose}
-            className="h-10 rounded-md border border-input px-4 text-sm font-medium hover:bg-accent"
+            className={buttonClass("outline", "lg")}
           >
             Cancel
           </button>
