@@ -4,12 +4,13 @@ import Link from "next/link";
 import { api } from "@/trpc/react";
 import { EmptyState } from "@/components/page-header";
 import { buttonClass } from "@/components/ui/button";
+import { SkeletonCards } from "@/components/ui/skeleton";
 
 export function ClientsView() {
   const clients = api.clients.list.useQuery();
 
   if (clients.isPending) {
-    return <p className="text-sm text-muted-foreground">Loading clients…</p>;
+    return <SkeletonCards count={4} />;
   }
 
   if (clients.error) {

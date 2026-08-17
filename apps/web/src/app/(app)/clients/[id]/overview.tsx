@@ -15,10 +15,12 @@ import { CONFIDENCE_LABELS, MEASUREMENT_COPY, shareOfNamed } from "@repo/core";
 import { api, type RouterOutputs } from "@/trpc/react";
 import { EmptyState } from "@/components/page-header";
 import { StatCard } from "@/components/ui/stat";
+import { ScoreDial } from "@/components/ui/score";
 import { MatrixSection } from "./matrix-view";
 import { TrafficCard } from "./traffic";
 import { controlClass } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
+import { SkeletonCards } from "@/components/ui/skeleton";
 
 const PLATFORMS = [
   { value: null, label: "All platforms" },
@@ -164,10 +166,7 @@ function TopOpportunities({ clientId }: { clientId: string }) {
       <ul className="grid gap-3 md:grid-cols-3">
         {top.map((row) => (
           <li key={row.id} className="flex flex-col gap-2 rounded-lg border p-4">
-            <span className="flex items-baseline gap-0.5">
-              <span className="metric text-2xl font-semibold tracking-tight">{row.score}</span>
-              <span className="metric text-xs text-muted-foreground">/100</span>
-            </span>
+            <ScoreDial score={row.score} />
             <span className="text-sm font-medium">{row.title}</span>
             <span className="line-clamp-3 text-xs text-muted-foreground">{row.reason}</span>
             <Link
@@ -337,7 +336,7 @@ export function ClientOverview({ clientId }: { clientId: string }) {
   const matrix = api.measurement.matrix.useQuery({ clientId });
 
   if (data.isPending) {
-    return <p className="text-sm text-muted-foreground">Loading…</p>;
+    return <SkeletonCards count={3} />;
   }
 
   const latest = data.data?.latest ?? null;

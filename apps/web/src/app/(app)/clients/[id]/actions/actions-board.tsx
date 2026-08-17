@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/page-header";
 import { buttonClass } from "@/components/ui/button";
 import { controlClass } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
+import { SkeletonCards, SkeletonText } from "@/components/ui/skeleton";
 
 const COLUMNS = [
   { status: "backlog", label: "Backlog" },
@@ -105,7 +106,7 @@ export function ActionsBoard({ clientId }: { clientId: string }) {
   }
 
   if (actions.isPending) {
-    return <p className="text-sm text-muted-foreground">Loading…</p>;
+    return <SkeletonCards count={3} />;
   }
 
   const rows = (actions.data ?? []) as ActionRow[];
@@ -469,7 +470,7 @@ function ActionBriefPanel({ actionId }: { actionId: string }) {
   const brief = api.actions.brief.useQuery({ actionId });
 
   if (brief.isPending) {
-    return <p className="text-sm text-muted-foreground">Loading the brief…</p>;
+    return <SkeletonText lines={4} />;
   }
 
   if (!brief.data) {

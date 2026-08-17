@@ -16,6 +16,7 @@ import { api } from "@/trpc/react";
 import { EmptyState } from "@/components/page-header";
 import { ConfidenceBadge, type ConfidenceLevel } from "@/components/ui/stat";
 import { NotePanel } from "@/components/ui/note-panel";
+import { SkeletonCards } from "@/components/ui/skeleton";
 
 /** Строка группы. Прочерк вместо числа — там, где выборка его не набрала. */
 function GroupRow({
@@ -70,7 +71,7 @@ export function ExperimentsView({ clientId }: { clientId: string }) {
   const activeId = selectedId ?? rows[0]?.id ?? null;
 
   if (experiments.isPending) {
-    return <p className="text-sm text-muted-foreground">Loading…</p>;
+    return <SkeletonCards count={3} />;
   }
 
   if (rows.length === 0) {
@@ -112,7 +113,7 @@ function ExperimentDetail({ experimentId }: { experimentId: string }) {
   const detail = api.experiments.get.useQuery({ id: experimentId });
 
   if (detail.isPending) {
-    return <p className="text-sm text-muted-foreground">Loading…</p>;
+    return <SkeletonCards count={3} />;
   }
   if (!detail.data) {
     return <p className="text-sm text-muted-foreground">Nothing to show.</p>;

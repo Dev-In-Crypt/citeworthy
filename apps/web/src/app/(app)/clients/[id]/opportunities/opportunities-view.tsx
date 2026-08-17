@@ -7,12 +7,14 @@ import { OPPORTUNITY_COPY, recommendationSchema, type Recommendation } from "@re
 import { api, type RouterOutputs } from "@/trpc/react";
 import { EmptyState } from "@/components/page-header";
 import { ConfidenceBadge } from "@/components/ui/stat";
+import { ScoreDial } from "@/components/ui/score";
 import { NotePanel } from "@/components/ui/note-panel";
 import { ProspectPanel } from "./prospect-panel";
 import { PlanPanel } from "./plan-panel";
 import { cn } from "@/lib/utils";
 import { buttonClass } from "@/components/ui/button";
 import { controlClass } from "@/components/ui/field";
+import { SkeletonCards, SkeletonText } from "@/components/ui/skeleton";
 
 type Opportunity = RouterOutputs["opportunities"]["list"][number];
 
@@ -51,7 +53,7 @@ export function OpportunitiesView({ clientId }: { clientId: string }) {
   }
 
   if (opportunities.isPending) {
-    return <p className="text-sm text-muted-foreground">Loading opportunities…</p>;
+    return <SkeletonCards count={4} />;
   }
 
   if (opportunities.error) {
@@ -171,25 +173,7 @@ function OpportunityCard({
         className="flex w-full flex-col gap-2 p-4 text-left hover:bg-accent/40"
       >
         <div className="flex items-start gap-4">
-          {/* Голое число не говорит ничего: 64 — это много или мало? Рядом
-              стоит шкала и полоса, чтобы масштаб читался без объяснений. */}
-          <span className="flex w-14 shrink-0 flex-col gap-1 pt-0.5">
-            <span className="flex items-baseline gap-0.5">
-              <span
-                data-testid="opportunity-score"
-                className="metric text-2xl leading-none font-semibold tracking-tight"
-              >
-                {opportunity.score}
-              </span>
-              <span className="metric text-xs text-muted-foreground">/100</span>
-            </span>
-            <span className="h-1 w-full overflow-hidden rounded-full bg-secondary">
-              <span
-                className="block h-full bg-primary"
-                style={{ width: `${opportunity.score}%` }}
-              />
-            </span>
-          </span>
+          <ScoreDial score={opportunity.score} testId="opportunity-score" className="pt-0.5" />
 
           <span className="flex min-w-0 flex-col gap-2">
             <span className="break-words text-base font-medium">{opportunity.title}</span>
@@ -255,7 +239,11 @@ function OpportunityDetail({
   });
 
   if (detail.isPending) {
-    return <p className="border-t p-4 text-sm text-muted-foreground">Loading the evidence…</p>;
+    return (
+      <div className="border-t p-4">
+        <SkeletonText lines={4} />
+      </div>
+    );
   }
   if (detail.error) {
     return (
@@ -315,7 +303,7 @@ function OpportunityDetail({
         <h3 className="text-sm font-medium">Why am I seeing this?</h3>
 
         {evidence.isPending ? (
-          <p className="text-sm text-muted-foreground">Loading the answers behind it…</p>
+          <SkeletonText lines={3} />
         ) : evidence.error ? (
           <p role="alert" className="text-sm text-destructive">
             {evidence.error.message}

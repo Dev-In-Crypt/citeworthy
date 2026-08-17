@@ -8,6 +8,7 @@ import { SchedulePanel } from "./schedule-panel";
 import { GeneratePrompts } from "./generate-prompts";
 import { buttonClass } from "@/components/ui/button";
 import { inputClass } from "@/components/ui/field";
+import { SkeletonCards } from "@/components/ui/skeleton";
 
 const INTENTS = ["comparison", "learning", "purchase", "other"] as const;
 
@@ -38,7 +39,7 @@ export function MeasureView({ clientId }: { clientId: string }) {
   const deleteCluster = api.prompts.deleteCluster.useMutation({ onSuccess: refresh });
 
   if (clusters.isPending || prompts.isPending) {
-    return <p className="text-sm text-muted-foreground">Loading…</p>;
+    return <SkeletonCards count={3} />;
   }
 
   const promptsByCluster = new Map<string, typeof prompts.data>();

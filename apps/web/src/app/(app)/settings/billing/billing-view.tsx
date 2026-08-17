@@ -4,6 +4,7 @@ import { useState } from "react";
 import { api } from "@/trpc/react";
 import { cn } from "@/lib/utils";
 import { buttonClass } from "@/components/ui/button";
+import { SkeletonCards } from "@/components/ui/skeleton";
 
 const PLAN_NAMES: Record<string, string> = {
   starter: "Starter",
@@ -31,7 +32,7 @@ export function BillingView() {
 
   const data = subscription.data;
   if (!data) {
-    return <p className="text-sm text-muted-foreground">Loading…</p>;
+    return <SkeletonCards count={2} />;
   }
 
   const { entitlements } = data;

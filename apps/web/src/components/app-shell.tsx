@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { BarChart3, Code2, CreditCard, Settings, Users, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SignOutButton } from "@/components/sign-out-button";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const NAV = [
   { href: "/dashboard", label: "Overview", icon: BarChart3 },
@@ -92,7 +93,8 @@ export function AppShell({
             ))}
           </nav>
           <span className="hidden text-sm text-muted-foreground md:inline">AI Search delivery</span>
-          <div className="shrink-0">
+          <div className="flex shrink-0 items-center gap-1">
+            <ThemeToggle />
             <SignOutButton />
           </div>
         </header>

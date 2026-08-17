@@ -74,6 +74,16 @@ test("look", async ({ page }) => {
   await page.waitForTimeout(1200);
   await page.screenshot({ path: "shots/opportunity-detail.png" });
 
+  // Тёмная тема: до сих пор её никто не видел ни разу.
+  await page.goto(`/clients/${clientId}/opportunities`);
+  await page.getByTestId("theme-toggle").click();
+  await page.waitForTimeout(600);
+  await page.screenshot({ path: "shots/dark-opportunities.png" });
+  await page.goto(`/clients/${clientId}`);
+  await page.waitForTimeout(1200);
+  await page.screenshot({ path: "shots/dark-overview.png" });
+  await page.getByTestId("theme-toggle").click();
+
   // Телефон.
   await page.setViewportSize({ width: 375, height: 812 });
   for (const [name, path] of shots.slice(0, 3)) {

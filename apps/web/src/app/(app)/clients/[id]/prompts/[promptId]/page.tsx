@@ -6,6 +6,7 @@ import { highlightMentions } from "@repo/core";
 import { api } from "@/trpc/react";
 import { EmptyState, PageHeader } from "@/components/page-header";
 import { buttonClass } from "@/components/ui/button";
+import { SkeletonCards } from "@/components/ui/skeleton";
 
 /** «2nd», «3rd» — порядковый суффикс для места среди названных брендов. */
 function ordinal(rank: number | null): string {
@@ -29,7 +30,7 @@ export default function PromptResponsesPage({
   const data = api.runs.responses.useQuery({ promptId });
 
   if (data.isPending) {
-    return <p className="text-sm text-muted-foreground">Loading answers…</p>;
+    return <SkeletonCards count={3} />;
   }
 
   if (data.error || !data.data) {

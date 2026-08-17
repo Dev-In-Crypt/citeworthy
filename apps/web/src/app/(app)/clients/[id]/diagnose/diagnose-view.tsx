@@ -5,6 +5,7 @@ import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { api } from "@/trpc/react";
 import { EmptyState } from "@/components/page-header";
 import { buttonClass } from "@/components/ui/button";
+import { SkeletonCards } from "@/components/ui/skeleton";
 
 /** Цвета типов источников: собственные — зелёным, всё стороннее — оттенками оранжевого. */
 const TYPE_COLORS: Record<string, string> = {
@@ -89,7 +90,7 @@ export function DiagnoseView({ clientId }: { clientId: string }) {
   );
 
   if (graph.isPending) {
-    return <p className="text-sm text-muted-foreground">Loading…</p>;
+    return <SkeletonCards count={2} />;
   }
 
   const data = graph.data;

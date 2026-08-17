@@ -6,6 +6,7 @@ import { api } from "@/trpc/react";
 import { EmptyState } from "@/components/page-header";
 import { cn } from "@/lib/utils";
 import { buttonClass } from "@/components/ui/button";
+import { SkeletonRows } from "@/components/ui/skeleton";
 
 /**
  * Портфель — первый экран агентства.
@@ -32,7 +33,7 @@ export function Portfolio() {
   const rows = portfolio.data ?? [];
 
   if (portfolio.isPending) {
-    return <p className="text-sm text-muted-foreground">Loading…</p>;
+    return <SkeletonRows rows={6} />;
   }
 
   /**
