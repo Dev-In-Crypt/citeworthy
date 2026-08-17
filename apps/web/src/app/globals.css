@@ -246,4 +246,22 @@
     background: var(--background);
     color: var(--foreground);
   }
+
+  /*
+   * Печатные правила отчёта.
+   *
+   * PDF собирается печатью этой же страницы, и до сих пор у неё не было ни
+   * одного правила печати: раздел мог разорваться между страницами так, что
+   * заголовок оставался внизу одной, а числа под ним уезжали на следующую.
+   * Клиент читает этот документ именно в PDF.
+   */
+  [data-surface="report"] section,
+  [data-surface="report"] li {
+    break-inside: avoid;
+  }
+
+  [data-surface="report"] h1,
+  [data-surface="report"] h2 {
+    break-after: avoid;
+  }
 }
