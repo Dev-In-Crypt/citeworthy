@@ -1,26 +1,37 @@
 # Citeworthy
 
-Agency-first SaaS for AI search visibility. Agencies measure how ChatGPT, Perplexity and Gemini
-answer about their clients, diagnose which sources drive the gap, run actions and experiments, and
-hand the client a white-label report.
+The operating system for AI Search retainers. Agencies measure how ChatGPT, Perplexity and Gemini
+answer about their clients, find where the client is losing and why, turn that into work, measure
+what moved, and hand the client a white-label report.
 
 The product name never appears on anything the agency's own client sees — reports and PDFs carry
 the agency's logo and colour only.
 
 ## What it does
 
+The working object is an **opportunity**: where this client is losing, on which questions, why, and
+what is worth doing about it. Everything else exists to produce one or to act on it.
+
 - **Measure.** Repeated samples per prompt across three platforms, aggregated into weekly windows.
   Visibility is the share of answers mentioning the brand, never a single answer.
-- **Diagnose.** Which kinds of sources models cite, where competitors appear and the client does
-  not, and reasoned recommendations — each one carries a non-empty reason.
-- **Deliver.** Actions board, experiments with a control group, activity log.
+- **Find.** Four detectors over the measured answers — a competitor ahead on a question, a cited
+  source the client is missing from, own pages that are read but do not carry the brand, a topic
+  trailing the rest. Each opportunity is scored 0–100 and stores the breakdown, so "why is this 91
+  and that 43" has an answer that does not require recomputing anything.
+- **Explain.** Every opportunity opens onto the evidence it was built from: the window, the sample
+  size, the affected questions, the competitors named there, and only then example answers.
+- **Deliver.** Convert an opportunity into an action and it carries its reason, evidence and topics
+  with it. Actions board, experiments with a comparison group, activity log.
 - **Report.** A public link the client opens without an account, plus PDF export printed from that
   same page.
-- **Audit.** A free-audit mode for prospects: generated buyer prompts, one measurement pass, and an
-  opportunity report with the proposed scope.
+- **Audit.** A free-audit mode for prospects: generated buyer prompts, one measurement pass, ranked
+  opportunities, a 90-day plan built from them, and conversion to a client that rebuilds nothing.
 
 Estimates are labelled as estimates. Words claiming proven causation are banned from the UI and
 reports, and a test enforces it.
+
+The 0–100 score is an internal triage number and stays internal: in a white-label report it would
+read as a grade of the client's website.
 
 ## Stack
 
@@ -52,6 +63,11 @@ pnpm e2e          # Playwright, against a production build
 pnpm lint && pnpm typecheck
 pnpm db:migrate | db:seed | db:studio
 ```
+
+`db:seed` also runs one fixture-backed measurement pass through the real pipeline, so a fresh
+database comes up with snapshots, opportunities, actions and an experiment. None of those numbers
+are written by hand — they are produced by the same code that runs in production, only the answers
+come from fixtures.
 
 ## Deploying
 
@@ -89,6 +105,7 @@ curl -H "Authorization: Bearer $CITEWORTHY_KEY" https://your-host/api/v1/clients
 | `GET /api/v1/clients` | Clients of the agency |
 | `GET /api/v1/clients/{id}/visibility` | Prompt × assistant matrix, intervals, movement |
 | `GET /api/v1/clients/{id}/sources` | Cited sources and presence |
+| `GET /api/v1/clients/{id}/opportunities` | Ranked gaps with score, evidence level and reason |
 | `GET /api/v1/clients/{id}/actions` | Work queue, each row with its reason |
 | `GET /api/v1/reports` | Reports and their status |
 
@@ -102,6 +119,11 @@ never claimed.
   another agency returns NOT_FOUND, never FORBIDDEN — the API must not confirm that it exists.
 - Visibility is only ever computed from aggregates: at least three samples per prompt per platform,
   weekly windows. Raw responses are always kept, so a parser change can be replayed.
+- Opportunities are recomputed after every run, and that recompute never writes a human decision.
+  Status, dismissal reason and first-detected date belong to the person; a dismissal records the
+  score it was made at and only comes back if the gap grows well past it.
+- Scoring is deterministic and versioned. Confidence multiplies rather than adds, so a gap nobody
+  has measured properly cannot reach the top of the queue on size alone.
 - Wording that claims proven causation is banned in the UI and in reports; approved phrasings live
   in `packages/core/src/copy.ts` and a test greps for violations.
 - Reports and PDFs carry the agency's brand only. A test asserts the product leaves no trace there.
