@@ -195,4 +195,8 @@ export const SAMPLE_HIGHLIGHTS = {
   deliveryGapBefore: SAMPLE_DELIVERY_REPORT.competitorGap.before,
   deliveryGapAfter: SAMPLE_DELIVERY_REPORT.competitorGap.after,
   deliveryContribution: SAMPLE_DELIVERY_REPORT.highestImpactAction?.estimatedContribution ?? "",
+  /** Сделанная работа — то, чем ретейнер оправдывается перед клиентом. */
+  deliveryWork: SAMPLE_DELIVERY_REPORT.workCompleted,
+  deliveryNewCitedUrls: SAMPLE_DELIVERY_REPORT.results.newCitedUrls,
+  deliveryNewBrandMentions: SAMPLE_DELIVERY_REPORT.results.newBrandMentions,
 } as const;

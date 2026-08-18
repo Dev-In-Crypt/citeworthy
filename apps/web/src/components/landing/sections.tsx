@@ -27,37 +27,98 @@ function SectionTitle({ children, hint }: { children: React.ReactNode; hint?: st
   );
 }
 
-export function Hero() {
+/**
+ * Карточка отчёта в шапке.
+ *
+ * Продаётся здесь не панель, а документ, который агентство кладёт перед своим
+ * клиентом. Показать его в первом экране честнее, чем описать словами: видно
+ * и что в нём есть, и чьё на нём имя. Цифры — из того же собранного примера,
+ * что и страница `/sample-report`, поэтому разойтись они не могут.
+ *
+ * Единственная тень в продукте — здесь: карточка обязана читаться как лист
+ * бумаги поверх страницы, а не как ещё один её блок.
+ */
+function ReportPreview() {
   return (
-    <section className={`${SECTION} flex flex-col gap-10 py-16 sm:py-24`}>
-      <div className="flex max-w-3xl flex-col gap-5">
-        <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">
-          Sell and deliver AI Search retainers without adding headcount
-        </h1>
-        <p className="text-lg text-muted-foreground">
-          Find where your clients disappear from AI answers, work out which sources decide it, and
-          hand the client a report in your own brand that shows what changed and what the evidence
-          is.
+    <div
+      data-testid="landing-report-card"
+      className="flex flex-col overflow-hidden rounded-lg border bg-card"
+      style={{ boxShadow: "var(--shadow-overlay)" }}
+    >
+      {/* Полоса цвета агентства: в настоящем отчёте он берётся из настроек. */}
+      <span aria-hidden className="h-[5px] w-full bg-client" />
+
+      <div className="flex flex-col gap-4 p-5">
+        <div className="flex items-center gap-2">
+          <span
+            aria-hidden
+            className="flex size-6 items-center justify-center rounded bg-client text-[11px] font-semibold text-white"
+          >
+            NW
+          </span>
+          <span className="text-sm font-medium text-client">Northwell Studio</span>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-muted-foreground">Named in AI answers</span>
+          <span className="metric text-3xl font-semibold">
+            {SAMPLE_HIGHLIGHTS.deliveryBefore}% → {SAMPLE_HIGHLIGHTS.deliveryAfter}%
+          </span>
+          <span className="metric text-xs text-muted-foreground">
+            {SAMPLE_HIGHLIGHTS.deliveryDeltaPp >= 0 ? "+" : ""}
+            {SAMPLE_HIGHLIGHTS.deliveryDeltaPp} pp over the quarter · estimated
+          </span>
+        </div>
+
+        <dl className="flex flex-col gap-1.5 border-t pt-3 text-sm">
+          {SAMPLE_HIGHLIGHTS.deliveryWork.slice(0, 3).map((item) => (
+            <div key={item.label} className="flex items-baseline justify-between gap-3">
+              <dt className="min-w-0 truncate text-muted-foreground">{item.label}</dt>
+              <dd className="metric shrink-0 font-medium">{item.count}</dd>
+            </div>
+          ))}
+        </dl>
+
+        <p className="border-t pt-3 text-xs text-muted-foreground">
+          Your logo, your colour, no trace of us.
         </p>
       </div>
+    </div>
+  );
+}
 
-      <div className="flex flex-wrap items-center gap-3">
-        <Link
-          href="/signup"
-          data-testid="landing-cta-audit"
-          className={buttonClass("primary", "lg", "h-11 px-5")}
-        >
-          Run a free audit on one of your clients
-        </Link>
-        <Link
-          href="/sample-report"
-          className={buttonClass("outline", "lg", "h-11 px-5")}
-        >
-          See an example report
-        </Link>
+export function Hero() {
+  return (
+    <section className={`${SECTION} grid items-start gap-10 py-16 sm:py-24 lg:grid-cols-[1fr_320px]`}>
+      <div className="flex min-w-0 flex-col gap-10">
+        <div className="flex flex-col gap-5">
+          <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">
+            Sell and deliver AI Search retainers without adding headcount
+          </h1>
+          <p className="text-lg text-muted-foreground">
+            Find where your clients disappear from AI answers, work out which sources decide it, and
+            hand the client a report in your own brand that shows what changed and what the evidence
+            is.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            href="/signup"
+            data-testid="landing-cta-audit"
+            className={buttonClass("primary", "lg", "h-11 px-5")}
+          >
+            Run a free audit on one of your clients
+          </Link>
+          <Link href="/sample-report" className={buttonClass("outline", "lg", "h-11 px-5")}>
+            See an example report
+          </Link>
+        </div>
+
+        <VisibilityGap />
       </div>
 
-      <VisibilityGap />
+      <ReportPreview />
     </section>
   );
 }
