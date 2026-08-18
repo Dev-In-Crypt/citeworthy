@@ -109,7 +109,9 @@ function MetadataStrip({
         <Meta label="Last run">{when(lastRun?.finishedAt ?? lastRun?.startedAt)}</Meta>
 
         <Meta label="Next run">
-          {schedule.data?.active ? when(schedule.data.nextRunAt) : "not scheduled"}
+          {/* «not scheduled» — это утверждение о настройке, а не о сбое сети:
+              на ошибке загрузки нельзя делать вид, что расписание выключено. */}
+          {schedule.error ? "—" : schedule.data?.active ? when(schedule.data.nextRunAt) : "not scheduled"}
         </Meta>
       </dl>
 
@@ -187,7 +189,18 @@ function NeedsAttention({ clientId }: { clientId: string }) {
   const actions = api.actions.list.useQuery({ clientId });
   const experiments = api.experiments.list.useQuery({ clientId });
 
-  if (opportunities.isPending || actions.isPending) return null;
+  if (opportunities.isPending || actions.isPending || experiments.isPending) return null;
+
+  // Сбой хотя бы одного из трёх запросов не должен читаться как «всё чисто»:
+  // это тот же ложный «пусто», что уже правили в ленте решений и в отчётах.
+  if (opportunities.error || actions.error || experiments.error) {
+    return (
+      <Card data-testid="needs-attention" className="flex flex-col gap-2">
+        <CardTitle>What needs a person</CardTitle>
+        <p className="text-sm text-muted-foreground">This could not be checked right now.</p>
+      </Card>
+    );
+  }
 
   const open = (opportunities.data ?? []).filter((row) => row.status === "open");
   const highPriority = open.filter((row) => row.priority === "high");
@@ -275,7 +288,9 @@ function NextWork({ clientId }: { clientId: string }) {
         <p className="text-sm text-muted-foreground">
           {opportunities.isPending
             ? "Loading…"
-            : "No open opportunities. New ones appear after the next run."}
+            : opportunities.error
+              ? "Opportunities could not be loaded."
+              : "No open opportunities. New ones appear after the next run."}
         </p>
       ) : (
         <ul className="flex flex-col gap-2.5">
@@ -318,7 +333,11 @@ function SourceMixCard({ clientId }: { clientId: string }) {
 
       {mix.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          {sources.isPending ? "Loading…" : MEASUREMENT_COPY.noDataYet}
+          {sources.isPending
+            ? "Loading…"
+            : sources.error
+              ? "Sources could not be loaded."
+              : MEASUREMENT_COPY.noDataYet}
         </p>
       ) : (
         <ul className="flex flex-col gap-2 text-sm">

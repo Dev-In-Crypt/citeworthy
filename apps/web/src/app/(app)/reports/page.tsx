@@ -44,6 +44,20 @@ export default function AgencyReportsPage() {
 
       {reports.isPending ? (
         <SkeletonRows rows={6} />
+      ) : reports.error ? (
+        // Пустое состояние — утверждение о данных: показать его вместо сбоя
+        // значит сказать «отчётов нет», когда на деле их не удалось загрузить.
+        <div
+          role="alert"
+          data-testid="form-error"
+          className="flex flex-col items-start gap-3 rounded-lg border border-dashed p-8"
+        >
+          <h2 className="text-base font-medium">Reports could not be loaded</h2>
+          <p className="max-w-prose text-sm text-muted-foreground">{reports.error.message}</p>
+          <button onClick={() => reports.refetch()} className={buttonClass("outline", "lg")}>
+            Try again
+          </button>
+        </div>
       ) : rows.length === 0 ? (
         <EmptyState
           title="No reports yet"
