@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Code2, CreditCard, Settings, Users, Wallet } from "lucide-react";
+import { BarChart3, Code2, CreditCard, FileText, Settings, Users, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SignOutButton } from "@/components/sign-out-button";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -25,6 +25,7 @@ import { Mark } from "@/components/ui/mark";
 const WORK = [
   { href: "/dashboard", label: "Overview", icon: BarChart3 },
   { href: "/clients", label: "Clients", icon: Users },
+  { href: "/reports", label: "Reports", icon: FileText },
 ] as const;
 
 const ACCOUNT = [

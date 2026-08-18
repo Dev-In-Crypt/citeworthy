@@ -16,6 +16,7 @@ import {
 } from "@repo/core";
 import type { CitationFact, SourceType, VisibilitySnapshot } from "@repo/core";
 import {
+  listAgencyReports,
   listCitationFacts,
   countClientMentionsBetween,
   countNewCitedDomains,
@@ -81,6 +82,18 @@ function defaultPeriod(): { start: Date; end: Date } {
 }
 
 export const reportsRouter = router({
+  /**
+   * Все отчёты агентства одним списком.
+   *
+   * Экран клиента отвечает на вопрос «что мы отдали этому клиенту», но
+   * «пять отчётов ждут согласования» на главной — вопрос про всё агентство,
+   * и обходить ради него клиентов по одному значит платить запросом за
+   * каждого.
+   */
+  listForAgency: protectedProcedure.query(({ ctx }) =>
+    listAgencyReports(ctx.db, ctx.user.agencyId),
+  ),
+
   list: protectedProcedure
     .input(z.object({ clientId: z.uuid() }))
     .query(async ({ ctx, input }) => {
