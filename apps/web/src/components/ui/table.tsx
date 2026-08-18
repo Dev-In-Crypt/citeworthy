@@ -59,7 +59,9 @@ export function TH({
   return (
     <th
       className={cn(
-        "py-2 font-medium",
+        // Правый жёлоб обязателен: колонка с числами прижата вправо, соседняя
+        // — влево, и без него «Change» и «Confidence» слипаются в одно слово.
+        "py-2 pr-4 font-medium last:pr-0",
         align === "right" && "text-right",
         align === "center" && "text-center",
         className,
@@ -84,7 +86,7 @@ export function TD({
   return (
     <td
       className={cn(
-        "py-2.5",
+        "py-2.5 pr-4 last:pr-0",
         align === "right" && "text-right",
         align === "center" && "text-center",
         // Цифры моноширинные всегда: иначе колонка дёргается при обновлении.

@@ -98,4 +98,26 @@ test("the portfolio replaces the placeholder dashboard", async ({ page }) => {
   // Ни одного измерения ещё не было: в клетке доли обязан стоять прочерк.
   await expect(table).toContainText("Awaiting first run");
   await expect(page.getByTestId("portfolio-thin")).toBeVisible();
+
+  /**
+   * Лента решений стоит выше таблицы и называет дело, а не цифру: у клиента,
+   * которого ещё ни разу не измеряли, ждёт ровно один пункт, и кнопка рядом
+   * ведёт туда, где его закрывают.
+   */
+  const feed = page.getByTestId("decision-feed");
+  await expect(feed).toContainText("Ledgerbrook");
+  await expect(feed).toContainText("Awaiting first run");
+  await expect(feed.getByRole("link", { name: "Schedule" })).toHaveAttribute(
+    "href",
+    /\/measure$/,
+  );
+
+  // Та же работа, сложенная по её виду: выбор запоминается между заходами.
+  await page.getByRole("button", { name: "By work" }).click();
+  await expect(feed).toContainText("Measurement");
+  await page.reload();
+  await expect(page.getByRole("button", { name: "By work" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
 });
