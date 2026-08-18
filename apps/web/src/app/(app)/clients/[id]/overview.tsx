@@ -14,7 +14,8 @@ import {
 import { CONFIDENCE_LABELS, MEASUREMENT_COPY, shareOfNamed } from "@repo/core";
 import { api, type RouterOutputs } from "@/trpc/react";
 import { EmptyState } from "@/components/page-header";
-import { StatCard } from "@/components/ui/stat";
+import { buttonClass } from "@/components/ui/button";
+import { Card, CardTitle } from "@/components/ui/card";
 import { ScoreDial } from "@/components/ui/score";
 import { MatrixSection } from "./matrix-view";
 import { TrafficCard } from "./traffic";
@@ -22,6 +23,107 @@ import { controlClass } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
 import { SkeletonCards } from "@/components/ui/skeleton";
 import { TrendingUp } from "lucide-react";
+
+/** Одна ячейка полосы под вкладками. */
+function Meta({
+  label,
+  children,
+  tone,
+}: {
+  label: string;
+  children: React.ReactNode;
+  tone?: "client" | "competitor";
+}) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd
+        className={cn(
+          "metric text-sm font-medium",
+          tone === "client" && "text-client",
+          tone === "competitor" && "text-competitor",
+        )}
+      >
+        {children}
+      </dd>
+    </div>
+  );
+}
+
+function when(value: Date | string | null | undefined): string {
+  if (!value) return "—";
+  return new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+/**
+ * Полоса метаданных под вкладками.
+ *
+ * До неё те же шесть цифр стояли карточками в правой колонке и спорили с
+ * матрицей за верх экрана: три прибора одного размера, и ни один не главный.
+ * Здесь они читаются одной строкой за секунду, а место героя остаётся у
+ * матрицы промптов — единственного, ради чего на этот экран заходят.
+ */
+function MetadataStrip({
+  clientId,
+  matrix,
+  latest,
+}: {
+  clientId: string;
+  matrix: RouterOutputs["measurement"]["matrix"] | undefined;
+  latest: RouterOutputs["measurement"]["visibility"]["latest"];
+}) {
+  const runs = api.runs.list.useQuery({ clientId });
+  const schedule = api.runs.schedule.useQuery({ clientId });
+
+  const lastRun = (runs.data ?? []).find((run) => run.status === "done") ?? null;
+  const totals = matrix?.totals;
+  const delta = matrix?.totalsDeltaPp ?? null;
+
+  // Полоса примыкает к вкладкам вплотную и уходит под края main: отступ под
+  // вкладками гасится, поля страницы — тоже, и цифры читаются как продолжение
+  // шапки, а не как ещё одна карточка поверх неё.
+  return (
+    <div className="-mx-4 -mt-6 flex flex-wrap items-center justify-between gap-x-8 gap-y-3 border-b bg-secondary/40 px-4 py-3 sm:-mx-6 sm:px-6">
+      <dl data-testid="client-meta" className="flex min-w-0 flex-wrap gap-x-8 gap-y-3">
+        <Meta label="Named in answers">
+          <span data-testid="stat-visibility">{latest ? `${latest.visibilityPct}%` : "—"}</span>
+        </Meta>
+
+        <Meta
+          label={`Change over ${matrix?.windowDays ?? 30} days`}
+          tone={
+            delta === null ? undefined : delta > 0 ? "client" : delta < 0 ? "competitor" : undefined
+          }
+        >
+          {delta === null ? "—" : `${delta > 0 ? "+" : ""}${delta} pp`}
+        </Meta>
+
+        <Meta label="Gap to strongest competitor" tone="competitor">
+          <span data-testid="stat-gap">{latest ? `${latest.competitorGapPp} pp` : "—"}</span>
+        </Meta>
+
+        <Meta label="Sample">
+          {totals ? `${totals.samples} answers · ${totals.confidence}` : "—"}
+        </Meta>
+
+        <Meta label="Last run">{when(lastRun?.finishedAt ?? lastRun?.startedAt)}</Meta>
+
+        <Meta label="Next run">
+          {schedule.data?.active ? when(schedule.data.nextRunAt) : "not scheduled"}
+        </Meta>
+      </dl>
+
+      {/* Обычный Link, а не ButtonLink: типизированные роуты Next проверяют
+          href дженериком самого Link, и обёртка теряет тип шаблона. */}
+      <Link
+        href={`/clients/${clientId}/measure`}
+        className={buttonClass("primary", "md", "shrink-0")}
+      >
+        Measure
+      </Link>
+    </div>
+  );
+}
 
 const PLATFORMS = [
   { value: null, label: "All platforms" },
@@ -102,8 +204,8 @@ function NeedsAttention({ clientId }: { clientId: string }) {
     highPriority.length === 0 && stalled.length === 0 && readyExperiments.length === 0;
 
   return (
-    <section data-testid="needs-attention" className="flex flex-col gap-2 rounded-lg border p-4">
-      <h2 className="text-sm font-medium">What needs attention</h2>
+    <Card data-testid="needs-attention" className="flex flex-col gap-2">
+      <CardTitle>What needs a person</CardTitle>
       {nothingWaiting ? (
         <p className="text-sm text-muted-foreground">Nothing is waiting on a person right now.</p>
       ) : (
@@ -141,21 +243,26 @@ function NeedsAttention({ clientId }: { clientId: string }) {
           )}
         </ul>
       )}
-    </section>
+    </Card>
   );
 }
 
-/** Три самые весомые возможности — то, с чего начинается работа. */
-function TopOpportunities({ clientId }: { clientId: string }) {
+/**
+ * Следующая работа.
+ *
+ * В этом продукте возможности и есть ранжированная очередь: у каждой строки
+ * есть счёт, и он объясняет порядок. Три карточки во всю ширину занимали
+ * столько же места, сколько сама матрица, — здесь пять строк в половине
+ * ширины, и решение принимается по счёту, а не по объёму карточки.
+ */
+function NextWork({ clientId }: { clientId: string }) {
   const opportunities = api.opportunities.list.useQuery({ clientId });
-  const top = (opportunities.data ?? []).filter((row) => row.status === "open").slice(0, 3);
-
-  if (opportunities.isPending || top.length === 0) return null;
+  const top = (opportunities.data ?? []).filter((row) => row.status === "open").slice(0, 5);
 
   return (
-    <section data-testid="top-opportunities" className="flex flex-col gap-3">
+    <Card data-testid="top-opportunities" className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-sm font-medium">Highest priority opportunities</h2>
+        <CardTitle>Next work</CardTitle>
         <Link
           href={`/clients/${clientId}/opportunities`}
           className="text-sm text-primary hover:underline"
@@ -164,22 +271,80 @@ function TopOpportunities({ clientId }: { clientId: string }) {
         </Link>
       </div>
 
-      <ul className="grid gap-3 md:grid-cols-3">
-        {top.map((row) => (
-          <li key={row.id} className="flex flex-col gap-2 rounded-lg border p-4">
-            <ScoreDial score={row.score} />
-            <span className="text-sm font-medium">{row.title}</span>
-            <span className="line-clamp-3 text-xs text-muted-foreground">{row.reason}</span>
-            <Link
-              href={`/clients/${clientId}/opportunities`}
-              className="mt-auto text-sm text-primary hover:underline"
-            >
-              Review opportunity →
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </section>
+      {top.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          {opportunities.isPending
+            ? "Loading…"
+            : "No open opportunities. New ones appear after the next run."}
+        </p>
+      ) : (
+        <ul className="flex flex-col gap-2.5">
+          {top.map((row) => (
+            <li key={row.id} className="flex items-start gap-3">
+              <ScoreDial score={row.score} className="shrink-0" />
+              <Link
+                href={`/clients/${clientId}/opportunities`}
+                className="min-w-0 flex-1 text-sm underline-offset-4 hover:underline"
+              >
+                <span className="font-medium">{row.title}</span>
+                <span className="line-clamp-2 text-xs text-muted-foreground">{row.reason}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  );
+}
+
+/**
+ * Откуда берутся ответы — верхушка диагноза источников.
+ *
+ * Полный разбор живёт на своём экране; здесь ровно столько, чтобы понять,
+ * стоит ли туда идти.
+ */
+function SourceMixCard({ clientId }: { clientId: string }) {
+  const sources = api.diagnosis.sourceGraph.useQuery({ clientId });
+  const mix = (sources.data?.mix ?? []).slice(0, 5);
+
+  return (
+    <Card className="flex flex-col gap-3">
+      <div className="flex items-baseline justify-between gap-3">
+        <CardTitle>Where the answers come from</CardTitle>
+        <Link href={`/clients/${clientId}/diagnose`} className="text-sm text-primary hover:underline">
+          Diagnose →
+        </Link>
+      </div>
+
+      {mix.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          {sources.isPending ? "Loading…" : MEASUREMENT_COPY.noDataYet}
+        </p>
+      ) : (
+        <ul className="flex flex-col gap-2 text-sm">
+          {mix.map((entry) => (
+            <li key={entry.sourceType} className="flex items-center gap-3">
+              <span className="w-28 shrink-0 truncate text-muted-foreground">
+                {entry.sourceType.replace(/_/g, " ")}
+              </span>
+              <span aria-hidden className="h-1.5 min-w-0 flex-1 rounded-full bg-muted">
+                <span
+                  className="block h-full rounded-full bg-primary"
+                  style={{ width: `${Math.min(100, entry.sharePct)}%` }}
+                />
+              </span>
+              <span className="metric w-12 shrink-0 text-right">
+                {Math.round(entry.sharePct)}%
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {sources.data && (
+        <p className="text-xs text-muted-foreground">{sources.data.presenceCaveat}</p>
+      )}
+    </Card>
   );
 }
 
@@ -189,8 +354,8 @@ function OneLineRead({ matrix }: { matrix: RouterOutputs["measurement"]["matrix"
   const competitor = totals.competitorTop;
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border p-4">
-      <h2 className="text-sm font-medium">Read as one line</h2>
+    <Card className="flex flex-col gap-2">
+      <CardTitle>Read as one line</CardTitle>
 
       <p data-testid="one-line-read" className="text-sm text-muted-foreground">
         {totals.ratePct === null ? (
@@ -242,7 +407,7 @@ function OneLineRead({ matrix }: { matrix: RouterOutputs["measurement"]["matrix"
           estimated
         </span>
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -260,8 +425,8 @@ function ProminenceCard({ matrix }: { matrix: RouterOutputs["measurement"]["matr
   const behind = shareOfNamed(prominence.behindCompetitors, prominence.named);
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border p-4">
-      <h2 className="text-sm font-medium">How you are named</h2>
+    <Card className="flex flex-col gap-2">
+      <CardTitle>How you are named</CardTitle>
 
       {prominence.named === 0 || !prominence.sufficient ? (
         <p data-testid="prominence-empty" className="text-sm text-muted-foreground">
@@ -295,36 +460,7 @@ function ProminenceCard({ matrix }: { matrix: RouterOutputs["measurement"]["matr
           </p>
         </>
       )}
-    </div>
-  );
-}
-
-/** Очередь работ — сколько открыто и сколько ждёт перепроверки. */
-function QueueCard({ clientId }: { clientId: string }) {
-  const actions = api.actions.list.useQuery({ clientId });
-  const rows = actions.data ?? [];
-
-  const open = rows.filter((action) => action.status !== "done" && action.status !== "dropped");
-  const awaiting = rows.filter((action) => action.status === "done");
-
-  return (
-    <div className="flex flex-col gap-2 rounded-lg border p-4">
-      <h2 className="text-sm font-medium">Queue</h2>
-      <div className="flex items-baseline gap-2">
-        <span data-testid="queue-open" className="metric text-2xl font-semibold">
-          {open.length}
-        </span>
-        <span className="text-sm text-muted-foreground">
-          {open.length === 1 ? "action open" : "actions open"} · {awaiting.length} awaiting re-check
-        </span>
-      </div>
-      <Link
-        href={`/clients/${clientId}/actions`}
-        className="text-sm font-medium text-primary underline-offset-4 hover:underline"
-      >
-        Open the queue →
-      </Link>
-    </div>
+    </Card>
   );
 }
 
@@ -359,6 +495,10 @@ export function ClientOverview({ clientId }: { clientId: string }) {
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Цифры первыми и одной строкой: полоса отвечает «как дела», а место
+          героя остаётся у матрицы — «где именно». */}
+      <MetadataStrip clientId={clientId} matrix={matrix.data} latest={latest} />
+
       {/* Что именно человек видит на этом экране — до того, как он прочтёт первую цифру. */}
       <p
         data-testid="method-note"
@@ -368,51 +508,37 @@ export function ClientOverview({ clientId }: { clientId: string }) {
         {MEASUREMENT_COPY.methodNote}
       </p>
 
-      {/* Решения идут раньше приборов: сначала что требует человека и за что
-          браться, и только потом — измерения, из которых это выведено. */}
-      <NeedsAttention clientId={clientId} />
-      <TopOpportunities clientId={clientId} />
+      {/*
+        Герой — матрица промптов: единственное место, где видно, какой именно
+        вопрос проигран и какому ассистенту. Справа — что решать и две вещи,
+        которых в матрице нет.
 
-      <div className="grid items-start gap-4 lg:grid-cols-[1.55fr_1fr]">
+        Карточки источников и работы стоят в левой колонке, а не отдельной
+        секцией ниже: правая колонка вдвое выше матрицы, и вынесенные вниз они
+        оставляли под матрицей пустую половину экрана.
+      */}
+      <div className="grid items-start gap-4 lg:grid-cols-[1fr_300px]">
         {matrix.data ? (
           <MatrixSection matrix={matrix.data} />
         ) : (
-          <div className="rounded-lg border p-4 text-sm text-muted-foreground">
+          <Card className="text-sm text-muted-foreground">
             {matrix.isPending ? "Loading…" : MEASUREMENT_COPY.noDataYet}
-          </div>
+          </Card>
         )}
 
-        <div className="flex flex-col gap-3">
+        <div className="flex min-w-0 flex-col gap-3">
+          <NeedsAttention clientId={clientId} />
           {matrix.data && <OneLineRead matrix={matrix.data} />}
           {matrix.data && <ProminenceCard matrix={matrix.data} />}
-
-          {/* Общая доля за последнюю неделю: матрица показывает, где именно
-              провал, а эта цифра — то, что агентство называет клиенту, и её
-              можно пересчитать по сырым ответам. */}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <StatCard
-              label="Named in answers"
-              testId="stat-visibility"
-              value={latest ? `${latest.visibilityPct}%` : "—"}
-              hint={
-                latest
-                  ? latest.deltaPp === null
-                    ? `${latest.sampleCount} answers this week`
-                    : `${latest.deltaPp >= 0 ? "+" : ""}${latest.deltaPp} pp vs previous week`
-                  : MEASUREMENT_COPY.noDataYet
-              }
-            />
-            <StatCard
-              label="Gap to the strongest competitor"
-              testId="stat-gap"
-              value={latest ? `${latest.competitorGapPp} pp` : "—"}
-              hint="Against the best-performing tracked competitor, same answers"
-            />
-          </div>
-
-          <TrafficCard clientId={clientId} visibilityDeltaPp={matrix.data?.totalsDeltaPp ?? null} />
-          <QueueCard clientId={clientId} />
         </div>
+      </div>
+
+      {/* Три равных карточки во всю ширину: откуда берутся ответы, за что
+          браться и сколько людей действительно пришло. */}
+      <div className="grid items-start gap-4 lg:grid-cols-3">
+        <SourceMixCard clientId={clientId} />
+        <NextWork clientId={clientId} />
+        <TrafficCard clientId={clientId} visibilityDeltaPp={matrix.data?.totalsDeltaPp ?? null} />
       </div>
 
       {latest && !latest.sufficient && (

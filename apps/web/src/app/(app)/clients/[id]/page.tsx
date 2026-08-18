@@ -1,11 +1,9 @@
 "use client";
 
 import { use } from "react";
-import Link from "next/link";
 import { api } from "@/trpc/react";
 import { PageHeader } from "@/components/page-header";
 import { ClientOverview } from "./overview";
-import { buttonClass } from "@/components/ui/button";
 
 export default function ClientOverviewPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -27,21 +25,10 @@ export default function ClientOverviewPage({ params }: { params: Promise<{ id: s
     );
   }
 
-  return (
-    <>
-      <PageHeader
-        title="Overview"
-        description="Where this client stands right now, and what to do next."
-        action={
-          <Link
-            href={`/clients/${id}/measure`}
-            className={buttonClass("primary", "lg")}
-          >
-            Measure
-          </Link>
-        }
-      />
-      <ClientOverview clientId={id} />
-    </>
-  );
+  /**
+   * Заголовка здесь нет намеренно: имя клиента и домен уже стоят во вкладках,
+   * а «Overview / Where this client stands right now» повторяло вкладку своим
+   * же словом и отодвигало первую цифру на треть экрана вниз.
+   */
+  return <ClientOverview clientId={id} />;
 }
