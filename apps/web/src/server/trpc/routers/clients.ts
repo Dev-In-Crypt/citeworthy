@@ -13,13 +13,14 @@ import {
   deleteClient,
   getClientById,
   listClientsByAgency,
+  agencyRunStats,
   listPortfolioRows,
   updateClient,
-  type PortfolioRow,
 } from "@repo/db";
 import { assertTenant, protectedProcedure, roleProcedure, router } from "../trpc";
 import { entitlementsForAgency } from "../../subscription";
 import { buildWeeklyBrief } from "../../weekly-brief";
+import { needsFor } from "../../needs";
 
 const clientInput = z.object({
   name: z.string().min(1).max(200),
@@ -56,40 +57,6 @@ const clientPatch = clientInput
     brandNames: z.array(z.string().min(1)).optional(),
     competitorNames: z.array(z.string().min(1)).optional(),
   });
-
-/**
- * Что у клиента ждёт человека. Одна функция на экран портфеля и на недельную
- * сводку: два списка «что ждёт» разошлись бы в первом же спорном случае.
- *
- * Возможности идут первыми — агентство приходит сюда за вопросом «за что
- * взяться», а не «какой у клиента средний процент».
- */
-function needsFor(row: PortfolioRow): string[] {
-  const needs: string[] = [];
-
-  if (row.highPriorityOpportunities > 0) {
-    needs.push(
-      row.highPriorityOpportunities === 1
-        ? "1 high-priority opportunity"
-        : `${row.highPriorityOpportunities} high-priority opportunities`,
-    );
-  }
-  if (row.reportsAwaitingApproval > 0) {
-    needs.push(
-      row.reportsAwaitingApproval === 1
-        ? "Report to approve"
-        : `${row.reportsAwaitingApproval} reports to approve`,
-    );
-  }
-  if (row.staleActions > 0) {
-    needs.push(`${row.staleActions} actions stalled`);
-  }
-  if (row.lastRunAt === null) {
-    needs.push("Awaiting first run");
-  }
-
-  return needs;
-}
 
 export const clientsRouter = router({
   list: protectedProcedure.query(({ ctx }) => listClientsByAgency(ctx.db, ctx.user.agencyId)),
@@ -145,7 +112,8 @@ export const clientsRouter = router({
         topOpportunityScore: row.topOpportunityScore,
         reportsAwaitingApproval: row.reportsAwaitingApproval,
         staleActions: row.staleActions,
-        needs,
+        needs: needs.map((item) => item.text),
+        needsRows: needs,
       };
     });
 
@@ -191,6 +159,9 @@ export const clientsRouter = router({
       })),
     );
   }),
+
+  /** Состояние прогонов агентства: что запустится сегодня и что уже упало. */
+  runStats: protectedProcedure.query(({ ctx }) => agencyRunStats(ctx.db, ctx.user.agencyId)),
 
   get: protectedProcedure.input(z.object({ id: z.uuid() })).query(async ({ ctx, input }) => {
     const client = await getClientById(ctx.db, input.id);

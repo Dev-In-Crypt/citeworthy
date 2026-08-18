@@ -10,11 +10,13 @@
  * портфельного запроса, который и так открывается на каждом заходе.
  */
 
+import type { NeedsRow } from "./needs";
+
 /** Строка портфеля в том виде, в каком её собирает `clients.portfolio`. */
 export interface BriefRow {
   clientId: string;
   name: string;
-  needs: string[];
+  needs: NeedsRow[];
   newOpportunities: number;
   highPriorityOpportunities: number;
   reportsAwaitingApproval: number;
@@ -27,6 +29,8 @@ export interface BriefHighlight {
   name: string;
   /** Одна строка, ради которой человек откроет клиента. */
   headline: string;
+  /** Все строки целиком: лента на главной показывает каждую со своей кнопкой. */
+  rows: NeedsRow[];
   /** Сколько ещё пунктов ждёт у того же клиента. */
   alsoWaiting: number;
   topOpportunityScore: number | null;
@@ -64,7 +68,8 @@ export function buildWeeklyBrief(rows: readonly BriefRow[]): WeeklyBrief {
       .map((row) => ({
         clientId: row.clientId,
         name: row.name,
-        headline: row.needs[0] ?? "",
+        headline: row.needs[0]?.text ?? "",
+        rows: row.needs,
         alsoWaiting: Math.max(0, row.needs.length - 1),
         topOpportunityScore: row.topOpportunityScore,
       })),

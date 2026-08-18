@@ -2187,3 +2187,111 @@ export async function setExperimentStatus(
 ): Promise<void> {
   await db.update(experiments).set({ status }).where(eq(experiments.id, experimentId));
 }
+
+export interface AgencyRunStats {
+  /** Расписаний, которые сработают до конца суток. */
+  scheduledToday: number;
+  /** Прогонов, завершившихся неудачно за последнюю неделю. */
+  failedLastWeek: number;
+}
+
+/**
+ * Состояние прогонов по агентству целиком.
+ *
+ * Отдельным запросом, а не перебором клиентов: главный экран открывают в
+ * каждый заход, и десяток запросов ради двух чисел — это десяток запросов.
+ * Неудачный прогон здесь важнее удачного: он означает, что цифры клиента
+ * сегодня не обновились, а экран об этом молчит.
+ */
+export async function agencyRunStats(
+  db: Database,
+  agencyId: string,
+  now: Date = new Date(),
+): Promise<AgencyRunStats> {
+  const endOfDay = new Date(now);
+  endOfDay.setUTCHours(23, 59, 59, 999);
+  const weekAgo = new Date(now.getTime() - 7 * 86_400_000);
+
+  const [scheduled, failed] = await Promise.all([
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(runSchedules)
+      .innerJoin(clients, eq(clients.id, runSchedules.clientId))
+      .where(
+        and(
+          eq(clients.agencyId, agencyId),
+          eq(runSchedules.active, true),
+          lte(runSchedules.nextRunAt, endOfDay),
+        ),
+      ),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(runs)
+      .innerJoin(clients, eq(clients.id, runs.clientId))
+      .where(
+        and(
+          eq(clients.agencyId, agencyId),
+          eq(runs.status, "failed"),
+          gte(runs.startedAt, weekAgo),
+        ),
+      ),
+  ]);
+
+  return {
+    scheduledToday: scheduled[0]?.count ?? 0,
+    failedLastWeek: failed[0]?.count ?? 0,
+  };
+}
+
+export interface AgencyReportRow {
+  id: string;
+  clientId: string;
+  clientName: string;
+  periodStart: Date;
+  periodEnd: Date;
+  status: Report["status"];
+  createdAt: Date;
+  /** Ссылка выдана, но клиент ещё не согласовал. */
+  awaitingApproval: boolean;
+}
+
+/**
+ * Все отчёты агентства одним списком.
+ *
+ * Отчёты живут у клиента, но вопрос «кому пора отправлять и кто ещё не
+ * согласовал» — про всё агентство сразу, и обходить ради него клиентов по
+ * одному значит платить запросом за каждого.
+ */
+export async function listAgencyReports(
+  db: Database,
+  agencyId: string,
+): Promise<AgencyReportRow[]> {
+  const rows = await db
+    .select({
+      id: reports.id,
+      clientId: reports.clientId,
+      clientName: clients.name,
+      periodStart: reports.periodStart,
+      periodEnd: reports.periodEnd,
+      status: reports.status,
+      createdAt: reports.createdAt,
+      shareId: reportShares.id,
+      approvedAt: reportShares.approvedAt,
+    })
+    .from(reports)
+    .innerJoin(clients, eq(clients.id, reports.clientId))
+    .leftJoin(reportShares, eq(reportShares.reportId, reports.id))
+    .where(eq(clients.agencyId, agencyId))
+    .orderBy(desc(reports.createdAt));
+
+  return rows.map((row) => ({
+    id: row.id,
+    clientId: row.clientId,
+    clientName: row.clientName,
+    periodStart: row.periodStart,
+    periodEnd: row.periodEnd,
+    status: row.status,
+    createdAt: row.createdAt,
+    awaitingApproval: row.shareId !== null && row.approvedAt === null,
+  }));
+}

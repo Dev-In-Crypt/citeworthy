@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { BRIEF_HIGHLIGHT_LIMIT, buildWeeklyBrief, type BriefRow } from "./weekly-brief";
+import type { NeedsRow } from "./needs";
+
+/** Строка «что ждёт» в тесте: важен только её текст. */
+function need(text: string): NeedsRow {
+  return { kind: "opportunity", tone: "needs-you", text, cta: "Review", to: "opportunities" };
+}
 
 /**
  * Verify: недельная сводка агентства.
@@ -34,9 +40,9 @@ describe("buildWeeklyBrief", () => {
 
   it("считает клиентов, у которых что-то ждёт человека", () => {
     const brief = buildWeeklyBrief([
-      row({ clientId: "a", needs: ["2 high-priority opportunities"], highPriorityOpportunities: 2 }),
+      row({ clientId: "a", needs: [need("2 high-priority opportunities")], highPriorityOpportunities: 2 }),
       row({ clientId: "b" }),
-      row({ clientId: "c", needs: ["Report to approve"], reportsAwaitingApproval: 1 }),
+      row({ clientId: "c", needs: [need("Report to approve")], reportsAwaitingApproval: 1 }),
     ]);
 
     expect(brief.clients).toBe(3);
@@ -47,8 +53,8 @@ describe("buildWeeklyBrief", () => {
 
   it("ставит первым клиента с самой весомой находкой", () => {
     const brief = buildWeeklyBrief([
-      row({ clientId: "quiet", name: "Quiet", needs: ["Awaiting first run"], topOpportunityScore: 12 }),
-      row({ clientId: "loud", name: "Loud", needs: ["1 high-priority opportunity"], topOpportunityScore: 88 }),
+      row({ clientId: "quiet", name: "Quiet", needs: [need("Awaiting first run")], topOpportunityScore: 12 }),
+      row({ clientId: "loud", name: "Loud", needs: [need("1 high-priority opportunity")], topOpportunityScore: 88 }),
     ]);
 
     expect(brief.highlights.map((item) => item.name)).toEqual(["Loud", "Quiet"]);
@@ -58,7 +64,7 @@ describe("buildWeeklyBrief", () => {
     // Карточка обязана помещаться в одну мысль; «и ещё два» честнее, чем
     // список из четырёх пунктов мелким шрифтом.
     const brief = buildWeeklyBrief([
-      row({ needs: ["1 high-priority opportunity", "Report to approve", "3 actions stalled"] }),
+      row({ needs: [need("1 high-priority opportunity"), need("Report to approve"), need("3 actions stalled")] }),
     ]);
 
     expect(brief.highlights[0]?.headline).toBe("1 high-priority opportunity");
@@ -67,7 +73,7 @@ describe("buildWeeklyBrief", () => {
 
   it("не показывает больше клиентов, чем можно осмотреть за раз", () => {
     const many = Array.from({ length: 20 }, (_, index) =>
-      row({ clientId: `c${index}`, needs: ["Awaiting first run"] }),
+      row({ clientId: `c${index}`, needs: [need("Awaiting first run")] }),
     );
 
     expect(buildWeeklyBrief(many).highlights).toHaveLength(BRIEF_HIGHLIGHT_LIMIT);
