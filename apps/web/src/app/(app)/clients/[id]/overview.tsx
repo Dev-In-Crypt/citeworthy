@@ -11,7 +11,13 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { CONFIDENCE_LABELS, MEASUREMENT_COPY, shareOfNamed } from "@repo/core";
+import {
+  CONFIDENCE_LABELS,
+  MEASUREMENT_COPY,
+  measurableAssistants,
+  shareOfNamed,
+  type Platform,
+} from "@repo/core";
 import { api, type RouterOutputs } from "@/trpc/react";
 import { EmptyState } from "@/components/page-header";
 import { buttonClass } from "@/components/ui/button";
@@ -127,14 +133,16 @@ function MetadataStrip({
   );
 }
 
-const PLATFORMS = [
-  { value: null, label: "All platforms" },
-  { value: "chatgpt", label: "ChatGPT" },
-  { value: "perplexity", label: "Perplexity" },
-  { value: "gemini", label: "Gemini" },
-] as const;
+type PlatformFilter = Platform | null;
 
-type PlatformFilter = (typeof PLATFORMS)[number]["value"];
+/** Фильтр по платформе — из каталога: новый ассистент появляется в нём сам. */
+const PLATFORMS: { value: PlatformFilter; label: string }[] = [
+  { value: null, label: "All platforms" },
+  ...measurableAssistants().map((assistant) => ({
+    value: assistant.id as Platform,
+    label: assistant.label,
+  })),
+];
 
 const COMPETITOR_COLORS = [
   "var(--color-competitor)",

@@ -67,6 +67,41 @@ test("saving a schedule and running a check produces a completed run", async ({ 
   await expect(page.getByTestId("runs-list")).toContainText("done");
 });
 
+test("Claude and Grok are off until chosen, and stay chosen after a reload", async ({ page }) => {
+  const clientId = await setUpClientWithPrompts(page);
+  await page.goto(`/clients/${clientId}/measure`);
+
+  // Запускная тройка включена сразу, новые платформы — нет: они стоят денег
+  // и требуют ключа, поэтому включаются осознанно.
+  await expect(page.getByLabel("ChatGPT")).toBeChecked();
+  await expect(page.getByLabel("Claude")).not.toBeChecked();
+  await expect(page.getByLabel("Grok")).not.toBeChecked();
+
+  await page.getByLabel("Claude").check();
+  await page.getByLabel("Grok").check();
+  await page.getByRole("button", { name: "Save schedule" }).click();
+  await expect(page.getByTestId("schedule-summary")).toContainText("claude");
+  await expect(page.getByTestId("schedule-summary")).toContainText("grok");
+
+  // Форма показывает сохранённое, а не умолчания: иначе следующее «Save»
+  // молча выключило бы то, что настроено.
+  await page.reload();
+  await expect(page.getByLabel("Claude")).toBeChecked();
+  await expect(page.getByLabel("Grok")).toBeChecked();
+
+  await page.getByRole("button", { name: "Run now" }).click();
+  await expect(page.getByTestId("run-status")).toContainText("done", { timeout: 30_000 });
+
+  // Теперь это измеряемые ассистенты: в матрице у них свои столбцы, а в
+  // заметке «не измеряем» остаются только те, у кого нет API.
+  await page.goto(`/clients/${clientId}`);
+  await expect(page.getByTestId("matrix-grid")).toContainText("Claude");
+  const note = page.getByTestId("unmeasured-note");
+  await expect(note).toContainText("Copilot");
+  await expect(note).not.toContainText("Claude");
+  await expect(note).not.toContainText("Grok");
+});
+
 test("running a check without prompts explains what to do", async ({ page }) => {
   const email = `runs-empty-${Math.random().toString(36).slice(2, 10)}@northwind-agency.test`;
 

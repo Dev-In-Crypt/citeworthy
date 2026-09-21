@@ -1,21 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { DEFAULT_PLATFORMS, measurableAssistants, type Platform } from "@repo/core";
 import { api } from "@/trpc/react";
 import { buttonClass } from "@/components/ui/button";
 import { inputClass } from "@/components/ui/field";
 
-const PLATFORMS = ["chatgpt", "perplexity", "gemini"] as const;
-type Platform = (typeof PLATFORMS)[number];
-
 type Cadence = "daily" | "weekly" | "biweekly";
 
-const PLATFORM_LABELS: Record<Platform, string> = {
-  chatgpt: "ChatGPT",
-  perplexity: "Perplexity",
-  gemini: "Gemini",
-};
-
+/**
+ * Что можно включить — берётся из каталога, а не пишется здесь ещё раз:
+ * новый ассистент появляется в расписании сам, как только для него есть
+ * адаптер.
+ */
+const PLATFORM_OPTIONS = measurableAssistants().map((assistant) => ({
+  id: assistant.id as Platform,
+  label: assistant.label,
+}));
 
 export function SchedulePanel({ clientId }: { clientId: string }) {
   const utils = api.useUtils();
@@ -43,11 +44,27 @@ export function SchedulePanel({ clientId }: { clientId: string }) {
    * эксперимент и важно точнее знать дату сдвига, — и стоит вдвое дороже.
    */
   const [cadence, setCadence] = useState<Cadence>("biweekly");
-  const [platforms, setPlatforms] = useState<Platform[]>(["chatgpt", "perplexity", "gemini"]);
+  // Запускная тройка включена сразу; остальные — осознанным выбором: у них
+  // должен быть ключ на сервере, и каждая добавляет ответы в каждый прогон.
+  const [platforms, setPlatforms] = useState<Platform[]>([...DEFAULT_PLATFORMS]);
   const [samples, setSamples] = useState(3);
   const [error, setError] = useState<string | null>(null);
 
   const saved = schedule.data;
+
+  /**
+   * Форма показывает сохранённое расписание, а не умолчания. Без этого клиент
+   * с включённым Claude при повторном заходе видел бы галочки запускной
+   * тройки, и нажатие «Save» молча выключало бы то, что настроено.
+   */
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    if (!saved || hydrated) return;
+    setCadence(saved.cadence);
+    setSamples(saved.samplesPerPrompt);
+    setPlatforms(saved.platforms as Platform[]);
+    setHydrated(true);
+  }, [saved, hydrated]);
   const save = api.runs.saveSchedule.useMutation({
     onSuccess: async () => {
       await utils.runs.schedule.invalidate({ clientId });
@@ -109,18 +126,22 @@ export function SchedulePanel({ clientId }: { clientId: string }) {
 
         <fieldset className="flex flex-col gap-1.5">
           <legend className="text-sm font-medium">Platforms</legend>
-          <div className="flex gap-3">
-            {PLATFORMS.map((platform) => (
-              <label key={platform} className="flex items-center gap-1.5 text-sm">
+          <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+            {PLATFORM_OPTIONS.map(({ id, label }) => (
+              <label key={id} className="flex items-center gap-1.5 text-sm">
                 <input
                   type="checkbox"
-                  checked={platforms.includes(platform)}
-                  onChange={() => togglePlatform(platform)}
+                  checked={platforms.includes(id)}
+                  onChange={() => togglePlatform(id)}
                 />
-                {PLATFORM_LABELS[platform]}
+                {label}
               </label>
             ))}
           </div>
+          <p className="max-w-prose text-xs text-muted-foreground">
+            Every assistant you add asks each prompt again on every run, so it adds to the cost. An
+            assistant only answers once its key is set on the server.
+          </p>
         </fieldset>
 
         <button

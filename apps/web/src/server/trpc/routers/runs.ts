@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { parseAdaptersMode } from "@repo/core";
+import { parseAdaptersMode, PLATFORM_IDS } from "@repo/core";
 import { completeRun } from "@repo/pipeline";
 import {
   createRun,
@@ -19,7 +19,7 @@ import { assertTenant, protectedProcedure, roleProcedure, router } from "../trpc
 
 // Литеральный кортеж, а не PLATFORMS: иначе zod выводит string[] и теряет union,
 // который ждёт схема БД.
-const platformEnum = z.enum(["chatgpt", "perplexity", "gemini"]);
+const platformEnum = z.enum(PLATFORM_IDS);
 
 export const runsRouter = router({
   schedule: protectedProcedure

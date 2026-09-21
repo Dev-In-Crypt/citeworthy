@@ -1,6 +1,6 @@
 "use client";
 
-import { ESTIMATED_COST_PER_ANSWER_USD, measurableAssistants } from "@repo/core";
+import { DEFAULT_PLATFORMS, ESTIMATED_COST_PER_ANSWER_USD } from "@repo/core";
 import { cn } from "@/lib/utils";
 
 /**
@@ -49,7 +49,9 @@ export function SamplingCost({
   samplesPerPrompt?: number;
   runsPerMonth?: number;
 }) {
-  const assistants = measurableAssistants().length;
+  // Оценка — для набора по умолчанию. Считать по всем измеряемым значило бы
+  // обещать расход на ассистентов, которых клиенту никто не включал.
+  const assistants = DEFAULT_PLATFORMS.length;
   const perRun = prompts * assistants * samplesPerPrompt;
   const perMonth = perRun * runsPerMonth;
   const costPerMonth = perMonth * ESTIMATED_COST_PER_ANSWER_USD;

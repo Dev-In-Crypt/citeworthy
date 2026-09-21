@@ -2,7 +2,7 @@
 
 import { use } from "react";
 import Link from "next/link";
-import { highlightMentions } from "@repo/core";
+import { ASSISTANTS, highlightMentions } from "@repo/core";
 import { api } from "@/trpc/react";
 import { EmptyState, PageHeader } from "@/components/page-header";
 import { buttonClass } from "@/components/ui/button";
@@ -16,11 +16,10 @@ function ordinal(rank: number | null): string {
   return { 1: "st", 2: "nd", 3: "rd" }[rank % 10] ?? "th";
 }
 
-const PLATFORM_LABELS: Record<string, string> = {
-  chatgpt: "ChatGPT",
-  perplexity: "Perplexity",
-  gemini: "Gemini",
-};
+// Подписи берутся из каталога: новый ассистент не требует правки в каждом экране.
+const PLATFORM_LABELS: Record<string, string> = Object.fromEntries(
+  ASSISTANTS.map((assistant) => [assistant.id, assistant.label]),
+);
 
 export default function PromptResponsesPage({
   params,

@@ -1,18 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { billingPeriod, formatUsd } from "@repo/core";
+import { ASSISTANTS, billingPeriod, formatUsd } from "@repo/core";
 import { api } from "@/trpc/react";
 import { EmptyState } from "@/components/page-header";
 import { controlClass } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
 import { Wallet } from "lucide-react";
 
-const PLATFORM_LABELS: Record<string, string> = {
-  chatgpt: "ChatGPT",
-  perplexity: "Perplexity",
-  gemini: "Gemini",
-};
+// Подписи берутся из каталога: новый ассистент не требует правки в каждом экране.
+const PLATFORM_LABELS: Record<string, string> = Object.fromEntries(
+  ASSISTANTS.map((assistant) => [assistant.id, assistant.label]),
+);
 
 /** Последние 12 периодов: дальше в прошлое смотреть незачем, а список короткий. */
 function recentPeriods(count = 12): string[] {

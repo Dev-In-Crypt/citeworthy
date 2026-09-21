@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { competitorGapPp, MIN_SAMPLES_PER_CELL } from "@repo/core";
+import { competitorGapPp, MIN_SAMPLES_PER_CELL, PLATFORM_IDS } from "@repo/core";
 import { getClientById, listVisibilitySeries } from "@repo/db";
 import { assertTenant, protectedProcedure, router } from "../trpc";
 import { clientVisibility } from "../../visibility";
 
-const platformEnum = z.enum(["chatgpt", "perplexity", "gemini"]);
+const platformEnum = z.enum(PLATFORM_IDS);
 
 export const measurementRouter = router({
   /** Ряд видимости для графика плюс сводка последнего периода. */

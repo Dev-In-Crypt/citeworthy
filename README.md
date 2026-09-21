@@ -54,6 +54,13 @@ cp .env.example .env && docker compose up -d && pnpm install && pnpm db:migrate 
 Platform adapters run in mock mode by default (`ADAPTERS_MODE=mock`) — no network, no API keys, and
 tests never call out.
 
+Five assistants have adapters: ChatGPT, Perplexity, Gemini, Claude and Grok. A new client is
+measured on the first three; Claude and Grok are switched on per client in the schedule, because
+each one adds answers to every run and needs its own key (`ANTHROPIC_API_KEY`, `XAI_API_KEY`).
+Copilot and Google's AI surfaces have no public answer API, so they stay listed as not measured.
+The Claude and Grok adapters are written from documentation and have not made a live call yet —
+run `live-check` (see `packages/core/src/adapters/live-check.ts`) with a key before trusting them.
+
 ## Commands
 
 ```bash
