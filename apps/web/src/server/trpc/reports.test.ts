@@ -106,9 +106,10 @@ describe("reports.generate", () => {
 
     await caller(agencyId).analytics.importTraffic({
       clientId,
-      csv: ["date,source,sessions", `${new Date().toISOString().slice(0, 10)},chatgpt.com,17`].join(
-        "\n",
-      ),
+      // Дата внутри периода отчёта, а не «сегодня»: период зафиксирован, и
+      // тест, привязанный к текущему дню, ломался бы, как только день выйдет
+      // за его границы.
+      csv: ["date,source,sessions", "2026-08-10,chatgpt.com,17"].join("\n"),
     });
 
     const withTraffic = reportPayloadSchema.parse((await generate()).payload);
