@@ -248,7 +248,39 @@ export const RESPONSE_FIXTURES: ResponseFixture[] = [
  * по точному совпадению текста вопроса.
  */
 export function allFixtures(): ResponseFixture[] {
-  return [...RESPONSE_FIXTURES, ...SPEND_FIXTURES, ...GAP_FIXTURES];
+  const written = [...RESPONSE_FIXTURES, ...SPEND_FIXTURES, ...GAP_FIXTURES];
+  return [...written, ...derivedFixtures(written)];
+}
+
+/**
+ * Ответы платформ, у которых собственных заготовок нет: Claude и Grok.
+ *
+ * Пересочинять вручную три набора ради режима без сети значило бы писать
+ * то же самое ещё дважды. Заготовки берутся у другой платформы и переезжают
+ * под новую — с новым идентификатором и меткой версии модели. Донор разный
+ * (Claude от Perplexity, Grok от Gemini), чтобы доли по платформам в матрице
+ * не совпадали до последнего знака.
+ *
+ * Это данные режима mock и ничего больше: живой адаптер отвечает своими
+ * словами, и никакая цифра из этих заготовок в отчёт о настоящем клиенте
+ * не попадает.
+ */
+const DERIVED_FROM: readonly { platform: Platform; donor: Platform; modelVersion: string }[] = [
+  { platform: "claude", donor: "perplexity", modelVersion: "claude-haiku-4-5-fixture" },
+  { platform: "grok", donor: "gemini", modelVersion: "grok-4-1-fast-fixture" },
+];
+
+function derivedFixtures(written: ResponseFixture[]): ResponseFixture[] {
+  return DERIVED_FROM.flatMap(({ platform, donor, modelVersion }) =>
+    written
+      .filter((fixture) => fixture.platform === donor)
+      .map((fixture) => ({
+        ...fixture,
+        id: fixture.id.replace(new RegExp(`^${donor}-`), `${platform}-`),
+        platform,
+        result: { ...fixture.result, modelVersion },
+      })),
+  );
 }
 
 export function fixturesForPlatform(platform: Platform): ResponseFixture[] {

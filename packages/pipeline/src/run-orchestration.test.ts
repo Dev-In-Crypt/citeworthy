@@ -8,6 +8,7 @@ import {
   listResponsesByRun,
 } from "@repo/db";
 import { promptClusters, prompts, runSchedules } from "@repo/db/schema/measurement";
+import { eq } from "drizzle-orm";
 import { orchestrateRun, planRunJobs } from "./run-orchestration";
 
 /** Verify T17: 2 промпта × 3 платформы × 3 сэмпла = ровно 18 ответов, run.status=done. */
@@ -137,6 +138,41 @@ describe("orchestrateRun (mock-режим)", () => {
 
     const perPlatform = written.filter((r) => r.platform === "chatgpt");
     expect(perPlatform).toHaveLength(6); // 2 промпта × 3 сэмпла
+  });
+
+  it("прогон без расписания берёт запускную тройку, а не все платформы", async () => {
+    // Новые платформы включаются осознанно: у них может не быть ключа, и
+    // разовый аудит не должен ни падать из-за этого, ни тратить чужие деньги.
+    const bare = await createRun(db, { clientId, scheduleId: null, trigger: "manual" });
+
+    const outcome = await orchestrateRun(db, bare.id, "mock");
+    const platforms = new Set((await listResponsesByRun(db, bare.id)).map((r) => r.platform));
+
+    expect(outcome.status).toBe("done");
+    expect([...platforms].sort()).toEqual(["chatgpt", "gemini", "perplexity"]);
+  });
+
+  it("Claude и Grok измеряются, когда включены в расписании клиента", async () => {
+    await db
+      .update(runSchedules)
+      .set({ platforms: ["chatgpt", "claude", "grok"] })
+      .where(eq(runSchedules.id, scheduleId));
+
+    const outcome = await orchestrateRun(db, runId, "mock");
+    const written = await listResponsesByRun(db, runId);
+
+    // 2 промпта × 3 платформы × 3 сэмпла.
+    expect(outcome).toMatchObject({ expected: 18, written: 18, failed: 0, status: "done" });
+    expect([...new Set(written.map((r) => r.platform))].sort()).toEqual([
+      "chatgpt",
+      "claude",
+      "grok",
+    ]);
+    for (const response of written.filter((r) => r.platform !== "chatgpt")) {
+      // Инвариант 6 действует и для новых платформ.
+      expect(response.modelVersion).not.toBe("");
+      expect(Number(response.costUsd)).toBeGreaterThan(0);
+    }
   });
 
   it("повторная оркестрация того же прогона не удваивает ответы", async () => {

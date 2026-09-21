@@ -3,6 +3,8 @@ import { OpenAiAdapter } from "./openai";
 import type { ReasoningEffort } from "./openai";
 import { PerplexityAdapter } from "./perplexity";
 import { GeminiAdapter } from "./gemini";
+import { ClaudeAdapter } from "./claude";
+import { GrokAdapter } from "./grok";
 
 /**
  * Подключение живых адаптеров.
@@ -61,6 +63,42 @@ export function registerLiveAdapters(env: NodeJS.ProcessEnv = process.env): stri
         }),
     );
     registered.push("gemini");
+  }
+
+  const claudeKey = env["ANTHROPIC_API_KEY"]?.trim();
+  if (claudeKey) {
+    const model = env["CLAUDE_MODEL"]?.trim();
+    const endpoint = env["CLAUDE_ENDPOINT"]?.trim();
+    const searchTool = env["CLAUDE_SEARCH_TOOL"]?.trim();
+    const maxSearches = Number(env["CLAUDE_MAX_SEARCHES"]);
+    registerLiveAdapter(
+      "claude",
+      () =>
+        new ClaudeAdapter({
+          apiKey: claudeKey,
+          ...(model ? { model } : {}),
+          ...(endpoint ? { endpoint } : {}),
+          ...(searchTool ? { searchTool } : {}),
+          ...(Number.isInteger(maxSearches) && maxSearches > 0 ? { maxSearches } : {}),
+        }),
+    );
+    registered.push("claude");
+  }
+
+  const grokKey = env["XAI_API_KEY"]?.trim();
+  if (grokKey) {
+    const model = env["GROK_MODEL"]?.trim();
+    const endpoint = env["GROK_ENDPOINT"]?.trim();
+    registerLiveAdapter(
+      "grok",
+      () =>
+        new GrokAdapter({
+          apiKey: grokKey,
+          ...(model ? { model } : {}),
+          ...(endpoint ? { endpoint } : {}),
+        }),
+    );
+    registered.push("grok");
   }
 
   return registered;

@@ -2,9 +2,29 @@ import { z } from "zod";
 
 /** Контракт C1 (TASKS.md). Менять только осознанно, с обновлением TASKS.md. */
 
-export type Platform = "chatgpt" | "perplexity" | "gemini";
+/**
+ * Литеральный кортеж, а не только `PLATFORMS`: zod-схемы входа выводят из
+ * него union, а из `readonly Platform[]` вывели бы `string[]` и потеряли его.
+ */
+export const PLATFORM_IDS = ["chatgpt", "perplexity", "gemini", "claude", "grok"] as const;
 
-export const PLATFORMS: readonly Platform[] = ["chatgpt", "perplexity", "gemini"] as const;
+export type Platform = (typeof PLATFORM_IDS)[number];
+
+/** Все платформы, которые умеет система: по ним живут enum в БД и очереди. */
+export const PLATFORMS: readonly Platform[] = PLATFORM_IDS;
+
+/**
+ * Набор по умолчанию — там, где расписания нет: разовый аудит и ручной
+ * запуск. Это запускная тройка, а не весь `PLATFORMS`: у новой платформы
+ * может не быть ключа (в live-режиме прогон по ней упадёт целиком), и она
+ * стоит денег, о которых агентство не просило. Включается платформа
+ * осознанно — галочкой в расписании клиента.
+ */
+export const DEFAULT_PLATFORMS: readonly Platform[] = [
+  "chatgpt",
+  "perplexity",
+  "gemini",
+] as const;
 
 export interface Citation {
   url: string;

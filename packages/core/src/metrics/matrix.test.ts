@@ -98,8 +98,8 @@ describe("computePromptMatrix", () => {
   it("неизмеряемый ассистент получает столбец, но ни числа, ни выборки", () => {
     const matrix = matrixOf(times(6, { clientMentioned: true }));
 
-    const claude = cell(matrix, "p1", "claude");
-    expect(claude).toMatchObject({ measurable: false, samples: 0, ratePct: null });
+    const copilot = cell(matrix, "p1", "copilot");
+    expect(copilot).toMatchObject({ measurable: false, samples: 0, ratePct: null });
   });
 
   it("неизмеряемый ассистент не попадает ни в один знаменатель", () => {

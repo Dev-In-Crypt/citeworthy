@@ -7,7 +7,7 @@ import {
   parseAdaptersMode,
   registerLiveAdapter,
 } from "./registry";
-import { adapterResultSchema, PLATFORMS } from "./types";
+import { adapterResultSchema, DEFAULT_PLATFORMS, PLATFORMS } from "./types";
 import type { Platform, PlatformAdapter } from "./types";
 
 /** Verify T12. */
@@ -120,7 +120,10 @@ describe("registry", () => {
 
   it("isPlatform отсекает неизвестные платформы", () => {
     expect(isPlatform("chatgpt")).toBe(true);
-    expect(isPlatform("claude")).toBe(false);
+    expect(isPlatform("claude")).toBe(true);
+    expect(isPlatform("grok")).toBe(true);
+    // У Copilot нет публичного API: платформой он не является.
+    expect(isPlatform("copilot")).toBe(false);
     const unknown: string = "bing";
     expect(isPlatform(unknown)).toBe(false);
   });
@@ -132,5 +135,19 @@ describe("контракт адаптера", () => {
     const adapter: PlatformAdapter = new MockAdapter(platform);
     expect(adapter.platform).toBe(platform);
     expect(typeof adapter.execute).toBe("function");
+  });
+});
+
+describe("набор по умолчанию", () => {
+  it("состоит из запускной тройки и входит в полный набор", () => {
+    expect([...DEFAULT_PLATFORMS]).toEqual(["chatgpt", "perplexity", "gemini"]);
+    for (const platform of DEFAULT_PLATFORMS) {
+      expect(PLATFORMS).toContain(platform);
+    }
+  });
+
+  it("новые платформы не включаются сами: они требуют ключа и стоят денег", () => {
+    expect(DEFAULT_PLATFORMS).not.toContain("claude");
+    expect(DEFAULT_PLATFORMS).not.toContain("grok");
   });
 });

@@ -59,21 +59,13 @@ const NOTES: Record<string, { requirement: SurfaceRequirement; note: string; rea
     note: "Same as AI Overviews: no API, so it needs a search-results provider.",
     ready: true,
   },
-  claude: {
-    requirement: "platform-api-key",
-    note: "Answers are available through the platform API; needs a key and a cost line.",
-    ready: true,
-  },
+  claude: { requirement: "none", note: "Measured through the platform API.", ready: true },
   copilot: {
     requirement: "serp-provider",
     note: "No API for the answer surface; needs a provider that captures it.",
     ready: true,
   },
-  grok: {
-    requirement: "platform-api-key",
-    note: "Answers are available through the platform API; needs a key and a cost line.",
-    ready: true,
-  },
+  grok: { requirement: "none", note: "Measured through the platform API.", ready: true },
 };
 
 export function surfaceCapabilities(): SurfaceCapability[] {

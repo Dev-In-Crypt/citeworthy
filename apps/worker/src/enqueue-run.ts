@@ -1,7 +1,7 @@
 import type { FlowProducer } from "bullmq";
 import { getRunById, getRunSchedule, listActivePromptsForClient, startRun } from "@repo/db";
 import type { Database } from "@repo/db";
-import { PLATFORMS } from "@repo/core";
+import { DEFAULT_PLATFORMS } from "@repo/core";
 import type { Platform } from "@repo/core";
 import { planRunJobs } from "@repo/pipeline";
 import { QUEUE_NAMES, runsQueueName, type FinalizeJobData, type RunJobData } from "./queues";
@@ -25,9 +25,10 @@ export async function enqueueRun(
   }
 
   const schedule = run.scheduleId ? await getRunSchedule(db, run.scheduleId) : undefined;
-  // Без расписания берётся весь набор платформ: молча измерить одну и
-  // показать это как «видимость» хуже, чем потратить больше.
-  const platforms = (schedule?.platforms ?? PLATFORMS) as Platform[];
+  // Без расписания берётся весь запускной набор, а не одна платформа: молча
+  // измерить одну и показать это как «видимость» хуже, чем потратить больше.
+  // Новые платформы сюда не входят — их включают в расписании осознанно.
+  const platforms = (schedule?.platforms ?? DEFAULT_PLATFORMS) as Platform[];
   const samples = schedule?.samplesPerPrompt ?? 3;
 
   const prompts = await listActivePromptsForClient(db, clientId);

@@ -1,4 +1,10 @@
-import { billingPeriod, getAdapter, PLATFORMS, type AdaptersMode, type Platform } from "@repo/core";
+import {
+  billingPeriod,
+  DEFAULT_PLATFORMS,
+  getAdapter,
+  type AdaptersMode,
+  type Platform,
+} from "@repo/core";
 import {
   createResponse,
   countResponsesByRun,
@@ -125,7 +131,9 @@ export async function orchestrateRun(
   // Без расписания берём весь запускной набор платформ, а не одну.
   // Молча измерить только ChatGPT и показать это как «видимость» — хуже,
   // чем потратить больше: агентство не узнало бы, что охват неполный.
-  const platforms = (schedule?.platforms ?? PLATFORMS) as Platform[];
+  // Новые платформы сюда не входят: у них может не быть ключа, а прогон по
+  // платформе без адаптера падает целиком.
+  const platforms = (schedule?.platforms ?? DEFAULT_PLATFORMS) as Platform[];
   const samples = schedule?.samplesPerPrompt ?? 3;
 
   const prompts = await listActivePromptsForClient(db, run.clientId);

@@ -32,6 +32,22 @@ export {
   geminiCostUsd,
 } from "./adapters/gemini";
 export type { GeminiAdapterConfig, GeminiPricing } from "./adapters/gemini";
+export {
+  CLAUDE_PRICING,
+  ClaudeAdapter,
+  claudeCostUsd,
+  DEFAULT_CLAUDE_ENDPOINT,
+  DEFAULT_CLAUDE_MODEL,
+} from "./adapters/claude";
+export type { ClaudeAdapterConfig, ClaudePricing } from "./adapters/claude";
+export {
+  DEFAULT_GROK_ENDPOINT,
+  DEFAULT_GROK_MODEL,
+  GROK_PRICING,
+  GrokAdapter,
+  grokCostUsd,
+} from "./adapters/grok";
+export type { GrokAdapterConfig, GrokPricing } from "./adapters/grok";
 export { registerLiveAdapters } from "./adapters/live";
 export {
   getAdapter,

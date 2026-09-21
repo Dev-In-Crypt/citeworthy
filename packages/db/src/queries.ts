@@ -21,6 +21,8 @@ import type { Action, NewAction } from "./schema/actions";
 import type { Source } from "./schema/sources";
 import type { NewSubscription, Subscription, UsageCounter } from "./schema/billing";
 type SourceTypeValue = NonNullable<Source["sourceType"]>;
+import type { platformEnum } from "./schema/measurement";
+type PlatformValue = (typeof platformEnum.enumValues)[number];
 import {
   citations,
   mentions,
@@ -689,7 +691,7 @@ export async function upsertVisibilitySnapshot(
 export async function listVisibilitySeries(
   db: Database,
   clientId: string,
-  filter: { clusterId?: string | null; platform?: "chatgpt" | "perplexity" | "gemini" | null } = {},
+  filter: { clusterId?: string | null; platform?: PlatformValue | null } = {},
 ): Promise<VisibilitySnapshotRow[]> {
   const clusterCondition =
     filter.clusterId == null
@@ -742,7 +744,7 @@ export async function incrementAiChecks(
 export interface CostRow {
   clientId: string;
   clientName: string;
-  platform: "chatgpt" | "perplexity" | "gemini";
+  platform: PlatformValue;
   responses: number;
   costUsd: string;
 }

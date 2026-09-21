@@ -119,6 +119,8 @@ const PLATFORM_LABELS: Record<string, string> = {
   chatgpt: "ChatGPT",
   perplexity: "Perplexity",
   gemini: "Gemini",
+  claude: "Claude",
+  grok: "Grok",
 };
 
 /**
