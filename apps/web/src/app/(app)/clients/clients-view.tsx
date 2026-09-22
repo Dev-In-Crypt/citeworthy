@@ -9,6 +9,15 @@ import { Users } from "lucide-react";
 
 export function ClientsView() {
   const clients = api.clients.list.useQuery();
+  // Доля берётся из той же сводки, что и главная: две разные цифры одного
+  // клиента на соседних экранах хуже, чем любая из них.
+  const portfolio = api.clients.portfolio.useQuery();
+  const visibility = new Map(
+    (portfolio.data ?? []).map((row) => [
+      row.clientId,
+      row.sufficient && row.visibilityPct !== null ? `${Math.round(row.visibilityPct)}%` : "—",
+    ]),
+  );
 
   if (clients.isPending) {
     return <SkeletonCards count={4} />;
@@ -46,7 +55,7 @@ export function ClientsView() {
         <li key={client.id}>
           <Link
             href={`/clients/${client.id}`}
-            className="flex h-full flex-col gap-3 rounded-lg border p-4 transition-colors hover:bg-accent"
+            className="flex h-full flex-col gap-3 rounded-lg border bg-card p-4 transition-colors hover:bg-accent"
           >
             <div className="flex flex-col gap-0.5">
               <span className="flex items-center gap-2">
@@ -65,9 +74,15 @@ export function ClientsView() {
 
             <div className="flex gap-6 text-sm">
               <div className="flex flex-col">
-                <span className="text-muted-foreground">Visibility</span>
-                {/* Метрики появятся в T24 — заглушка честно говорит, что данных ещё нет. */}
-                <span className="metric text-lg font-semibold">—</span>
+                <span className="text-muted-foreground">Named in answers</span>
+                {/* Прочерк — и пока нет замера, и пока замер ниже порога сэмплов:
+                    число там было бы догадкой. */}
+                <span
+                  data-testid={`client-visibility-${client.id}`}
+                  className="metric text-lg font-semibold"
+                >
+                  {visibility.get(client.id) ?? "—"}
+                </span>
               </div>
               <div className="flex flex-col">
                 <span className="text-muted-foreground">Competitors</span>

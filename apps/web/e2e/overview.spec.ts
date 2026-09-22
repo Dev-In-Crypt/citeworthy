@@ -58,4 +58,9 @@ test("client overview shows visibility built from a completed run", async ({ pag
   // Цифра переживает перезагрузку — она из БД, а не из состояния страницы.
   await page.reload();
   await expect(page.getByTestId("stat-visibility")).toHaveText(/^\d+(\.\d+)?%$/);
+
+  // Список клиентов показывает ту же долю, а не вечный прочерк: здесь долго
+  // стояла заглушка, пережившая сам расчёт видимости.
+  await page.goto("/clients");
+  await expect(page.getByTestId(`client-visibility-${clientId}`)).toHaveText(/^\d+%$/);
 });
