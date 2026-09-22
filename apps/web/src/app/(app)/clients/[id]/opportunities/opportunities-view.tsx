@@ -26,7 +26,7 @@ const KIND_LABELS: Record<string, string> = {
 };
 
 const PRIORITY_STYLE: Record<string, string> = {
-  high: "border-competitor/50 text-competitor",
+  high: "border-competitor/50 text-competitor-ink",
   medium: "border-input text-foreground",
   low: "border-input text-muted-foreground",
 };

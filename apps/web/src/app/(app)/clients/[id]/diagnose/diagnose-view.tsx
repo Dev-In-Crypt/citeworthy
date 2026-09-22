@@ -226,7 +226,7 @@ export function DiagnoseView({ clientId }: { clientId: string }) {
                     <td className="metric py-2 text-right">{source.sharePct}%</td>
                     <td className="py-2 text-center">
                       {source.clientPresent ? (
-                        <span data-testid="client-present" className="text-client">
+                        <span data-testid="client-present" className="text-client-ink">
                           ✓
                         </span>
                       ) : (

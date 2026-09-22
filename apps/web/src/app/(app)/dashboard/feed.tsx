@@ -278,7 +278,7 @@ export function DashboardRail() {
           <span className="flex items-baseline justify-between gap-3 text-muted-foreground">
             Failed in 7 days
             <span
-              className={cn("metric font-medium", failed > 0 ? "text-competitor" : "text-foreground")}
+              className={cn("metric font-medium", failed > 0 ? "text-competitor-ink" : "text-foreground")}
             >
               {runs.data?.failedLastWeek ?? "—"}
             </span>

@@ -133,7 +133,7 @@ export default function PromptResponsesPage({
                 ) : (
                   <span
                     data-testid="not-named"
-                    className="rounded-full bg-competitor/12 px-2 py-1 text-[11px] font-medium text-competitor"
+                    className="rounded-full bg-competitor/12 px-2 py-1 text-[11px] font-medium text-competitor-ink"
                   >
                     not named
                   </span>

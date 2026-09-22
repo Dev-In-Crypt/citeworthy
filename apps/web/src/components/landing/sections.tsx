@@ -56,7 +56,7 @@ function ReportPreview() {
           >
             NW
           </span>
-          <span className="text-sm font-medium text-client">Northwell Studio</span>
+          <span className="text-sm font-medium text-client-ink">Northwell Studio</span>
         </div>
 
         <div className="flex flex-col gap-1">

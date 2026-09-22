@@ -104,7 +104,7 @@ export function Portfolio() {
               >
                 {formatPct(row.visibilityPct)}
               </TD>
-              <TD numeric align="right" className="text-competitor">
+              <TD numeric align="right" className="text-competitor-ink">
                 {formatPp(row.gapPp)}
               </TD>
               <TD
@@ -112,8 +112,8 @@ export function Portfolio() {
                 align="right"
                 className={cn(
                   row.deltaPp === null && "text-muted-foreground",
-                  row.deltaPp !== null && row.deltaPp > 0 && "text-client",
-                  row.deltaPp !== null && row.deltaPp < 0 && "text-competitor",
+                  row.deltaPp !== null && row.deltaPp > 0 && "text-client-ink",
+                  row.deltaPp !== null && row.deltaPp < 0 && "text-competitor-ink",
                 )}
               >
                 {formatPp(row.deltaPp)}
@@ -123,7 +123,7 @@ export function Portfolio() {
                   className={cn(
                     "metric rounded-full px-2 py-1 text-[11px] font-medium",
                     row.confidence === "low"
-                      ? "bg-competitor/12 text-competitor"
+                      ? "bg-competitor/12 text-competitor-ink"
                       : "bg-muted text-muted-foreground",
                   )}
                 >

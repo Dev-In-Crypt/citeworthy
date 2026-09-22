@@ -159,8 +159,8 @@ function PresenceBars({ matrix }: { matrix: Matrix }) {
                   data-testid="row-delta"
                   className={cn(
                     "mr-2 font-medium",
-                    delta > 0 && "text-client",
-                    delta < 0 && "text-competitor",
+                    delta > 0 && "text-client-ink",
+                    delta < 0 && "text-competitor-ink",
                   )}
                 >
                   {delta > 0 ? "+" : ""}

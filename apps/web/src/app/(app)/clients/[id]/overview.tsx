@@ -46,8 +46,8 @@ function Meta({
       <dd
         className={cn(
           "metric text-sm font-medium",
-          tone === "client" && "text-client",
-          tone === "competitor" && "text-competitor",
+          tone === "client" && "text-client-ink",
+          tone === "competitor" && "text-competitor-ink",
         )}
       >
         {children}

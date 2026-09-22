@@ -79,9 +79,18 @@
   --input: oklch(0.922 0.013 255.508);
   --ring: oklch(0.511 0.262 276.966);
 
-  /* Семантика данных: клиент против конкурентов */
+  /*
+   * Семантика данных: клиент против конкурентов.
+   *
+   * Два тона на каждого: линия и заливка — насыщенный, текст — темнее. Прежний
+   * оранжевый давал на белом 2.8:1 и не проходил даже порог для линий
+   * графика (3:1); у надписей порог 4.5:1, и его не проходил ни один из двух
+   * цветов. Значения — из утверждённого брендбука.
+   */
   --client: oklch(0.627 0.194 149.214);
-  --competitor: oklch(0.705 0.187 47.604);
+  --client-ink: oklch(0.527 0.154 150.069);
+  --competitor: oklch(0.646 0.222 41.116);
+  --competitor-ink: oklch(0.553 0.195 38.402);
 
   /* Единственная тень в продукте — у того, что висит над страницей. */
   --shadow-overlay: 0 12px 32px -8px oklch(0.208 0.042 265.755 / 18%);
@@ -111,7 +120,9 @@
 
   /* Светлее, чем в светлой теме: на тёмном фоне те же цвета глохнут. */
   --client: oklch(0.723 0.19 149.579);
+  --client-ink: oklch(0.723 0.19 149.579);
   --competitor: oklch(0.78 0.16 55.934);
+  --competitor-ink: oklch(0.78 0.16 55.934);
 
   --shadow-overlay: 0 12px 32px -8px oklch(0 0 0 / 55%);
 }
@@ -174,7 +185,9 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-client: var(--client);
+  --color-client-ink: var(--client-ink);
   --color-competitor: var(--competitor);
+  --color-competitor-ink: var(--competitor-ink);
 
   --shadow-overlay: var(--shadow-overlay);
 
@@ -242,6 +255,12 @@
     --muted-foreground: oklch(0.554 0.046 257.417);
     --border: oklch(0.922 0.013 255.508);
     --input: oklch(0.922 0.013 255.508);
+    /* Цвета клиента и конкурентов тоже светлые: иначе в отчёте, открытом
+       из тёмной темы, они оставались бы тёмными поверх белого листа. */
+    --client: oklch(0.627 0.194 149.214);
+    --client-ink: oklch(0.527 0.154 150.069);
+    --competitor: oklch(0.646 0.222 41.116);
+    --competitor-ink: oklch(0.553 0.195 38.402);
 
     background: var(--background);
     color: var(--foreground);
