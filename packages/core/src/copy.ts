@@ -185,6 +185,64 @@ export const OPPORTUNITY_COPY = {
     "Kept out of the list until the date passes, then shown again with whatever the measurements say by then.",
 } as const;
 
+/**
+ * Утверждения об измерении на публичном сайте (/, /product, /pricing,
+ * /free-audit). Сайт обещает от имени продукта, поэтому его фразы о том, что
+ * и как измерено, живут здесь же и проверяются тем же grep-тестом, что и
+ * фразы продукта. Где смысл совпадает с продуктом, сайт берёт константы выше.
+ */
+export const MARKETING_COPY = {
+  /** Подвал каждой страницы сайта. */
+  siteBasis:
+    "Every figure on this site is estimated from repeated samples of assistant answers. Example agencies, clients, competitors and *.example domains are invented.",
+  /** Карточка «как сделана каждая цифра». */
+  methodNote:
+    "Everything is estimated from repeated samples of assistant answers. Nothing is published anywhere until you approve it.",
+  /** Под недельным графиком: одна неделя — не результат. */
+  readTheTrend:
+    "Single weeks overlap; the change over the quarter is wider than one week's range. Read the trend, not a week.",
+  /** Что значит «gap» у источника. */
+  gapDefinition: "“Gap” = cited in answers that name a competitor but not the client.",
+  /** Сырые ответы хранятся — инвариант 6. */
+  answersStored:
+    "Every answer is stored with its model version, so a parser improvement can be replayed over history.",
+  /** Оценка вклада — всегда диапазон. */
+  contributionAsRange: "estimated contribution, shown as a range",
+  /**
+   * Подпись к примеру эксперимента, где нетронутые темы были. Сравнение идёт
+   * с ними, а не с «базовой линией платформы»: такого метода в продукте нет.
+   */
+  experimentRecord:
+    "This is a record of what was done and what followed, compared with topics the work did not touch. It is evidence, not attribution of cause.",
+  /** Как работает эксперимент — описание метода (контракт C5). */
+  experimentMethod:
+    "Log the date a change went live. The product compares the topics it touched with the topics you left alone, over the same weeks, and shows the difference as a range with a confidence level. It is a record of what followed, not a claim about why.",
+  /** Без нетронутых тем сравнивать не с чем, и отчёт это говорит. */
+  experimentWithoutControl:
+    "Without untouched topics there is nothing to compare against, and the report says so instead of showing a difference.",
+  /** Кого не измеряем и почему. */
+  notMeasuredSurfaces:
+    "Microsoft Copilot and Google AI Overviews / AI Mode offer no public API, so they are not measured, and no report estimates them.",
+  /** Пределы, названные вслух на главной. */
+  limits: {
+    quarter:
+      "Models re-crawl and re-cite over weeks. Sixty to ninety days is the honest unit here; a short period shows early signal rather than settled results.",
+    attribution:
+      "With one client and no untouched topics to compare against, movement cannot be separated from platform-wide drift, and the report says so where that is the case.",
+    ranges:
+      "Estimated contribution is shown as a range next to a confidence level, because that is what the data supports.",
+    revenue:
+      "Visibility is a share of answers. What that share is worth belongs to your client's model, not to ours.",
+    nothingPublished:
+      "The product reads what assistants already answer and tells you what it found. Anything that changes a client's site stays a human decision.",
+  },
+  /** Аудит: снимок, а не прогноз. */
+  auditNotForecast:
+    "The ranked work is what the current sources suggest, with expected effort. It does not predict what share of answers the client will reach.",
+  auditSnapshot:
+    "One pass shows where the client stands this week. Movement needs repeated weekly samples; sixty to ninety days is the honest unit.",
+} as const;
+
 export const EXPERIMENT_COPY = {
   /** Заголовок оценки эффекта: всегда «estimated» — см. инвариант 2. */
   estimatedEffect: "Estimated incremental effect",

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { collectConsoleErrors } from "./console";
 
 /**
  * Verify T70: лендинг показывает оффер, тарифы и живой пример отчёта,
@@ -6,11 +7,7 @@ import { expect, test } from "@playwright/test";
  */
 
 test("landing gives an anonymous visitor the offer, the plans and a way in", async ({ page }) => {
-  const consoleErrors: string[] = [];
-  page.on("console", (message) => {
-    if (message.type() === "error") consoleErrors.push(message.text());
-  });
-  page.on("pageerror", (error) => consoleErrors.push(error.message));
+  const consoleErrors = collectConsoleErrors(page);
 
   await page.goto("/");
 
@@ -32,14 +29,21 @@ test("landing gives an anonymous visitor the offer, the plans and a way in", asy
   // Пределы названы вслух, а не спрятаны в подвал.
   await expect(page.getByTestId("landing-limits")).toContainText("ninety days");
 
-  // Allowance объяснён: сколько проверок съедает обычный клиент. Молчание
-  // здесь читалось бы как «сколько угодно».
-  await expect(page.getByTestId("pricing-checks")).toContainText("950 checks");
+  // Лимиты видны рядом с ценой. Объяснение allowance («950 checks») переехало
+  // на /pricing и проверяется в marketing.spec.ts; главная ведёт туда ссылкой.
   await expect(page.getByText("4,000")).toBeVisible();
+  await expect(page.getByRole("link", { name: /Full pricing and what an AI check is/ })).toHaveAttribute(
+    "href",
+    "/pricing",
+  );
 
-  // Цифры витрины взяты из демонстрационного отчёта.
-  await expect(page.getByTestId("landing-report-figures")).toContainText("19.4% → 28.6%");
-  await expect(page.getByTestId("visibility-gap")).toContainText("11.5%");
+  // Цифры витрины взяты из демонстрационного отчёта: видимость за квартал и
+  // диапазон вклада главного действия — вместе с оговоркой, что сравнивать
+  // было не с чем.
+  const figures = page.getByTestId("landing-report-figures");
+  await expect(figures).toContainText("19.4% → 28.6%");
+  await expect(figures).toContainText("+2–6");
+  await expect(figures).toContainText("no untouched topics");
 
   const html = await page.content();
   expect(html).not.toMatch(/\bproven\b|\bproof\b|\bguaranteed\b|\bcaused\b/i);

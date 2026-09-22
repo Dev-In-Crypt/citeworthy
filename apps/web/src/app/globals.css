@@ -42,6 +42,47 @@
   src: url("/fonts/Inter-SemiBold.woff2") format("woff2");
 }
 
+/*
+ * Шрифты витрины: серифный Newsreader — только для заголовков (правило
+ * брендбука), IBM Plex Mono — для подписей, оснований и осей графиков.
+ * Приложение их не использует: оно остаётся на Inter.
+ *
+ * Файлы, как и Inter, лежат в public/fonts и в сборке не качаются. Пока их
+ * нет, браузер берёт следующий шрифт стека (--font-serif / --font-mono ниже),
+ * и страницы остаются читаемыми.
+ */
+@font-face {
+  font-family: "Newsreader";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/Newsreader-Medium.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Newsreader";
+  font-style: italic;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/Newsreader-MediumItalic.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/IBMPlexMono-Regular.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/IBMPlexMono-Medium.woff2") format("woff2");
+}
+
 
 /*
  * Дизайн-токены (IMPLEMENTATION_PLAN.md §4.3):
@@ -131,6 +172,16 @@
   --font-sans:
     "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, sans-serif;
+  /*
+   * Шрифты витрины. Моноширинный по умолчанию (`<code>` в приложении) остаётся
+   * системным: переопределённый --font-mono иначе протёк бы в экраны продукта.
+   */
+  --font-serif: "Newsreader", "Source Serif 4", Georgia, "Times New Roman", serif;
+  --font-mono:
+    "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, "Cascadia Mono", Consolas, monospace;
+  --default-mono-font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
+    monospace;
 
   /*
    * Шкала размеров. Переопределяются штатные ступени Tailwind, а не заводятся
@@ -282,5 +333,59 @@
   [data-surface="report"] h1,
   [data-surface="report"] h2 {
     break-after: avoid;
+  }
+
+  /*
+   * Поверхность витрины: /, /product, /pricing, /free-audit и обрамление
+   * примеров отчёта.
+   *
+   * Токены — из брендбука (tokens.css), имена с тем же префиксом --cw-, чтобы
+   * сверять их построчно. Тёплая бумага вместо холодного slate — только здесь:
+   * токены приложения не трогаются. Как и отчёт, витрина закреплена светлой:
+   * тёмная тема — настройка продукта, а не сайта, и посетитель, у которого она
+   * сохранилась, не должен получить наполовину перекрашенную страницу.
+   */
+  [data-surface="marketing"] {
+    --cw-paper: #f7f6f2;
+    --cw-paper-2: #efede7;
+    --cw-paper-3: #fbfaf7;
+    --cw-surface: #ffffff;
+    --cw-ink: #15171c;
+    --cw-ink-2: #3c414b;
+    --cw-muted: #5e6572;
+    --cw-border: #e3e1da;
+    /* Пунктир разделов — декоративная линия, не цвет текста. */
+    --cw-rule: #cfccc2;
+    --cw-grid: #eeece6;
+    --cw-indigo: #4f39f6;
+    --cw-indigo-hover: #432dd7;
+    --cw-indigo-tint: #eef2ff;
+    --cw-client-tint: #f0fdf4;
+    --cw-competitor-tint: #fff1e7;
+    --cw-band: rgb(0 166 62 / 0.12);
+    --cw-dark-bg: #15171c;
+    --cw-dark-text: #f7f6f2;
+    --cw-dark-muted: #a3a9b4;
+    --cw-dark-indigo: #7c86ff;
+    --cw-dark-rule: #3a3e47;
+    --cw-shadow-report: 0 1px 2px rgb(21 23 28 / 0.06), 0 24px 48px -12px rgb(21 23 28 / 0.18);
+
+    /* Цвета данных — те же, что в приложении, но светлые при любой теме. */
+    --client: oklch(0.627 0.194 149.214);
+    --client-ink: oklch(0.527 0.154 150.069);
+    --competitor: oklch(0.646 0.222 41.116);
+    --competitor-ink: oklch(0.553 0.195 38.402);
+
+    background: var(--cw-paper);
+    color: var(--cw-ink);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.62;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Под витриной и поля страницы бумажные, а не цвета приложения. */
+  body:has([data-surface="marketing"]) {
+    background: #f7f6f2;
   }
 }

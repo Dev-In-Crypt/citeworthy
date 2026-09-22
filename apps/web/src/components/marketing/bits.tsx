@@ -1,0 +1,101 @@
+import type { ReactNode } from "react";
+
+/** Мелкие повторяющиеся куски витрины. */
+
+type Level = "low" | "medium" | "high";
+
+/**
+ * Уровень уверенности: столбики и слово. Цвет не используется нарочно —
+ * «medium» зелёным читался бы как «хорошо», а это не оценка, а точность.
+ */
+export function Conf({ level, estimated = true }: { level: Level; estimated?: boolean }) {
+  return (
+    <span className={`conf ${level}`}>
+      <span className="m" aria-hidden>
+        <i />
+        <i />
+        <i />
+      </span>
+      {estimated ? "estimated · " : ""}confidence: {level}
+    </span>
+  );
+}
+
+export function SecHead({
+  n,
+  title,
+  children,
+  id,
+}: {
+  n: number;
+  title: ReactNode;
+  children?: ReactNode;
+  id?: string;
+}) {
+  return (
+    <div className="sec-head">
+      <span className="n" aria-hidden>
+        {n}
+      </span>
+      <h2 className="h1" id={id}>
+        {title}
+      </h2>
+      {children && <p>{children}</p>}
+    </div>
+  );
+}
+
+export type ChipKind = "gap" | "has" | "plain";
+
+export function SrcChip({ n, domain, kind, note }: { n: number; domain: string; kind: ChipKind; note?: string }) {
+  return (
+    <span className={`src-chip ${kind === "plain" ? "" : kind}`}>
+      <span className="i">[{n}]</span>
+      {domain}
+      {note && <span className="g">· {note}</span>}
+    </span>
+  );
+}
+
+export function Faq({ items, testId }: { items: { q: string; a: ReactNode }[]; testId?: string }) {
+  return (
+    <div className="faq" data-testid={testId}>
+      {items.map((item, i) => (
+        <details key={item.q} open={i === 0}>
+          <summary>{item.q}</summary>
+          <p>{item.a}</p>
+        </details>
+      ))}
+    </div>
+  );
+}
+
+export function LegendLine({ kind }: { kind: "client" | "comp" | "control" | "band" }) {
+  if (kind === "band") {
+    return (
+      <svg width="22" height="10" aria-hidden>
+        <rect width="22" height="10" fill="rgb(0 166 62 / .12)" />
+      </svg>
+    );
+  }
+  if (kind === "client") {
+    return (
+      <svg width="22" height="8" aria-hidden>
+        <line x1="0" y1="4" x2="22" y2="4" stroke="#00A63E" strokeWidth="2.5" />
+        <circle cx="11" cy="4" r="3" fill="#00A63E" />
+      </svg>
+    );
+  }
+  if (kind === "control") {
+    return (
+      <svg width="22" height="8" aria-hidden>
+        <line x1="0" y1="4" x2="22" y2="4" stroke="#5E6572" strokeWidth="2" strokeDasharray="2 3" />
+      </svg>
+    );
+  }
+  return (
+    <svg width="22" height="8" aria-hidden>
+      <line x1="0" y1="4" x2="22" y2="4" stroke="#F54900" strokeWidth="1.5" strokeDasharray="5 4" />
+    </svg>
+  );
+}
