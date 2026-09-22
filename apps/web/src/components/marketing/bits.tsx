@@ -1,6 +1,36 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
+import { SALES_CONTACT } from "./content";
 
 /** Мелкие повторяющиеся куски витрины. */
+
+/**
+ * Ссылка на разговор о тарифе, если контакт задан, иначе — на бесплатный
+ * аудит. Звонок не обещается, пока звонить некуда.
+ */
+export function TalkOrAudit({ fallback = "Start with the free audit →" }: { fallback?: string }) {
+  if (SALES_CONTACT) {
+    return (
+      <a className="link" href={SALES_CONTACT.href} data-testid="sales-contact">
+        {SALES_CONTACT.label} →
+      </a>
+    );
+  }
+  return (
+    <Link className="link" href="/free-audit">
+      {fallback}
+    </Link>
+  );
+}
+
+/** Ссылка на методологию рядом с блоками, где много цифр. */
+export function MethodLink({ children = "How we measure →" }: { children?: ReactNode }) {
+  return (
+    <Link className="link method-link" href="/method">
+      {children}
+    </Link>
+  );
+}
 
 type Level = "low" | "medium" | "high";
 

@@ -456,6 +456,78 @@
 .mk.sample-cta { border-top: 1px dashed var(--cw-rule); }
 .mk.sample-cta .wrap { padding-top: 56px; padding-bottom: 64px; display: flex; flex-direction: column; align-items: flex-start; gap: 16px; }
 
+/* ================= новые блоки: доказательства, деньги, метод, калькулятор ================= */
+.mk .method-link { font-weight: 500; }
+.mk .method-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; font-size: 14px; color: var(--cw-ink-2); }
+.mk .mini-rep .ok { margin: 6px 9px 8px; height: 8px; width: 42%; border-radius: 2px; background: #1f3a5f; }
+
+/* карточка «одна цифра в рабочем пространстве агентства» */
+.mk .ev-card { width: 100%; max-width: 520px; padding: 20px; display: grid; gap: 14px; box-shadow: var(--cw-shadow-report); }
+.mk .ev-card-head { display: flex; justify-content: space-between; gap: 6px 12px; flex-wrap: wrap; align-items: baseline; padding-bottom: 10px; border-bottom: 1px dashed var(--cw-border); }
+.mk .ev-card-main { display: grid; gap: 8px; }
+.mk .ev-big { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.mk .ev-big b { font-size: 52px; font-weight: 600; letter-spacing: -0.045em; line-height: 1; font-variant-numeric: tabular-nums; }
+.mk .ev-big span { font-size: 14.5px; color: var(--cw-ink-2); }
+.mk .ev-facts { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; font-size: 12.5px; color: var(--cw-ink-2); }
+.mk .ev-delta { font-size: 13px; color: var(--cw-ink-2); }
+.mk .ev-delta em { font-style: normal; color: var(--cw-muted); }
+.mk .ev-rows { display: grid; gap: 8px; }
+.mk .ev-rows li { display: grid; grid-template-columns: 84px minmax(0, 1fr) auto; gap: 10px; align-items: center; font-size: 13px; }
+.mk .ev-rows .n { font-weight: 500; }
+.mk .ev-rows .v { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mk .ev-rows .v small { font: 400 11px var(--font-mono); color: var(--cw-muted); }
+.mk .ev-leader { font-size: 13px; color: var(--cw-ink-2); }
+.mk .ev-answer { border: 1px solid var(--cw-border); border-radius: 6px; background: var(--cw-paper-3); padding: 12px 14px; font-size: 13.5px; line-height: 1.55; }
+.mk .ev-answer .src { font-family: var(--font-mono); font-size: 10.5px; color: var(--cw-muted); margin-bottom: 6px; }
+.mk .ev-answer q { quotes: "\201C" "\201D"; color: var(--cw-ink-2); }
+
+/* внешняя цифра с источником */
+.mk .market-note { margin: 0 0 28px; padding: 16px 20px; border-left: 3px solid var(--cw-indigo); background: var(--cw-surface); border-radius: 0 8px 8px 0; max-width: 760px; }
+.mk .market-note blockquote { font: 500 21px/1.35 var(--font-serif); color: var(--cw-ink); }
+.mk .market-note figcaption { margin-top: 8px; font-family: var(--font-mono); font-size: 11.5px; }
+.mk .money { display: flex; flex-direction: column; gap: 10px; }
+.mk .money .link { margin-top: auto; }
+
+/* сокращённый отчёт клиента: те же разделы, что в ReportView */
+.mk .r-sum { padding: 6px 22px 4px; font-size: 12px; line-height: 1.5; color: var(--cw-ink-2); }
+.mk .r-stats b.sm { font-size: 15px; letter-spacing: -0.01em; }
+.mk .r-rows li { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0; border-bottom: 1px solid var(--cw-border); font-size: 12px; }
+.mk .r-rows li:last-child { border-bottom: 0; }
+.mk .r-rows b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.mk .r-rows .more-rows { color: var(--cw-muted); font-family: var(--font-mono); font-size: 10.5px; }
+.mk .r-next li span.r-meta-line { font-family: var(--font-mono); font-size: 10px; }
+.mk .r-caveats { display: grid; gap: 4px; font-size: 11px; line-height: 1.45; color: var(--cw-muted); }
+.mk .r-approve { margin: 12px 22px 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; border: 1px solid var(--cw-border); border-radius: 5px; padding: 9px 10px; }
+.mk .r-approve .lab { font-size: 12px; font-weight: 600; width: 100%; }
+.mk .r-approve .field { flex: 1; min-width: 0; height: 30px; display: flex; align-items: center; padding: 0 9px; border: 1px solid var(--cw-border); border-radius: 5px; font-size: 12px; color: var(--cw-muted); }
+
+/* тарифы: цена за клиента и калькулятор */
+.mk .plan .per-client { font-size: 14px; color: var(--cw-ink-2); margin-top: -8px; }
+.mk .plan .per-client b { font-weight: 600; color: var(--cw-ink); font-variant-numeric: tabular-nums; }
+.mk .calc { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); overflow: hidden; }
+.mk .calc-in { padding: 26px; display: grid; gap: 14px; align-content: start; }
+.mk .calc-field { display: grid; gap: 6px; font-size: 14px; color: var(--cw-ink-2); }
+.mk .calc-field input { width: 100%; min-width: 0; height: 44px; padding: 0 12px; border: 1px solid var(--cw-border); border-radius: 8px; background: #fff; font: 500 17px var(--font-sans); font-variant-numeric: tabular-nums; color: var(--cw-ink); }
+.mk .calc-out { padding: 26px; background: var(--cw-paper-3); border-left: 1px solid var(--cw-border); display: flex; flex-direction: column; gap: 4px; }
+.mk .calc-row { display: flex; justify-content: space-between; align-items: baseline; gap: 6px 16px; flex-wrap: wrap; padding: 12px 0; border-bottom: 1px dashed var(--cw-border); font-size: 14px; color: var(--cw-ink-2); }
+.mk .calc-row b { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; color: var(--cw-ink); font-variant-numeric: tabular-nums; }
+.mk .calc-out .basis { margin-top: auto; border-top: 0; }
+
+/* бесплатный аудит: короткий список под кнопками */
+.mk .fa-facts { display: grid; gap: 6px; margin-top: 24px; font-size: 14.5px; color: var(--cw-ink-2); }
+.mk .fa-facts li { display: grid; grid-template-columns: 18px 1fr; gap: 6px; }
+.mk .fa-facts li::before { content: "\2713"; color: var(--client-ink); font-weight: 600; }
+
+/* метод: пример диапазонов и таблица уверенности */
+.mk .range-demo { display: grid; gap: 4px; }
+.mk .rd-row { display: grid; gap: 8px; padding: 12px 0; border-bottom: 1px dashed var(--cw-border); }
+.mk .rd-top { display: flex; justify-content: space-between; gap: 4px 12px; flex-wrap: wrap; font-size: 14px; color: var(--cw-ink-2); }
+.mk .rd-top b { font-weight: 600; color: var(--cw-ink); font-variant-numeric: tabular-nums; }
+.mk .rd-top small { font: 400 11.5px var(--font-mono); color: var(--cw-muted); }
+.mk .rd-axis { position: relative; height: 14px; border-radius: 3px; background: var(--cw-paper-2); }
+.mk .rd-band { position: absolute; top: 0; bottom: 0; background: rgb(0 166 62 / 0.2); border: 1.5px solid var(--client); border-radius: 3px; }
+.mk .rd-dot { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--client-ink); }
+.mk .conf-table-card { max-width: 640px; }
 /* ================= responsive ================= */
 @media (max-width: 1060px) {
   .mk .g4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -480,9 +552,12 @@
   .mk .incl li:nth-last-child(-n + 3) { border-bottom: 1px solid var(--cw-border); }
   .mk .incl li:nth-last-child(-n + 2) { border-bottom: 0; }
   .mk .fa-hero, .mk .prev, .mk .five { grid-template-columns: minmax(0, 1fr); gap: 36px; }
+  .mk .calc { grid-template-columns: minmax(0, 1fr); }
+  .mk .calc-out { border-left: 0; border-top: 1px solid var(--cw-border); }
   .mk .get { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-@media (max-width: 900px) {
+/* Пять пунктов меню не помещаются рядом с кнопкой уже около 1000px — меню сворачивается раньше. */
+@media (max-width: 1024px) {
   .mk .nav, .mk .signin { display: none; }
   .mk .menu { display: block; }
   .mk .head-right { gap: 10px; }
@@ -558,4 +633,10 @@
   .mk .get { grid-template-columns: minmax(0, 1fr); }
   .mk .flow li { grid-template-columns: 36px minmax(0, 1fr); }
   .mk .five .note { margin-left: 0; }
+  .mk .ev-card { padding: 16px; }
+  .mk .ev-big b { font-size: 44px; }
+  .mk .ev-rows li { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; }
+  .mk .ev-rows .bar { grid-column: 1 / -1; grid-row: 2; }
+  .mk .calc-in, .mk .calc-out { padding: 18px; }
+  .mk .market-note blockquote { font-size: 18px; }
 }

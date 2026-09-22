@@ -198,25 +198,47 @@ export const MARKETING_COPY = {
   /** Карточка «как сделана каждая цифра». */
   methodNote:
     "Everything is estimated from repeated samples of assistant answers. Nothing is published anywhere until you approve it.",
-  /** Под недельным графиком: одна неделя — не результат. */
-  readTheTrend:
-    "Single weeks overlap; the change over the quarter is wider than one week's range. Read the trend, not a week.",
+  /**
+   * Главное обещание сайта (hero). Сказано «показываем диапазон и
+   * доказательства», а не «точнее»: сэмплов у нас меньше, чем у ежедневных
+   * трекеров, и сравнение по точности мы бы проиграли.
+   */
+  evidencePromise:
+    "We show the range and the evidence behind every number: how many answers it rests on, how confident it is, and the answers themselves. No rank, and no single score.",
+  /** Строка метода под hero. Каденс — по умолчанию продукта (раз в две недели). */
+  methodLine:
+    "No number from fewer than 3 answers per question per assistant · measured every two weeks by default · every raw answer kept",
+  /** Порог сэмплов (контракт C3), сказанный одной фразой для сайта. */
+  sampleFloor: "No figure from fewer than three answers per question per assistant.",
+  /** Каденс по умолчанию: так выставлено в настройках расписания клиента. */
+  cadence: "Every two weeks by default; weekly or daily if you switch it on.",
   /** Что значит «gap» у источника. */
   gapDefinition: "“Gap” = cited in answers that name a competitor but not the client.",
-  /** Сырые ответы хранятся — инвариант 6. */
+  /**
+   * Сырые ответы хранятся — инвариант 6. Инструмента переобработки истории
+   * нет, поэтому обещаем только то, что ответ лежит и его можно перечитать.
+   */
   answersStored:
-    "Every answer is stored with its model version, so a parser improvement can be replayed over history.",
-  /** Оценка вклада — всегда диапазон. */
-  contributionAsRange: "estimated contribution, shown as a range",
+    "Every answer is stored as it came back, with its model version and cost, so any figure can be checked against the text behind it.",
+  /**
+   * Диапазон вклада действия — фиксированная полоса вокруг точечной оценки
+   * (reports/build.ts), а не интервал из данных. Так и сказано.
+   */
+  contributionBand:
+    "An action's estimated contribution is shown as a band around the estimate. The band has a fixed width: it marks the figure as rough, it is not a statistical interval.",
   /**
    * Подпись к примеру эксперимента, где нетронутые темы были. Сравнение идёт
    * с ними, а не с «базовой линией платформы»: такого метода в продукте нет.
    */
   experimentRecord:
     "This is a record of what was done and what followed, compared with topics the work did not touch. It is evidence, not attribution of cause.",
-  /** Как работает эксперимент — описание метода (контракт C5). */
+  /**
+   * Как работает эксперимент — описание метода (контракт C5). Дата — момент,
+   * когда действие отмечено сделанным; отдельной даты «выкатили» нет.
+   * Группа сравнения — другие темы того же клиента, которых работа не касалась.
+   */
   experimentMethod:
-    "Log the date a change went live. The product compares the topics it touched with the topics you left alone, over the same weeks, and shows the difference as a range with a confidence level. It is a record of what followed, not a claim about why.",
+    "When a piece of work is marked done, the product compares the topics it touched with the client's other topics that it left alone, over the same weeks, and shows the difference as an estimate with a confidence level. It is a record of what followed, not a claim about why.",
   /** Без нетронутых тем сравнивать не с чем, и отчёт это говорит. */
   experimentWithoutControl:
     "Without untouched topics there is nothing to compare against, and the report says so instead of showing a difference.",
@@ -230,7 +252,7 @@ export const MARKETING_COPY = {
     attribution:
       "With one client and no untouched topics to compare against, movement cannot be separated from platform-wide drift, and the report says so where that is the case.",
     ranges:
-      "Estimated contribution is shown as a range next to a confidence level, because that is what the data supports.",
+      "A share comes with a range that depends on how many answers sit behind it. An action's estimated contribution is shown as a fixed-width band around the estimate, next to a confidence level, so it never reads as an exact number.",
     revenue:
       "Visibility is a share of answers. What that share is worth belongs to your client's model, not to ours.",
     nothingPublished:
@@ -240,7 +262,79 @@ export const MARKETING_COPY = {
   auditNotForecast:
     "The ranked work is what the current sources suggest, with expected effort. It does not predict what share of answers the client will reach.",
   auditSnapshot:
-    "One pass shows where the client stands this week. Movement needs repeated weekly samples; sixty to ninety days is the honest unit.",
+    "One pass shows where the client stands this week. Movement needs repeated measurements over weeks; sixty to ninety days is the honest unit.",
+  /**
+   * Почему аудит не мгновенный. Срок не обещаем: он зависит от числа
+   * вопросов и от очереди, а обещание, которое нельзя сдержать, хуже молчания.
+   */
+  auditTakesTime:
+    "Each question is asked three times on each of ChatGPT, Perplexity and Gemini, so an audit of two dozen questions is over two hundred answers. It takes longer than a page load, on purpose: one answer per question would be noise.",
+  /**
+   * Белая этикетка. Абсолюты вроде «ничего нашего» не говорим: ссылка живёт на
+   * нашем домене, письмо уходит с нашего адреса отправки.
+   */
+  whiteLabel: {
+    page: "The client sees your logo and colour. The report page does not name us, link to us or mention a plan.",
+    link: "The link opens without an account. It lives on our domain; custom domains are not available yet.",
+    email:
+      "Sent from the product, the email goes out under your agency's name from our sending address.",
+    pdf: "You can download the same page as a PDF to forward. The client's link has an approve step, not a download button.",
+    approve:
+      "The client approves the report, and the next sprint in it, by typing their name on the page. The name and the date are recorded.",
+  },
+} as const;
+
+/**
+ * Страница /method — публичная методология. Каждое утверждение здесь должно
+ * совпадать с кодом: пороги и числа страница берёт из констант продукта
+ * (MIN_SAMPLES_PER_CELL, SAMPLE_CONFIDENCE_THRESHOLDS, BASELINE_WINDOW_DAYS),
+ * а тексты — отсюда, чтобы их проверял тот же grep-тест.
+ */
+export const METHOD_COPY = {
+  lead: "Assistants rarely give the same answer twice. So we never report a single answer: we ask each question several times, count how often your client is named, and show how sure that count is.",
+  noRank:
+    "We do not report a “rank in ChatGPT”. Ask the same question twice and the list of brands changes, so a position read off one answer says very little.",
+  /** Внешнее исследование — с атрибуцией и ссылкой рядом, не как наш факт. */
+  sparkToro:
+    "SparkToro asked AI tools the same recommendation questions many times and found the list of brands almost never repeated: fewer than 1 in 100 runs gave the same list.",
+  instead:
+    "What we report instead is visibility: the share of sampled answers that name the brand, per assistant. Assistants are shown side by side, never blended into one score.",
+  prominence:
+    "Inside the workspace we also show how the client is named when it is named: in how many answers it comes first, or ahead of every tracked competitor. That is a count across samples too, not a position read off one answer.",
+  questions:
+    "Questions are the buyer prompts you track for a client. You can generate a first draft from templates, import your own list, and edit either until it reads the way buyers actually ask.",
+  samples:
+    "By default each question is asked three times on each assistant you switch on, every run, and you can ask more. A cell with fewer than three answers in its window shows a dash instead of a number.",
+  api: "Each assistant is asked through its developer API with web search switched on, not through the consumer app. What a person sees in the app can differ.",
+  sources: "Every answer is stored with the pages it cited, so each figure can be traced to answers and sources.",
+  windows:
+    "Answers are grouped by week. Screens add up a rolling window (the last 28 days by default) so a figure rests on more answers; reports compare the start of the period with the end.",
+  interval:
+    "The range around a share is a 95% interval worked out from the number of answers behind it. Few answers, wide range.",
+  withinNoise:
+    "When two periods' ranges overlap, the change is labelled as within what the sample can tell apart, not as up or down.",
+  confidence:
+    "Confidence describes how many answers sit behind a figure, not how good the result is. The same thresholds apply on every screen, in reports and in the API.",
+  experiments:
+    "An experiment compares the topics a piece of work touched with the client's other topics that it did not touch, over the same weeks. The baseline is the 28 days before the work was marked done.",
+  estimate:
+    "The change in the touched topics minus the change in the untouched ones, from the baseline to the weeks after the work.",
+  rangeExampleNote: "Worked with the same 95% interval the product uses, on a 0–100% axis.",
+  experimentConfidence:
+    "Its confidence comes from whether untouched topics exist and stayed steady, how many answers came in afterwards, how deep the baseline is, and whether a new source started being cited.",
+  experimentLimits:
+    "Untouched topics of the same client are a stand-in for a comparison group, not a true one. Without them, the report says movement cannot be separated from platform-wide change.",
+  kept: "Recorded on every answer: the raw text, the pages it cited, the model version that produced it, and what it cost to ask.",
+  decisions:
+    "Human decisions stay put. A recalculation never overwrites what your team decided about an opportunity.",
+  neverClaim: [
+    "A rank or position in any assistant",
+    "A single 0–100 visibility score",
+    "That a piece of work produced a change: we show what followed, with a comparison where one exists",
+    "A forecast of the share a client will reach",
+    "A revenue figure for visibility",
+    "Anything about assistants we do not measure",
+  ],
 } as const;
 
 export const EXPERIMENT_COPY = {

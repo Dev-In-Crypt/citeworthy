@@ -1,4 +1,11 @@
-import { CHECKS_PER_CLIENT_MONTH, PLAN_LIMITS, SAMPLE_HIGHLIGHTS } from "@repo/core";
+import {
+  BASELINE_WINDOW_DAYS,
+  CHECKS_PER_CLIENT_MONTH,
+  PLAN_LIMITS,
+  confidenceFor,
+  wilsonInterval,
+  type ConfidenceLevel,
+} from "@repo/core";
 
 /**
  * Данные для графиков и карточек витрины.
@@ -25,35 +32,6 @@ export const C = {
   ink: "#15171C",
 } as const;
 
-export const WEEKS = ["W15", "W16", "W17", "W18", "W19", "W20", "W21", "W22", "W23", "W24", "W25", "W26"];
-
-/**
- * Первая и последняя точки клиента — из примера отчёта; промежуточные
- * нарисованы для иллюстрации.
- */
-const FERNPOST = [
-  SAMPLE_HIGHLIGHTS.deliveryBefore,
-  19.9, 20.8, 20.3, 21.9, 22.8, 23.5, 24.9, 25.6, 26.8, 27.4,
-  SAMPLE_HIGHLIGHTS.deliveryAfter,
-];
-const QUILL = [41.2, 41.8, 40.9, 41.5, 42.3, 41.6, 42.0, 41.4, 42.4, 41.9, 42.2, 42.0];
-const LOAM = [33.7, 33.2, 33.9, 32.8, 32.9, 32.1, 32.6, 31.8, 31.9, 31.2, 31.6, 31.4];
-const TIDE = [22.5, 23.0, 22.4, 23.3, 23.1, 23.9, 23.6, 24.2, 24.0, 24.6, 24.3, 24.8];
-
-/** 216 ответов в неделю: 24 промпта × 3 ассистента × 3 сэмпла. */
-export const ANSWERS_PER_WEEK = 24 * 3 * 3;
-
-/** Полуширина 90%-го интервала для доли, оценённой по `n` ответам. */
-function halfWidth(pct: number, n: number): number {
-  const p = pct / 100;
-  return 1.645 * Math.sqrt((p * (1 - p)) / n) * 100;
-}
-
-export const FERNPOST_BAND = {
-  lo: FERNPOST.map((v) => v - halfWidth(v, ANSWERS_PER_WEEK)),
-  hi: FERNPOST.map((v) => v + halfWidth(v, ANSWERS_PER_WEEK)),
-};
-
 export type SeriesKind = "client" | "comp" | "control";
 
 export interface Series {
@@ -65,28 +43,81 @@ export interface Series {
   markers?: boolean;
 }
 
-export const SHARE_SERIES: Series[] = [
-  { name: CLIENT, data: FERNPOST, kind: "client" },
-  { name: "Quillstack", data: QUILL, kind: "comp" },
-  { name: "Loambox", data: LOAM, kind: "comp", opacity: 0.6 },
-  { name: "Tidepin", data: TIDE, kind: "comp", opacity: 0.38 },
+/* ---------------- карточка «как агентство видит цифру» ---------------- */
+
+/**
+ * Пример экрана агентства: доля клиента за окно по умолчанию (28 дней) при
+ * каденсе по умолчанию (раз в две недели) — два прогона по 24 вопроса,
+ * 3 ассистента, 3 сэмпла. Интервал и уверенность считаются теми же функциями,
+ * что в продукте, а не вписаны руками.
+ */
+export const EVIDENCE_WINDOW_DAYS = 28;
+export const EVIDENCE_PROMPTS = 24;
+const RUNS_IN_WINDOW = 2;
+const SAMPLES = 3;
+const PER_ASSISTANT = EVIDENCE_PROMPTS * SAMPLES * RUNS_IN_WINDOW;
+
+export interface EvidenceRow {
+  assistant: string;
+  named: number;
+  answers: number;
+  pct: number;
+  low: number;
+  high: number;
+  confidence: ConfidenceLevel;
+}
+
+function evidenceRow(assistant: string, named: number, answers: number): EvidenceRow {
+  const interval = wilsonInterval(named, answers);
+  return {
+    assistant,
+    named,
+    answers,
+    pct: interval?.pct ?? 0,
+    low: Math.round(interval?.low ?? 0),
+    high: Math.round(interval?.high ?? 0),
+    confidence: confidenceFor(answers),
+  };
+}
+
+/**
+ * По ассистентам. Общая доля — сумма названий на все ответы окна, около 29%:
+ * рядом с концом квартала в примере отчёта, но окно другое (28 дней, а не
+ * неделя), поэтому до десятых они не обязаны совпадать.
+ */
+export const EVIDENCE_ROWS: EvidenceRow[] = [
+  evidenceRow("ChatGPT", 48, PER_ASSISTANT),
+  evidenceRow("Perplexity", 37, PER_ASSISTANT),
+  evidenceRow("Gemini", 39, PER_ASSISTANT),
 ];
+
+export const EVIDENCE_TOTAL = evidenceRow(
+  "All three",
+  EVIDENCE_ROWS.reduce((sum, row) => sum + row.named, 0),
+  EVIDENCE_ROWS.reduce((sum, row) => sum + row.answers, 0),
+);
+
+/* ---------------- эксперимент ---------------- */
 
 /**
  * Пример эксперимента: темы, которые покрыла работа, против нетронутых тем за
  * те же недели (контракт C5: Δtreatment − Δcontrol). Иллюстрация метода, а не
  * данные из примера отчёта: в квартале примера нетронутых тем не было, и отчёт
- * так и говорит. Поэтому пример лежит в следующем спринте — том, перед которым
- * на доске отмечены контрольные темы (invoicing, time tracking).
+ * так и говорит. Поэтому пример лежит в следующем спринте.
+ *
+ * Окна — как в продукте: «до» — 28 дней перед отметкой «done» (четыре недели),
+ * «после» — все недели начиная с неё. Недели на переобход не пропускаются:
+ * такого правила в расчёте нет.
  */
 export const EXPERIMENT = {
   weeks: ["W22", "W23", "W24", "W25", "W26", "W27", "W28", "W29", "W30", "W31", "W32", "W33"],
   actionWeekIndex: 5,
   treated: [18.8, 19.2, 18.7, 19.1, 19.0, 20.6, 22.1, 23.4, 24.2, 24.9, 25.3, 25.5],
   untouched: [19.6, 20.1, 19.7, 19.9, 19.8, 20.4, 20.9, 21.3, 21.6, 21.9, 22.0, 22.2],
-  /** До: W22–W26; после: W30–W33; W27–W29 пропущены, пока модели переобходят страницы. */
-  before: [0, 5] as const,
-  after: [8, 12] as const,
+  /** До: W23–W26 (четыре недельных среза = BASELINE_WINDOW_DAYS); после: W27–W33. */
+  before: [1, 5] as const,
+  after: [5, 12] as const,
+  baselineDays: BASELINE_WINDOW_DAYS,
 };
 
 function mean(values: number[]): number {
@@ -96,19 +127,6 @@ function mean(values: number[]): number {
 export function periodMean(series: number[], [from, to]: readonly [number, number]): number {
   return Math.round(mean(series.slice(from, to)) * 10) / 10;
 }
-
-/* ---------------- источники → бренды (диаграмма потоков) ---------------- */
-
-export const BRANDS = [CLIENT, "Quillstack", "Loambox", "Tidepin"] as const;
-export type Brand = (typeof BRANDS)[number];
-
-export const SOURCE_FLOWS: { name: string; sub: string; flows: Record<Brand, number> }[] = [
-  { name: "Review platforms", sub: "reviewhub.example +1", flows: { Fernpost: 6, Quillstack: 22, Loambox: 16, Tidepin: 8 } },
-  { name: "Comparison articles", sub: "toolreview.example +6", flows: { Fernpost: 9, Quillstack: 14, Loambox: 7, Tidepin: 3 } },
-  { name: "Community threads", sub: "forum.example", flows: { Fernpost: 3, Quillstack: 12, Loambox: 9, Tidepin: 4 } },
-  { name: "Competitor pages", sub: "quillstack.example +1", flows: { Fernpost: 0, Quillstack: 15, Loambox: 10, Tidepin: 0 } },
-  { name: "Fernpost’s own pages", sub: "fernpost.example", flows: { Fernpost: 17, Quillstack: 2, Loambox: 0, Tidepin: 0 } },
-];
 
 /* ---------------- промпт × ассистент ---------------- */
 
@@ -134,15 +152,16 @@ export const MATRIX: { prompt: string; cells: MatrixCell[]; competitorOnly?: boo
   { prompt: "project tool with time tracking and invoicing", cells: [33, 22, 44, 22, null] },
 ];
 
-/**
- * Доли конкурентов в примере аудита — те же, что в фикстуре
- * `SAMPLE_AUDIT_REPORT` (в payload отчёта попадает только их среднее).
- */
-export const AUDIT_COMPETITORS = [
-  { name: "Quillstack", pct: 39.6, opacity: 1 },
-  { name: "Loambox", pct: 30.2, opacity: 0.7 },
-  { name: "Tidepin", pct: 18.1, opacity: 0.5 },
-];
+/* ---------------- источники ---------------- */
+
+/** Доля ответов, цитирующих источник, в примере. «gap» — конкурент назван, клиент нет. */
+export const SOURCES = [
+  { domain: "reviewhub.example", kind: "gap", note: "gap", pct: 18 },
+  { domain: "forum.example", kind: "gap", note: "gap", pct: 12 },
+  { domain: "toolreview.example", kind: "has", note: "names both", pct: 9 },
+  { domain: "listings.example", kind: "gap", note: "gap", pct: 7 },
+  { domain: "fernpost.example", kind: "has", note: "names client", pct: 6 },
+] as const;
 
 /* ---------------- агентства для белой карточки ---------------- */
 
@@ -164,9 +183,12 @@ export type PlanId = "starter" | "growth" | "scale";
 
 /**
  * Типичный расход клиента, округлённый до 50 — так его и называют в тексте.
- * Считается из той же константы, по которой выставлены allowance.
+ * `CHECKS_PER_CLIENT_MONTH` посчитан для еженедельного опроса: по нему
+ * выставлены allowance, и это худший обычный случай. По умолчанию продукт
+ * опрашивает раз в две недели — это вдвое меньше.
  */
 export const TYPICAL_CHECKS_PER_CLIENT = Math.round(CHECKS_PER_CLIENT_MONTH / 50) * 50;
+export const TYPICAL_CHECKS_BIWEEKLY = Math.round(CHECKS_PER_CLIENT_MONTH / 2 / 50) * 50;
 
 /** С Claude и Grok клиента спрашивают пять ассистентов вместо трёх. */
 export const TYPICAL_CHECKS_FIVE_ASSISTANTS = Math.round((TYPICAL_CHECKS_PER_CLIENT * 5) / 3 / 50) * 50;
@@ -179,6 +201,7 @@ export const PLANS: {
   clientLimit: number;
   aiCheckAllowance: number;
   checksPerClient: number;
+  perClientUsd: number;
   typicalUse: number;
 }[] = (["starter", "growth", "scale"] as const).map((id) => {
   const limits = PLAN_LIMITS[id];
@@ -186,17 +209,23 @@ export const PLANS: {
     id,
     name: { starter: "Starter", growth: "Growth", scale: "Scale" }[id],
     audience: {
-      starter: "Your first AI Search retainer, or a pilot on existing clients",
-      growth: "A delivery line running across a book of clients",
-      scale: "AI Search as a standing service across the agency",
+      starter: "A pilot on a few existing clients, or your first AI-visibility retainer",
+      growth: "An AI-visibility line running across a book of clients",
+      scale: "AI visibility as a standing service across the agency",
     }[id],
     priceUsd: limits.priceUsd,
     clientLimit: limits.clientLimit,
     aiCheckAllowance: limits.aiCheckAllowance,
     checksPerClient: Math.round(limits.aiCheckAllowance / limits.clientLimit / 10) * 10,
+    // Цена за клиента при полном плане — считается, а не вписывается.
+    perClientUsd: Math.round(limits.priceUsd / limits.clientLimit),
     typicalUse: limits.clientLimit * TYPICAL_CHECKS_PER_CLIENT,
   };
 });
+
+const perClient = PLANS.map((plan) => plan.perClientUsd);
+export const PER_CLIENT_MIN = Math.min(...perClient);
+export const PER_CLIENT_MAX = Math.max(...perClient);
 
 /* ---------------- форматирование ---------------- */
 

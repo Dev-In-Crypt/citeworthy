@@ -5,37 +5,34 @@ import {
   MARKETING_COPY,
   MEASUREMENT_COPY,
   OPPORTUNITY_COPY,
-  REPORT_COPY,
   SAMPLE_DELIVERY_REPORT,
-  SAMPLE_HIGHLIGHTS,
   delta,
   estimateExperiment,
   formatContributionRange,
 } from "@repo/core";
-import { AgencyCard } from "@/components/marketing/agency-card";
-import { Conf, LegendLine, SecHead, SrcChip } from "@/components/marketing/bits";
+import { Conf, LegendLine, MethodLink, SecHead, SrcChip } from "@/components/marketing/bits";
 import { MarketingShell } from "@/components/marketing/chrome";
-import { ExperimentChart, PromptMatrix, SourceFlow } from "@/components/marketing/charts";
-import { AGENCIES, CLIENT, EXPERIMENT, periodMean } from "@/components/marketing/data";
+import { ExperimentChart, PromptMatrix } from "@/components/marketing/charts";
+import { CLIENT, EXPERIMENT, SOURCES, periodMean } from "@/components/marketing/data";
+import { ReportPreview } from "@/components/marketing/report-preview";
 
 /**
  * Страница продукта: шесть частей по порядку работы с клиентом.
  *
- * Все графики — пример на выдуманных данных и так подписаны. Цифры отчёта в
- * карточке — из собранного примера отчёта, вместе с его оговоркой: в том
- * квартале нетронутых тем не было, и вклад действия не отделён от общего
- * дрейфа платформ. Раздел экспериментов показывает сам метод — сравнение с
- * нетронутыми темами — на отдельном, тоже выдуманном примере.
+ * Все графики — пример на выдуманных данных и так подписаны. Отчёт в
+ * карточке собран из примера отчёта и повторяет настоящий `ReportView`.
+ * Раздел экспериментов показывает сам метод — сравнение с нетронутыми темами
+ * клиента — на отдельном, тоже выдуманном примере, с теми же окнами, что в
+ * расчёте продукта.
  */
 
 export const metadata: Metadata = {
   title: "Product · Citeworthy",
   description:
-    "Measure, diagnose, act, run experiments and report: how Citeworthy turns sampled AI answers into agency work and white-label reports.",
+    "Measure, diagnose, act, run experiments and report: how Citeworthy turns sampled AI answers into ranked agency work and white-label reports.",
 };
 
-const H = SAMPLE_HIGHLIGHTS;
-const HIGHEST = SAMPLE_DELIVERY_REPORT.highestImpactAction;
+const WL = MARKETING_COPY.whiteLabel;
 
 /* Пример эксперимента считается той же математикой, что и в продукте (контракт C5). */
 const treatedBefore = periodMean(EXPERIMENT.treated, EXPERIMENT.before);
@@ -47,14 +44,17 @@ const estimate = estimateExperiment({
   treatmentAfter: treatedAfter,
   controlBefore: untouchedBefore,
   controlAfter: untouchedAfter,
-  treatmentSamplesAfter: 4 * 9 * 9,
+  treatmentSamplesAfter: (EXPERIMENT.after[1] - EXPERIMENT.after[0]) * 4 * 9,
   baselineSnapshots: EXPERIMENT.before[1] - EXPERIMENT.before[0],
   hasControlGroup: true,
   hasNewCitation: false,
 });
 const effectRange = formatContributionRange(estimate.incrementalPp) ?? "";
 
-/** Концы диапазона для полосы на оси: «+2–6 pp» → [2, 6]. */
+const weekSpan = ([from, to]: readonly [number, number]) =>
+  `${EXPERIMENT.weeks[from]}–${EXPERIMENT.weeks[to - 1]}`;
+
+/** Концы диапазона для полосы на оси: «+2–5 pp» → [2, 5]. */
 function rangeEnds(range: string): [number, number] {
   const numbers = range.match(/\d+(\.\d+)?/g)?.map(Number) ?? [0];
   const sign = range.startsWith("−") ? -1 : 1;
@@ -68,8 +68,6 @@ const [effectLo, effectHi] = rangeEnds(effectRange);
 const fmt1 = (v: number) => v.toFixed(1);
 const fmtDelta = (v: number | null) =>
   v === null ? "–" : `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(1)}`;
-
-const actionsCompleted = SAMPLE_HIGHLIGHTS.deliveryWork.reduce((sum, item) => sum + item.count, 0);
 
 const FACTORS = [
   { label: OPPORTUNITY_COPY.factorLabels.impact, width: 82, value: "large" },
@@ -123,12 +121,12 @@ export default function ProductPage() {
           <div>
             <div className="kicker page-kicker">Product</div>
             <h1 className="display">
-              From the answers assistants give <em>to the report your client reads.</em>
+              From the answers assistants give <em>to the report your client approves.</em>
             </h1>
             <p className="lead">
-              Six parts, one per client: measure the answers, find the sources behind them, rank the
-              work, check what followed it, report it in your brand, and pull any of it into your own
-              tools.
+              Six parts, one per client: measure the answers, find the sources cited around them,
+              rank the work, check what followed it, report it in your brand, and pull any of it into
+              your own tools.
             </p>
             <nav className="jump" aria-label="On this page">
               <a href="#measure"><i>1</i>Measure</a>
@@ -142,13 +140,15 @@ export default function ProductPage() {
           <aside className="card method" aria-label="Measurement method">
             <div className="cap">How every figure is made</div>
             <dl>
-              <div><dt>Samples per prompt, per assistant</dt><dd>≥ 3</dd></div>
-              <div><dt>Aggregation window</dt><dd>weekly</dd></div>
+              <div><dt>Answers per question per assistant before a number shows</dt><dd>≥ 3</dd></div>
+              <div><dt>Default cadence</dt><dd>every 2 weeks</dd></div>
+              <div><dt>Answers grouped into</dt><dd>weekly windows</dd></div>
               <div><dt>Raw answer stored</dt><dd>every one</dd></div>
-              <div><dt>Model version recorded</dt><dd>per answer</dd></div>
+              <div><dt>Model version and cost recorded</dt><dd>per answer</dd></div>
               <div><dt>Figures from a single answer</dt><dd>none</dd></div>
             </dl>
             <div className="basis">{MARKETING_COPY.methodNote}</div>
+            <MethodLink>The full method →</MethodLink>
           </aside>
         </section>
       </div>
@@ -156,15 +156,15 @@ export default function ProductPage() {
       {/* 1 · измерение */}
       <section className="sec" id="measure">
         <div className="wrap">
-          <SecHead n={1} title="Measure: every prompt, every assistant, every week">
-            You write the questions your client&apos;s buyers ask, or generate them and edit the
-            list. Each one is asked on every assistant you switch on, at least three times a week,
-            and each cell is an aggregate of those samples.
+          <SecHead n={1} title="Measure: every question, on every assistant you switch on">
+            Write the questions your client’s buyers ask, import a list, or generate a draft from
+            templates and edit it. Each question is asked several times on every assistant you switch
+            on, and each cell is an aggregate of those answers. {MARKETING_COPY.cadence}
           </SecHead>
           <div className="card">
             <div className="panel-head">
               <span className="t">
-                Prompt × assistant <span>· {CLIENT} · W26 · example data</span>
+                Prompt × assistant <span>· {CLIENT} · last 28 days · example data</span>
               </span>
               <Conf level="medium" />
             </div>
@@ -183,7 +183,7 @@ export default function ProductPage() {
                 </span>
                 <span>
                   <i className="sw" style={{ background: "#fff", border: "1px solid #E3E1DA" }} />
-                  under the sample floor
+                  fewer than 3 answers, so no number
                 </span>
                 <span>
                   <i
@@ -207,15 +207,15 @@ export default function ProductPage() {
             </div>
             <div className="card fact">
               <b>≥ 3</b>
-              <span>samples per prompt per assistant before a cell shows a number.</span>
+              <span>answers per question per assistant before a cell shows a number.</span>
             </div>
             <div className="card fact">
-              <b>Weekly</b>
-              <span>windows. Earlier weeks stay as they were measured.</span>
+              <b>2 weeks</b>
+              <span>between measurements by default. Weekly or daily if you switch it on.</span>
             </div>
             <div className="card fact">
-              <b>Stored</b>
-              <span>every raw answer, so a parser improvement can be replayed over history.</span>
+              <b>Kept</b>
+              <span>every raw answer, with its model version and cost.</span>
             </div>
           </div>
           <p className="label" style={{ marginTop: 14 }}>
@@ -227,44 +227,45 @@ export default function ProductPage() {
       {/* 2 · диагностика */}
       <section className="sec" id="diagnose">
         <div className="wrap">
-          <SecHead n={2} title="Diagnose: which sources decide the answer">
+          <SecHead n={2} title="Diagnose: which sources are cited where competitors are named">
             Every answer comes with the pages it cited. Grouped by kind of source, they show where
-            competitors are named and your client is not, which tells you whether the gap is on the
-            client&apos;s own site or out in the category.
+            competitors are named and your client is not, and whether the gap sits on the client’s
+            own site or out in the category.
           </SecHead>
           <div className="split rev">
-            <div className="card">
-              <div className="panel-head">
-                <span className="t">
-                  Cited sources → brands named in the same answer <span>· W26 · example data</span>
-                </span>
-                <Conf level="medium" estimated={false} />
+            <div className="card srcs">
+              <div>
+                <div className="ev-title">Cited sources · {CLIENT} · example data</div>
+                <div className="label" style={{ marginTop: 2 }}>
+                  share of answers citing each source · last 28 days
+                </div>
               </div>
-              <div className="panel-body">
-                <SourceFlow />
-              </div>
-              <div className="panel-foot label">
-                Each band: citations of that kind of source in answers naming that brand. One answer
-                can cite several sources and name several brands.
+              <ul>
+                {SOURCES.map((s, i) => (
+                  <li key={s.domain}>
+                    <div className="row">
+                      <SrcChip n={i + 1} domain={s.domain} kind={s.kind} note={s.note} />
+                      <span className="pct">{s.pct}%</span>
+                    </div>
+                    <span className="bar">
+                      <i
+                        style={{
+                          width: `${s.pct * 4}%`,
+                          background: s.kind === "gap" ? "#F54900" : s.note === "names client" ? "#00A63E" : "#3C414B",
+                          opacity: s.kind === "gap" ? 0.75 : s.note === "names client" ? 1 : 0.55,
+                        }}
+                      />
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <div className="basis" style={{ marginTop: "auto" }}>
+                {MARKETING_COPY.gapDefinition}
               </div>
             </div>
             <div className="card verdict">
               <div className="kicker">Diagnosis · {CLIENT}</div>
               <p className="h3">{DIAGNOSIS_COPY.thirdPartyGap}</p>
-              <div className="share-row">
-                <span>Competitor mentions from answers citing third-party sources</span>
-                <b>78%</b>
-                <span className="bar">
-                  <i style={{ width: "78%", background: "#F54900", opacity: 0.8 }} />
-                </span>
-              </div>
-              <div className="share-row">
-                <span>{CLIENT} mentions from answers citing its own pages</span>
-                <b>49%</b>
-                <span className="bar">
-                  <i style={{ width: "49%", background: "#00A63E" }} />
-                </span>
-              </div>
               <div className="cites">
                 <SrcChip n={1} domain="reviewhub.example" kind="gap" note="gap" />
                 <SrcChip n={2} domain="forum.example" kind="gap" note="gap" />
@@ -281,7 +282,7 @@ export default function ProductPage() {
               <span className="label">examples from the sample, shown after the aggregate</span>
             </div>
             <div className="tape-item">
-              <div className="src"><span>Perplexity · sample 1/3</span><span>23 Jun</span></div>
+              <div className="src"><span>Perplexity · answer 1 of 3</span><span>23 Jun</span></div>
               <q>
                 Most reviewers recommend <span className="nm-comp">Quillstack</span>, with{" "}
                 <span className="nm-comp">Loambox</span> as a cheaper option …
@@ -289,7 +290,7 @@ export default function ProductPage() {
               <div className="cites"><SrcChip n={1} domain="reviewhub.example" kind="gap" note="gap" /></div>
             </div>
             <div className="tape-item">
-              <div className="src"><span>ChatGPT · sample 2/3</span><span>24 Jun</span></div>
+              <div className="src"><span>ChatGPT · answer 2 of 3</span><span>24 Jun</span></div>
               <q>
                 Reviewers rate <span className="nm-comp">Quillstack</span> highest for larger teams;{" "}
                 <span className="nm-comp">Tidepin</span> suits freelancers …
@@ -300,7 +301,7 @@ export default function ProductPage() {
               </div>
             </div>
             <div className="tape-item">
-              <div className="src"><span>Gemini · sample 3/3</span><span>25 Jun</span></div>
+              <div className="src"><span>Gemini · answer 3 of 3</span><span>25 Jun</span></div>
               <q>
                 On review sites, <span className="nm-comp">Loambox</span> and{" "}
                 <span className="nm-comp">Quillstack</span> collect the most studio reviews …
@@ -315,13 +316,13 @@ export default function ProductPage() {
       <section className="sec" id="act">
         <div className="wrap">
           <SecHead n={3} title="Opportunities: ranked work, each with a reason">
-            {OPPORTUNITY_COPY.basis} No item exists without a reason.
+            {OPPORTUNITY_COPY.basis} No opportunity and no action exists without a reason.
           </SecHead>
           <div className="split rev">
             <div className="card">
               <div className="panel-head">
                 <span className="t">
-                  Opportunities <span>· {CLIENT} · window W24–W26 · example data</span>
+                  Opportunities <span>· {CLIENT} · example data</span>
                 </span>
                 <span className="label">5 of 11</span>
               </div>
@@ -375,21 +376,21 @@ export default function ProductPage() {
             <div className="side">
               <div className="card pad">
                 <div className="cap" style={{ marginBottom: 12 }}>
-                  Actions board · this sprint
+                  Actions board · this sprint · example
                 </div>
                 <div className="board">
                   <div className="bcol">
-                    <h3>Planned <span>2</span></h3>
+                    <h3>Backlog <span>2</span></h3>
                     <div className="tks">
                       <div className="tk">
                         <b>Review listing</b>
                         <span>Reason: reviewhub.example cited in 18% of answers</span>
-                        <div className="who"><i>AK</i>due 10 Jul</div>
+                        <div className="who"><i>AK</i>owner</div>
                       </div>
                       <div className="tk">
                         <b>Comparison page</b>
                         <span>Reason: no own page among 9 cited sources</span>
-                        <div className="who"><i>MR</i>due 17 Jul</div>
+                        <div className="who"><i>MR</i>owner</div>
                       </div>
                     </div>
                   </div>
@@ -399,7 +400,7 @@ export default function ProductPage() {
                       <div className="tk">
                         <b>Pricing page refresh</b>
                         <span>Reason: cited 6 times, name not carried</span>
-                        <div className="who"><i>JS</i>since 1 Jul</div>
+                        <div className="who"><i>JS</i>owner</div>
                       </div>
                     </div>
                   </div>
@@ -409,18 +410,24 @@ export default function ProductPage() {
                       <div className="tk">
                         <b>Migration guide</b>
                         <span>Reason: 3 answers send migrations to a competitor</span>
-                        <div className="who"><i>AK</i>2 Jul</div>
+                        <div className="who"><i>AK</i>done</div>
                       </div>
                       <span className="more">+ 2 more</span>
                     </div>
                   </div>
                 </div>
                 <div className="ctrl">
-                  <b>Control topics · untouched:</b> invoicing, time tracking. Marked before the
-                  sprint started, so later movement has something to be compared with.
+                  <b>Untouched topics · invoicing, time tracking.</b> This sprint’s work does not
+                  touch them, so they are what later movement gets compared with.
                 </div>
               </div>
               <ul className="rules" style={{ marginTop: 22 }}>
+                <li>
+                  <span>
+                    <b>Every action opens as a brief</b>: the objective, why it matters, the numbers
+                    behind it, steps and acceptance criteria for its type.
+                  </span>
+                </li>
                 <li>
                   <span>
                     <b>Dismissing needs a reason too</b>, so the next person does not re-open it.{" "}
@@ -435,7 +442,7 @@ export default function ProductPage() {
                 <li>
                   <span>
                     <b>Nothing is published for you.</b> The board records work your team does; any
-                    change to a client&apos;s site stays a human decision.
+                    change to a client’s site stays a human decision.
                   </span>
                 </li>
               </ul>
@@ -447,7 +454,7 @@ export default function ProductPage() {
       {/* 4 · эксперименты */}
       <section className="sec" id="experiments">
         <div className="wrap">
-          <SecHead n={4} title="Experiments: what followed the work, with an interval">
+          <SecHead n={4} title="Experiments: what followed the work, as an estimate">
             {MARKETING_COPY.experimentMethod}
           </SecHead>
           <div className="card exp" data-testid="experiment-example">
@@ -466,12 +473,13 @@ export default function ProductPage() {
                 </span>
               </div>
               <ExperimentChart
-                actionLabel="Migration guide refreshed · 2 Jul"
-                actionLabelShort="Guide refreshed · W27"
+                actionLabel="Guide marked done · W27"
+                actionLabelShort="Marked done · W27"
               />
               <div className="basis">
-                Before: W22–W26 · after: W30–W33 · W27–W29 left out while models re-crawl · 3
-                assistants × 3 samples per prompt
+                Before: the {EXPERIMENT.baselineDays} days before the work was marked done (
+                {weekSpan(EXPERIMENT.before)}) · after: every week since ({weekSpan(EXPERIMENT.after)}) · 3
+                assistants × 3 samples per question
               </div>
             </div>
             <div className="exp-side">
@@ -484,7 +492,7 @@ export default function ProductPage() {
                 <div
                   className="range"
                   role="img"
-                  aria-label={`Range from ${effectLo} to ${effectHi} points on an axis from ${AXIS.min} to ${AXIS.max}`}
+                  aria-label={`Band from ${effectLo} to ${effectHi} points on an axis from ${AXIS.min} to ${AXIS.max}`}
                 >
                   <div className="axis" />
                   <div className="zero" style={{ left: `${toPct(0)}%` }} />
@@ -497,6 +505,9 @@ export default function ProductPage() {
                   <span className="tk2" style={{ left: `${toPct(4)}%` }}>+4</span>
                   <span className="tk2 end" style={{ left: "100%" }}>+10</span>
                 </div>
+                <p className="label" style={{ marginTop: 6 }}>
+                  {MARKETING_COPY.contributionBand}
+                </p>
               </div>
               <Conf level={estimate.confidence} />
               <table className="ba">
@@ -534,90 +545,54 @@ export default function ProductPage() {
       {/* 5 · отчёты */}
       <section className="sec" id="reports">
         <div className="wrap">
-          <SecHead n={5} title="White-label reports, in your name only">
-            A report is a link the client opens without an account, and a PDF of the same page. Your
-            logo and colour are on it; the product is not named anywhere.
+          <SecHead n={5} title="White-label reports, in your agency’s name">
+            A report is a page your client opens from a link, without an account, in your logo and
+            colour. You can download the same page as a PDF to forward.
           </SecHead>
           <div className="split">
             <div className="side">
               <h3 className="h3">What the client can do</h3>
               <ul className="never">
                 <li>Open the report from a link, with no account and no login</li>
-                <li>Download the same page as a PDF</li>
-                <li>Approve the next sprint from the page</li>
+                <li>Approve the report and the next sprint in it; the name and date are recorded</li>
+                <li>Read the caveats in the “How to read this” section at the end</li>
               </ul>
               <h3 className="h3" style={{ marginTop: 32 }}>
-                What never appears
+                What the report page never shows
               </h3>
               <ul className="never x">
-                <li>Our name, logo, favicon or colour</li>
+                <li>Our name or logo</li>
                 <li>“Powered by” or any link back to us</li>
                 <li>Pricing, plan names or upsell messages</li>
               </ul>
-              <p className="label" style={{ marginTop: 16 }}>
-                What always stays: “estimated”, the confidence level, the sample basis and a reason
-                under every recommended action.
-              </p>
+              <ul className="rules" style={{ marginTop: 20 }}>
+                <li>
+                  <span>
+                    <b>Worth knowing.</b> {WL.link} {WL.email}
+                  </span>
+                </li>
+                <li>
+                  <span>
+                    <b>What always stays.</b> Figures are called estimates, the measurement basis is
+                    stated, and the caveats close the report. In an audit report every ranked item
+                    carries its reason; a quarterly report’s next sprint is the plan you agree with
+                    the client.
+                  </span>
+                </li>
+              </ul>
             </div>
             <div className="wl-stage">
-              <AgencyCard
-                agencies={AGENCIES}
-                initial={1}
-                ariaLabel="Example white-label quarterly report"
+              <ReportPreview
+                payload={SAMPLE_DELIVERY_REPORT}
+                variant="delivery"
                 testId="product-report"
-                meta={
-                  <>
-                    Prepared for {CLIENT}
-                    <br />1 Apr – 30 Jun 2026
-                  </>
-                }
-              >
-                <div className="r-title">Quarterly report: what moved, what was done</div>
-                <div className="r-stats">
-                  <div>
-                    <b>
-                      {H.deliveryBefore} → {H.deliveryAfter}%
-                    </b>
-                    <span>share of answers naming {CLIENT} · ▲ {H.deliveryDeltaPp} pp</span>
-                  </div>
-                  <div>
-                    <b>{actionsCompleted}</b>
-                    <span>actions completed · {H.deliveryNewCitedUrls} newly cited URLs</span>
-                  </div>
-                </div>
-                {HIGHEST && (
-                  <div className="hl">
-                    <span>Highest-impact action</span>
-                    <b>{HIGHEST.title}</b>
-                    <span>
-                      Estimated contribution: {HIGHEST.estimatedContribution} · Confidence:{" "}
-                      {HIGHEST.confidence}
-                    </span>
-                  </div>
-                )}
-                <div className="r-sec">
-                  <h5>Next sprint</h5>
-                  <ol className="r-next">
-                    <li>
-                      <div>
-                        {SAMPLE_DELIVERY_REPORT.nextSprint[0]}
-                        <span>Reason: cited in answers that name Quillstack and Loambox, not {CLIENT}.</span>
-                      </div>
-                    </li>
-                    <li>
-                      <div>
-                        {SAMPLE_DELIVERY_REPORT.nextSprint[2]}
-                        <span>Reason: integration questions cite a page that lists retired partners.</span>
-                      </div>
-                    </li>
-                  </ol>
-                </div>
-                <div className="r-caveat">{REPORT_COPY.noComparisonGroup}</div>
-                <div className="r-foot">
-                  <span className="approve">Approve next sprint</span>
-                  <span className="label">3 samples per prompt per assistant</span>
-                </div>
-              </AgencyCard>
+                ariaLabel="Example white-label quarterly report, abridged"
+                initial={1}
+                approve
+              />
+              <Link className="link" href="/sample-report">
+                Open the full example report →
+              </Link>
             </div>
           </div>
         </div>
@@ -627,9 +602,9 @@ export default function ProductPage() {
       <section className="sec" id="api">
         <div className="wrap">
           <SecHead n={6} title="API: the same numbers, in your own tools">
-            A read-only REST API for your agency&apos;s data. Responses carry the same intervals and
-            caveats as the screens, so a figure does not lose its basis when it lands in another
-            dashboard.
+            A read-only REST API for your agency’s data. Responses carry the same intervals, sample
+            counts and reasons as the screens, so a figure does not lose its basis when it lands in
+            another dashboard.
           </SecHead>
           <div className="split even">
             <div className="card pad">
@@ -649,7 +624,7 @@ export default function ProductPage() {
               </table>
               <div className="basis" style={{ marginTop: 12 }}>
                 A key is shown once, right after it is created; only a hash of it is stored. Another
-                agency&apos;s client returns “not found”.
+                agency’s client returns “not found”.
               </div>
             </div>
             <pre className="code" aria-label="Example request and abridged response">
@@ -693,9 +668,8 @@ export default function ProductPage() {
           <h2 className="h1">See it on one of your own clients first</h2>
           <div>
             <p className="prose">
-              The free audit runs the first three parts once and hands you the result as a report in
-              your brand: a measurement pass, the diagnosis and ranked work. Nothing is charged to
-              run it.
+              The free audit runs the first steps once, from questions to ranked work, and ends on an
+              opportunity report in your brand. Nothing is charged to run it.
             </p>
             <div className="ctas" style={{ marginTop: 22 }}>
               <Link className="btn primary" href="/signup">

@@ -11,7 +11,7 @@ test("landing gives an anonymous visitor the offer, the plans and a way in", asy
 
   await page.goto("/");
 
-  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Are we in ChatGPT?");
 
   // Главный призыв ведёт к бесплатному аудиту, то есть на регистрацию.
   await expect(page.getByTestId("landing-cta-audit")).toHaveAttribute("href", "/signup");
@@ -20,30 +20,43 @@ test("landing gives an anonymous visitor the offer, the plans and a way in", asy
     "/sample-report",
   );
 
+  // Строка метода под hero: каденс по умолчанию и ссылка на методологию.
+  const method = page.getByTestId("hero-method");
+  await expect(method).toContainText("every two weeks by default");
+  await expect(method.getByRole("link")).toHaveAttribute("href", "/method");
+
+  // Главное обещание показано, а не только сказано: доля с диапазоном,
+  // числом ответов, уверенностью и самим ответом.
+  const evidence = page.getByTestId("landing-evidence");
+  await expect(evidence).toContainText("range");
+  await expect(evidence).toContainText("answers");
+  await expect(evidence).toContainText("confidence");
+
   // Три тарифа с суммами из PLAN_LIMITS — витрина и API берут их из одного места.
   await expect(page.getByTestId("pricing-plans").locator("> li")).toHaveCount(3);
   await expect(page.getByTestId("plan-price-starter")).toHaveText("$499");
   await expect(page.getByTestId("plan-price-growth")).toHaveText("$1,299");
   await expect(page.getByTestId("plan-price-scale")).toHaveText("$2,499");
 
-  // Пределы названы вслух, а не спрятаны в подвал.
-  await expect(page.getByTestId("landing-limits")).toContainText("ninety days");
-
-  // Лимиты видны рядом с ценой. Объяснение allowance («950 checks») переехало
-  // на /pricing и проверяется в marketing.spec.ts; главная ведёт туда ссылкой.
+  // Лимиты видны рядом с ценой. Объяснение allowance («950 checks») — на
+  // /pricing и проверяется в marketing.spec.ts; главная ведёт туда ссылкой.
   await expect(page.getByText("4,000")).toBeVisible();
   await expect(page.getByRole("link", { name: /Full pricing and what an AI check is/ })).toHaveAttribute(
     "href",
     "/pricing",
   );
 
-  // Цифры витрины взяты из демонстрационного отчёта: видимость за квартал и
-  // диапазон вклада главного действия — вместе с оговоркой, что сравнивать
-  // было не с чем.
-  const figures = page.getByTestId("landing-report-figures");
-  await expect(figures).toContainText("19.4% → 28.6%");
-  await expect(figures).toContainText("+2–6");
-  await expect(figures).toContainText("no untouched topics");
+  // Отчёт на витрине — сокращённый настоящий: цифры из демонстрационного
+  // отчёта и раздел оговорок, без причин под «Next sprint».
+  const report = page.getByTestId("landing-report");
+  await expect(report).toContainText("19.4% → 28.6%");
+  await expect(report).toContainText("How to read this");
+  await expect(report).toContainText("no untouched topics");
+
+  // Возражения — словами покупателя, включая «у нас уже есть SEO-пакет».
+  await expect(page.getByTestId("landing-objections")).toContainText("Semrush");
+  // Внешняя цифра о рынке — со ссылкой на источник.
+  await expect(page.locator('a[href*="agencyanalytics.com"]')).toHaveCount(1);
 
   const html = await page.content();
   expect(html).not.toMatch(/\bproven\b|\bproof\b|\bguaranteed\b|\bcaused\b/i);

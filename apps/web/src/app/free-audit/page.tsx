@@ -1,89 +1,49 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { MARKETING_COPY, REPORT_COPY, SAMPLE_AUDIT_REPORT, SAMPLE_HIGHLIGHTS } from "@repo/core";
-import { AgencyCard } from "@/components/marketing/agency-card";
-import { Conf, Faq, SecHead } from "@/components/marketing/bits";
+import { MARKETING_COPY, REPORT_COPY, SAMPLE_AUDIT_REPORT } from "@repo/core";
+import { Faq, MethodLink, SecHead, TalkOrAudit } from "@/components/marketing/bits";
 import { MarketingShell } from "@/components/marketing/chrome";
-import { AUDIT_FAQ_AFTER, AUDIT_STEPS } from "@/components/marketing/content";
-import { AGENCIES, AUDIT_COMPETITORS, CLIENT, signed, usd } from "@/components/marketing/data";
+import { AUDIT_STEPS, PRICING_NOTES, SALES_CONTACT } from "@/components/marketing/content";
+import { ReportPreview } from "@/components/marketing/report-preview";
 
 /**
  * Бесплатный аудит — главный вход в продукт.
  *
- * Карточка отчёта собрана из того же примера аудита, что и /sample-report/audit:
- * доля клиента, средняя по конкурентам, разрыв, предложенный ретейнер. Маржа
- * агентства из примера сюда не выводится — это внутренняя экономика агентства.
+ * Пример результата стоит в первом экране, рядом с кнопкой: агентство видит,
+ * что получит, до регистрации. Карточка собрана из того же примера аудита,
+ * что и /sample-report/audit, и повторяет настоящий отчёт: доля клиента,
+ * средняя по конкурентам (долей каждого конкурента в отчёте нет), работы с
+ * причинами, предложенный ретейнер. Маржа агентства сюда не выводится.
+ *
+ * Срок не обещается и «мгновенно» не говорится: каждый вопрос спрашивается
+ * несколько раз, и время зависит от числа вопросов.
  */
 
 export const metadata: Metadata = {
   title: "Free audit · Citeworthy",
   description:
-    "Audit one of your own clients for free: one measurement pass, a diagnosis, ranked work with reasons, and an opportunity report in your brand.",
+    "Audit one of your own clients for free: what ChatGPT, Perplexity and Gemini say about it, which sources they cite, ranked work with reasons, and an opportunity report in your brand.",
 };
 
-const H = SAMPLE_HIGHLIGHTS;
-const OPPORTUNITY = SAMPLE_AUDIT_REPORT.opportunity;
-const BAR_MAX = 50;
-
-/** Ранжированная работа в карточке: причины переписаны на домены .example, как во всей витрине. */
-const RANKED = [
-  {
-    title: "Get the client covered on reviewhub.example",
-    reason: `Reason: cited in 18% of answers for this category (14 citations); Quillstack and Loambox appear, ${CLIENT} does not. Impact: high · Effort: medium`,
-  },
-  {
-    title: "Get the client covered on forum.example",
-    reason: `Reason: cited in 12% of answers (9 citations); threads comparing the category name competitors, not ${CLIENT}. Impact: medium · Effort: medium`,
-  },
-  {
-    title: "Publish a page that answers this cluster directly",
-    reason: "Reason: no fernpost.example page is among the 9 sources cited for the comparison cluster. Impact: medium · Effort: medium",
-  },
-];
-
-const GET = [
-  {
-    title: "A measurement pass",
-    body: "Your client's buyer prompts, asked on ChatGPT, Perplexity and Gemini, three samples each. Every answer and every cited source is stored.",
-    who: "on one of your own clients",
-  },
-  {
-    title: "A diagnosis",
-    body: "Which sources carry the category, which ones name competitors and not your client, and whether the gap is on the client's own pages or outside them.",
-    who: "based on sources actually cited",
-  },
-  {
-    title: "Ranked work",
-    body: "A list of what to do, in order, with a reason attached to each item and an estimated impact and effort.",
-    who: "every item has a reason",
-  },
-  {
-    title: "An opportunity report",
-    body: "A report in your logo and colour, with the diagnosis, the ranked work and your proposed engagement, ready to send.",
-    who: "white-label, link or PDF",
-  },
-];
-
-const FLOW_WHO: { label: string; ours?: boolean }[][] = [
-  [{ label: "you" }],
-  [{ label: "drafted for you", ours: true }, { label: "you edit" }],
-  [{ label: "runs for you", ours: true }],
-  [{ label: "you read" }],
-  [{ label: "built for you", ours: true }, { label: "you send" }],
-];
-
 const FAQ = [
+  {
+    q: "How long does it take?",
+    a: `Longer than a page load, and we do not promise a time. ${MARKETING_COPY.auditTakesTime}`,
+  },
   {
     q: "Which assistants does the audit use?",
     a: `ChatGPT, Perplexity and Gemini, each with its own cited sources. Claude and Grok can be switched on per client later. ${MARKETING_COPY.notMeasuredSurfaces}`,
   },
-  { q: "What happens right after the audit?", a: AUDIT_FAQ_AFTER },
+  {
+    q: "What happens right after the audit?",
+    a: "You read the diagnosis and the ranked work in your workspace, adjust the proposed engagement, and generate the report. It goes nowhere until you send it. If the client signs, you keep measuring them in the same workspace without setting anything up again.",
+  },
   {
     q: "What if we want to keep measuring the client?",
     a: (
       <>
-        Ongoing weekly measurement is what the plans cover. There is no self-serve checkout yet:
-        accounts are set up with us, so tell us when you are ready. <Link href="/pricing">See pricing</Link>.
+        Ongoing measurement is what the plans cover. {PRICING_NOTES.checkout}{" "}
+        <Link href="/pricing">See pricing</Link>.
       </>
     ),
   },
@@ -100,115 +60,60 @@ export default function FreeAuditPage() {
               Audit one of your own clients, <em>for free.</em>
             </h1>
             <p className="lead">
-              One measurement pass on one of your clients, a diagnosis of the sources behind the
-              answers, ranked work with a reason on each item, and an opportunity report in your
-              brand that you can send as it is.
+              See what ChatGPT, Perplexity and Gemini say about a client and its competitors, which
+              sources they cite, and what to work on first, as a report in your brand you can take
+              into the next client meeting.
             </p>
             <div className="ctas">
-              <Link className="btn primary" href="/signup">
+              <Link className="btn primary" href="/signup" data-testid="audit-cta">
                 Create your agency account
               </Link>
-              <a className="link" href="#preview">
-                See a sample audit report ↓
+              <a className="link" href="#how">
+                What happens, step by step ↓
               </a>
             </div>
-          </div>
-          <aside className="card cost" aria-label="What it costs">
-            <div className="cap">What it costs</div>
-            <div className="v">$0</div>
-            <p className="small">The audit runs on your own account and costs nothing to try.</p>
-            <ul>
-              <li>No card: there is no checkout on the site at all</li>
-              <li>One client, one pass, the full diagnosis</li>
+            <ul className="fa-facts">
+              <li>Free to run, and no card is asked for</li>
+              <li>Nothing is published anywhere</li>
               <li>The report is yours to send, or not</li>
             </ul>
-            <div className="basis">
-              If the result is dull, you have lost an afternoon; if it is not, you have a
-              conversation to sell.
-            </div>
-          </aside>
+          </div>
+          <div className="wl-stage">
+            <ReportPreview
+              payload={SAMPLE_AUDIT_REPORT}
+              variant="audit"
+              testId="audit-report"
+              ariaLabel="Example white-label audit report, abridged"
+              hint="Sample output, in an agency’s brand"
+              initial={1}
+            />
+          </div>
         </section>
       </div>
 
-      {/* 1 · что получает агентство */}
-      <section className="sec">
-        <div className="wrap">
-          <SecHead n={1} title="What your agency gets">
-            The way in is the same thing you would sell: pick one client, measure them, and see
-            whether the result is worth a conversation.
-          </SecHead>
-          <ol className="get">
-            {GET.map((item, i) => (
-              <li className="card" key={item.title}>
-                <span className="num">{i + 1}</span>
-                <h3>{item.title}</h3>
-                <p>{item.body}</p>
-                <span className="label who">{item.who}</span>
-              </li>
-            ))}
-          </ol>
-        </div>
-      </section>
-
-      {/* 2 · пять шагов */}
-      <section className="sec">
-        <div className="wrap five">
-          <div>
-            <SecHead n={2} title="Five steps, one client">
-              You choose the client and check the questions. The product does the asking, reading
-              and ranking.
-            </SecHead>
-            <div className="note">
-              The prompts matter more than anything else here. Generated prompts are a starting
-              draft; edit them until they read the way your client&apos;s buyers actually ask.
-            </div>
-          </div>
-          <ol className="flow">
-            {AUDIT_STEPS.map((step, i) => (
-              <li key={step}>
-                <span className="n">{i + 1}</span>
-                <div>
-                  <b>{step}</b>
-                  <span className="who">
-                    {FLOW_WHO[i]?.map((w) => (
-                      <span key={w.label} className={w.ours ? "who-chip p" : "who-chip"}>
-                        {w.label}
-                      </span>
-                    ))}
-                  </span>
-                </div>
-              </li>
-            ))}
-          </ol>
-        </div>
-      </section>
-
-      {/* 3 · как выглядит отчёт аудита */}
+      {/* 1 · что приходит */}
       <section className="sec" id="preview">
         <div className="wrap">
-          <SecHead n={3} title="What the audit report looks like">
-            This is the example audit, with invented names. Your client sees your agency&apos;s logo
-            and colour, and nothing of ours.
+          <SecHead n={1} title="What comes back">
+            The card above is the example audit, abridged, with invented names. Your client sees your
+            agency’s logo and colour.
           </SecHead>
-          <div className="prev">
+          <div className="g2">
             <div>
+              <h3 className="h4" style={{ marginBottom: 6 }}>
+                In the report you send
+              </h3>
               <ol className="anat">
                 <li>
                   <span>
                     <b>Where the client stands today.</b> Share of sampled answers naming the client,
-                    next to the tracked competitors&apos; average.
-                  </span>
-                </li>
-                <li>
-                  <span>
-                    <b>Who is named instead.</b> Each tracked competitor&apos;s share from the same
-                    answers.
+                    next to the tracked competitors’ average.
                   </span>
                 </li>
                 <li>
                   <span>
                     <b>Ranked work for the next 90 days.</b> Each item with its reason, estimated
-                    impact and effort. The full list continues past the first page.
+                    impact and effort.
                   </span>
                 </li>
                 <li>
@@ -223,104 +128,85 @@ export default function FreeAuditPage() {
                   </span>
                 </li>
               </ol>
-              <p style={{ marginTop: 20 }}>
+              <p style={{ marginTop: 16 }}>
                 <Link className="link" href="/sample-report/audit">
                   Open the full example audit report →
                 </Link>
               </p>
             </div>
-            <div className="wl-stage">
-              <AgencyCard
-                agencies={AGENCIES}
-                initial={1}
-                ariaLabel="Example white-label audit report"
-                testId="audit-report"
-                meta={
-                  <>
-                    Audit for {CLIENT}
-                    <br />5–12 Jan 2026
-                  </>
-                }
-              >
-                <div className="r-title">Where {CLIENT} stands in AI answers today</div>
-                <div className="r-sub">
-                  One measurement pass · ChatGPT, Perplexity, Gemini · 72 sampled answers
-                </div>
-                <div className="r-stats">
-                  <div>
-                    <b>{H.auditVisibilityPct}%</b>
-                    <span>
-                      visibility today · {signed(H.auditGapPp)} pp versus the competitor average
-                    </span>
-                  </div>
-                  <div>
-                    <b>{H.auditCompetitorAvgPct}%</b>
-                    <span>tracked competitors, average share of answers</span>
-                  </div>
-                </div>
-                <div className="bars" role="img" aria-label="Share of answers by brand">
-                  {AUDIT_COMPETITORS.map((c) => (
-                    <div key={c.name}>
-                      <span style={{ color: "#CA3500" }}>{c.name}</span>
-                      <span className="b">
-                        <i style={{ width: `${(c.pct / BAR_MAX) * 100}%`, background: "#F54900", opacity: c.opacity }} />
-                      </span>
-                      <span className="p">{c.pct}%</span>
-                    </div>
-                  ))}
-                  <div>
-                    <span style={{ color: "#008236", fontWeight: 600 }}>{CLIENT}</span>
-                    <span className="b">
-                      <i style={{ width: `${(H.auditVisibilityPct / BAR_MAX) * 100}%`, background: "#00A63E" }} />
-                    </span>
-                    <span className="p" style={{ color: "#008236" }}>
-                      {H.auditVisibilityPct}%
-                    </span>
-                  </div>
-                </div>
-                <div className="r-sec">
-                  <h5>
-                    Ranked work for the next 90 days · {RANKED.length} of {H.auditActions}
-                  </h5>
-                  <ol className="r-next">
-                    {RANKED.map((item) => (
-                      <li key={item.title}>
-                        <div>
-                          {item.title}
-                          <span>{item.reason}</span>
-                        </div>
-                      </li>
-                    ))}
-                  </ol>
-                </div>
-                {OPPORTUNITY && (
-                  <div className="prop">
-                    <div>
-                      <span>Proposed engagement</span>
-                      <br />
-                      <b>{usd(OPPORTUNITY.suggestedRetainerUsd)} / month</b>
-                    </div>
-                    <span>
-                      estimated effort: {OPPORTUNITY.estimatedEffortHours.min}–
-                      {OPPORTUNITY.estimatedEffortHours.max} h per month
-                    </span>
-                  </div>
-                )}
-                <div className="r-caveat">{REPORT_COPY.opportunityBasis}</div>
-                <div className="r-foot">
-                  <Conf level="low" />
-                  <span className="label">one pass · 3 samples per prompt</span>
-                </div>
-              </AgencyCard>
+            <div>
+              <h3 className="h4" style={{ marginBottom: 6 }}>
+                In your workspace, for your team
+              </h3>
+              <ul className="rules" style={{ marginTop: 14 }}>
+                <li>
+                  <span>
+                    <b>The diagnosis.</b> Which sources are cited in answers that name competitors
+                    and not your client, and whether the gap is on the client’s own pages or outside
+                    them.
+                  </span>
+                </li>
+                <li>
+                  <span>
+                    <b>Question by question.</b> How often each assistant names the client, and which
+                    tracked competitor leads where it does not.
+                  </span>
+                </li>
+                <li>
+                  <span>
+                    <b>The answers themselves.</b> Every answer behind the numbers, with the pages it
+                    cited.
+                  </span>
+                </li>
+              </ul>
+              <p style={{ marginTop: 16 }}>
+                <MethodLink />
+              </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* 4 · чем аудит не является */}
+      {/* 2 · пять шагов */}
+      <section className="sec" id="how">
+        <div className="wrap five">
+          <div>
+            <SecHead n={2} title="Five steps, one client">
+              You choose the client and check the questions. The product does the asking, reading
+              and ranking.
+            </SecHead>
+            <div className="note">
+              The questions matter more than anything else here. Generated ones are a starting draft;
+              edit them until they read the way your client’s buyers actually ask.
+            </div>
+            <div className="note" style={{ marginTop: 12 }} data-testid="audit-timing">
+              <b>Why it is not instant.</b> {MARKETING_COPY.auditTakesTime}
+            </div>
+          </div>
+          <ol className="flow">
+            {AUDIT_STEPS.map((step, i) => (
+              <li key={step.text}>
+                <span className="n">{i + 1}</span>
+                <div>
+                  <b>{step.text}</b>
+                  <span className="who">
+                    {step.who.map((w) => (
+                      <span key={w.label} className={w.ours ? "who-chip p" : "who-chip"}>
+                        {w.label}
+                      </span>
+                    ))}
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
+
+      {/* 3 · чем аудит не является */}
       <section className="sec">
         <div className="wrap">
-          <SecHead n={4} title="What the audit is not">
+          <SecHead n={3} title="What the audit is not">
             Worth knowing before you send it, because your client will read it as a promise if you
             let them.
           </SecHead>
@@ -334,28 +220,28 @@ export default function FreeAuditPage() {
               <p>{MARKETING_COPY.auditSnapshot}</p>
             </div>
             <div className="limit">
-              <h3>Not our pitch to your client</h3>
+              <h3>Your pitch, not ours</h3>
               <p>
-                The report carries your brand only. The proposed retainer and effort are your
-                figures, not ours, and the report says so.
+                The report carries your brand only. The proposed retainer and hours start from
+                default values; set your own before you send it.
               </p>
             </div>
             <div className="limit">
               <h3>Nothing is published</h3>
               <p>
-                The audit reads what assistants already answer. Nothing changes on the client&apos;s
-                site, and the report goes nowhere until you send it.
+                The audit reads what assistants already answer. Nothing changes on the client’s site,
+                and the report goes nowhere until you send it.
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* 5 · вопросы */}
+      {/* 4 · вопросы */}
       <section className="sec">
         <div className="wrap">
-          <SecHead n={5} title="Before you start" />
-          <Faq items={FAQ} />
+          <SecHead n={4} title="Before you start" />
+          <Faq items={FAQ} testId="audit-faq" />
         </div>
       </section>
 
@@ -364,13 +250,14 @@ export default function FreeAuditPage() {
           <h2 className="h1">Pick one client and see what the assistants say about them</h2>
           <div>
             <p className="prose">
-              Create the agency account, add the client, and run the pass. The report is yours to
+              Create the agency account, add the client and run the audit. The report is yours to
               send.
             </p>
             <div className="ctas" style={{ marginTop: 22 }}>
               <Link className="btn primary" href="/signup">
                 Create your agency account
               </Link>
+              {SALES_CONTACT && <TalkOrAudit />}
             </div>
           </div>
         </div>

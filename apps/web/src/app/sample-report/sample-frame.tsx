@@ -54,8 +54,8 @@ export function SampleFrame({
         <div className="wrap">
           <h2 className="h3">Run this for one of your clients</h2>
           <p className="prose">
-            The audit takes one measurement pass across all three assistants and ends on a page like
-            this one, in your brand rather than ours.
+            The free audit asks ChatGPT, Perplexity and Gemini your client’s buyer questions, several
+            times each, and ends on a page like this one, in your agency’s brand.
           </p>
           <div className="ctas">
             <Link className="btn primary" href="/signup">
@@ -63,6 +63,9 @@ export function SampleFrame({
             </Link>
             <Link className="link" href="/free-audit">
               How the free audit works →
+            </Link>
+            <Link className="link" href="/method">
+              How we measure →
             </Link>
           </div>
         </div>

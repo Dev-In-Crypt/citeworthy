@@ -1,22 +1,31 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Faq, SecHead } from "@/components/marketing/bits";
+import { MARKETING_COPY } from "@repo/core";
+import { Faq, SecHead, TalkOrAudit } from "@/components/marketing/bits";
 import { MarketingShell } from "@/components/marketing/chrome";
-import { AUDIT_FAQ_AFTER, PRICING_NOTES } from "@/components/marketing/content";
-import { PLANS, TYPICAL_CHECKS_PER_CLIENT, int, usd } from "@/components/marketing/data";
+import { PRICING_NOTES, RESALE, SALES_CONTACT } from "@/components/marketing/content";
+import {
+  PER_CLIENT_MAX,
+  PER_CLIENT_MIN,
+  PLANS,
+  TYPICAL_CHECKS_PER_CLIENT,
+  int,
+  usd,
+} from "@/components/marketing/data";
+import { ResaleCalculator } from "@/components/marketing/resale-calculator";
 
 /**
  * Тарифы.
  *
- * Суммы и лимиты — только из `PLAN_LIMITS` (через `PLANS`), никаких литералов:
- * это те же числа, по которым API ограничивает клиентов. Условия — только
- * утверждённые основателем (см. `PRICING_NOTES`); чего нет в утверждённом,
- * того нет и на странице.
+ * Суммы, лимиты и цена за клиента — только из `PLAN_LIMITS` (через `PLANS`),
+ * никаких литералов: это те же числа, по которым API ограничивает клиентов.
+ * Условия — только утверждённые основателем (см. `PRICING_NOTES`); чего нет
+ * в утверждённом, того нет и на странице.
  */
 
 export const metadata: Metadata = {
   title: "Pricing · Citeworthy",
-  description: `Three plans, billed per active client account: ${PLANS.map((p) => `${p.name} ${usd(p.priceUsd)}`).join(", ")} a month. What counts as a client and what an AI check is.`,
+  description: `Three plans, billed per client account with your whole team included: ${PLANS.map((p) => `${p.name} ${usd(p.priceUsd)}`).join(", ")} a month, about ${usd(PER_CLIENT_MIN)}–${usd(PER_CLIENT_MAX)} per client.`,
 };
 
 const clientLimits = PLANS.map((p) => p.clientLimit);
@@ -25,32 +34,43 @@ const clientLimitsText = `${clientLimits.slice(0, -1).join(", ")} or ${clientLim
 const INCLUDED = [
   {
     title: "Measurement",
-    body: "ChatGPT, Perplexity and Gemini by default; Claude and Grok per client. At least three samples per prompt per assistant, weekly.",
+    body: `ChatGPT, Perplexity and Gemini by default; Claude and Grok per client. ${MARKETING_COPY.sampleFloor} ${MARKETING_COPY.cadence}`,
   },
   {
     title: "Diagnosis",
     body: "The sources assistants cite, grouped by kind, with where competitors appear and your client does not.",
   },
-  { title: "Actions board", body: "Ranked opportunities, each with a reason, turned into work with an owner." },
+  {
+    title: "Actions board",
+    body: "Ranked opportunities, each with a reason, turned into work with an owner and a brief.",
+  },
   {
     title: "Experiments",
-    body: "Before and after for the work you log, compared with untouched topics, shown as a range.",
+    body: "What followed the work you mark done, compared with the client’s untouched topics, shown as an estimate with a confidence level.",
   },
   {
     title: "White-label reports",
-    body: "A link your client opens without an account, in your logo and colour, with nothing of ours on it.",
+    body: `${MARKETING_COPY.whiteLabel.page} The client approves by link.`,
   },
-  { title: "PDF export", body: "The same report as a PDF, for clients who forward documents rather than links." },
+  { title: "PDF export", body: "Download the same report as a PDF, for clients who forward documents rather than links." },
 ];
 
 const FAQ = [
+  {
+    q: "What does it cost per client?",
+    a: `With the plan full: ${PLANS.map((p) => `${p.name} about ${usd(p.perClientUsd)}`).join(", ")} per client a month. Your team is not counted.`,
+  },
   { q: "Do you charge per seat?", a: `No. ${PRICING_NOTES.unit} ${PRICING_NOTES.seats}` },
   { q: "What exactly is an AI check?", a: PRICING_NOTES.checks },
   { q: "What happens if we go past the allowance?", a: PRICING_NOTES.overage },
   { q: "What if we need more clients than the plan allows?", a: PRICING_NOTES.clientLimit },
   { q: "Do Claude and Grok cost extra?", a: PRICING_NOTES.extraAssistants },
+  { q: "Do we have to drop Semrush or Ahrefs?", a: `No. ${PRICING_NOTES.seoSuite}` },
   { q: "Can we pay by card on the site?", a: `Not yet. ${PRICING_NOTES.checkout}` },
-  { q: "Is the free audit really free?", a: `Yes. ${AUDIT_FAQ_AFTER}` },
+  {
+    q: "Is the free audit really free?",
+    a: "Yes. Creating an agency account and running the audit costs nothing, and no card is asked for.",
+  },
 ];
 
 export default function PricingPage() {
@@ -61,23 +81,23 @@ export default function PricingPage() {
           <div>
             <div className="kicker page-kicker">Pricing</div>
             <h1 className="display">
-              Priced per client account, <em>not per seat.</em>
+              Priced per client, <em>with your whole team included.</em>
             </h1>
             <p className="lead">
-              {PRICING_NOTES.unit} {PRICING_NOTES.included} The price is set against the retainer
-              revenue it supports, not against the price of a rank tracker.
+              {PRICING_NOTES.unit} {PRICING_NOTES.included} {PRICING_NOTES.frame}
             </p>
           </div>
           <aside className="card howbuy">
             <div className="cap">How buying works today</div>
             <p className="h4">No self-serve checkout yet</p>
             <p className="small">
-              Accounts are set up with us. Start with the free audit on one of your clients; if it is
-              worth a conversation, you talk to the founder, agree the plan, and billing is set up.
+              Start with the free audit on one of your clients. Plans and billing are then set up with
+              us directly; there is no “Buy now” button to pretend with.
             </p>
             <Link className="btn primary" href="/free-audit">
               Start with the free audit
             </Link>
+            {SALES_CONTACT && <TalkOrAudit />}
           </aside>
         </section>
 
@@ -92,6 +112,10 @@ export default function PricingPage() {
                 <b data-testid={`plan-price-${plan.id}`}>{usd(plan.priceUsd)}</b>
                 <span>/ month</span>
               </div>
+              <p className="per-client">
+                ≈ <b data-testid={`plan-per-client-${plan.id}`}>{usd(plan.perClientUsd)}</b> per client
+                a month with the plan full
+              </p>
               <dl className="kv">
                 <div>
                   <dt>Client accounts</dt>
@@ -102,10 +126,7 @@ export default function PricingPage() {
                   <dd data-testid={`plan-checks-${plan.id}`}>{int(plan.aiCheckAllowance)}</dd>
                 </div>
               </dl>
-              <p className="per">
-                ≈ {int(plan.checksPerClient)} checks per client · a typical client uses ~
-                {int(TYPICAL_CHECKS_PER_CLIENT)}
-              </p>
+              <p className="per">≈ {int(plan.checksPerClient)} checks per client a month</p>
               <ul>
                 <li>Measurement, diagnosis and reports on every client</li>
                 <li>White-label reports and PDF export</li>
@@ -119,10 +140,31 @@ export default function PricingPage() {
         </ul>
       </div>
 
-      {/* 1 · единицы */}
+      {/* 1 · перепродажа */}
+      <section className="sec" id="resale">
+        <div className="wrap">
+          <SecHead n={1} title="Price the service before you buy anything">
+            You can sell AI visibility as its own line item or inside a retainer. Only you know what
+            your clients will pay, so the calculator below uses your numbers, not ours.
+          </SecHead>
+          <ResaleCalculator
+            plans={PLANS.map(({ id, name, priceUsd, clientLimit }) => ({ id, name, priceUsd, clientLimit }))}
+            title={RESALE.title}
+            intro={RESALE.intro}
+            caveat={RESALE.caveat}
+            defaultPriceUsd={RESALE.defaultPriceUsd}
+            defaultClients={RESALE.defaultClients}
+          />
+          <div className="note" style={{ marginTop: 20 }} data-testid="seo-suite">
+            {PRICING_NOTES.seoSuite}
+          </div>
+        </div>
+      </section>
+
+      {/* 2 · единицы */}
       <section className="sec">
         <div className="wrap">
-          <SecHead n={1} title="Two units: clients and AI checks">
+          <SecHead n={2} title="Two units: clients and AI checks">
             The plan limits two things. Everything else, including the number of people on your
             team, is not counted.
           </SecHead>
@@ -133,11 +175,11 @@ export default function PricingPage() {
                 One brand you measure, with its own prompts, competitors, sources, board and reports.
               </p>
               <p className="small">
-                The plan sets how many client accounts can be active at once: {clientLimitsText}.
-                Adding a client beyond that means moving to the next plan, and the product asks you
-                to rather than failing quietly.
+                The plan sets how many client accounts the workspace can hold at once:{" "}
+                {clientLimitsText}. Adding one beyond that means moving to the next plan, and the
+                product asks you to rather than failing quietly.
               </p>
-              <div className="basis">Billing unit: the active client account. Not seats, not sources, not prompts.</div>
+              <div className="basis">Billing unit: the client account. Not seats, not sources, not prompts.</div>
             </div>
             <div className="card def">
               <div className="cap">What an AI check is</div>
@@ -152,8 +194,8 @@ export default function PricingPage() {
                 <span className="t res"><b>1</b><span>AI check</span></span>
               </div>
               <div className="basis">
-                Asking the same prompt three times on ChatGPT is three checks. Visibility needs at
-                least three samples per prompt per assistant.
+                Asking the same prompt three times on ChatGPT is three checks. A figure needs at
+                least three answers per prompt per assistant.
               </div>
             </div>
           </div>
@@ -180,7 +222,7 @@ export default function PricingPage() {
             <div className="legend" style={{ fontSize: 12.5 }}>
               <span>
                 <i className="sw" style={{ height: 10, background: "#3C414B" }} />
-                typical use, every client full
+                every client full, measured weekly
               </span>
               <span>
                 <i className="sw" style={{ height: 10, background: "#EFEDE7" }} />
@@ -194,10 +236,10 @@ export default function PricingPage() {
         </div>
       </section>
 
-      {/* 2 · что входит */}
+      {/* 3 · что входит */}
       <section className="sec">
         <div className="wrap">
-          <SecHead n={2} title="Included in every plan">
+          <SecHead n={3} title="Included in every plan">
             {PRICING_NOTES.included} Plans differ only in how many clients and checks they cover.
           </SecHead>
           <ol className="incl">
@@ -212,12 +254,11 @@ export default function PricingPage() {
         </div>
       </section>
 
-      {/* 3 · как купить */}
+      {/* 4 · как купить */}
       <section className="sec">
         <div className="wrap">
-          <SecHead n={3} title="How to start">
-            There is no self-serve checkout yet, so there is no “Buy now” button to pretend with.
-            This is the actual path.
+          <SecHead n={4} title="How to start">
+            There is no self-serve checkout yet. This is the actual path.
           </SecHead>
           <ol className="buy">
             <li className="card">
@@ -227,36 +268,41 @@ export default function PricingPage() {
             </li>
             <li className="card">
               <span className="num">2</span>
-              <h3>Talk to the founder</h3>
+              <h3>Pick the plan with us</h3>
               <p>
-                If the result is worth a conversation, say how many clients you plan to measure and
-                agree the plan together.
+                Plans are agreed directly rather than through a checkout: say how many clients you
+                plan to measure, and the matching plan is set up.
               </p>
+              {SALES_CONTACT && (
+                <p style={{ marginTop: 10 }}>
+                  <TalkOrAudit />
+                </p>
+              )}
             </li>
             <li className="card">
               <span className="num">3</span>
               <h3>Billing is set up</h3>
-              <p>Accounts and billing are set up with us directly, and the plan&apos;s limits apply from then on.</p>
+              <p>Billing is set up with us directly, and the plan’s limits apply from then on.</p>
             </li>
           </ol>
         </div>
       </section>
 
-      {/* 4 · вопросы */}
+      {/* 5 · вопросы */}
       <section className="sec">
         <div className="wrap">
-          <SecHead n={4} title="Billing questions" />
+          <SecHead n={5} title="Billing questions" />
           <Faq items={FAQ} testId="pricing-faq" />
         </div>
       </section>
 
       <section className="sec">
         <div className="wrap closing">
-          <h2 className="h1">Price it against the retainer, after you have seen the audit</h2>
+          <h2 className="h1">Price it against the retainer, after you have seen one audit</h2>
           <div>
             <p className="prose">
-              Run the audit on one client first. You will know what the numbers look like for your
-              own book before any plan is agreed.
+              Run the audit on one client first. You will see what the output looks like, and what
+              you could charge for it, before any plan is agreed.
             </p>
             <div className="ctas" style={{ marginTop: 22 }}>
               <Link className="btn primary" href="/signup">

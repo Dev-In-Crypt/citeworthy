@@ -1,14 +1,38 @@
-import { MARKETING_COPY, MEASUREMENT_COPY } from "@repo/core";
-import { TYPICAL_CHECKS_FIVE_ASSISTANTS, TYPICAL_CHECKS_PER_CLIENT, int } from "./data";
+import { MARKETING_COPY } from "@repo/core";
+import {
+  PER_CLIENT_MAX,
+  PER_CLIENT_MIN,
+  TYPICAL_CHECKS_BIWEEKLY,
+  TYPICAL_CHECKS_FIVE_ASSISTANTS,
+  TYPICAL_CHECKS_PER_CLIENT,
+  int,
+  usd,
+} from "./data";
 
 /**
  * Тексты витрины, которые повторяются на нескольких страницах.
  *
  * Граница с `packages/core/src/copy.ts` такая: всё, что объясняет, **что
- * означает цифра** и как она измерена, берётся оттуда константой — иначе
- * продукт и витрина начнут объяснять метрику по-разному. Остальное
- * (позиционирование, кому это надо, как купить) живёт здесь.
+ * означает цифра** и как она измерена, и всё про белую этикетку берётся
+ * оттуда константой — иначе продукт и витрина начнут объяснять метрику
+ * по-разному. Остальное (позиционирование, кому это надо, как купить,
+ * возражения) живёт здесь.
  */
+
+/**
+ * Контакт для разговора о тарифе. Пока его нет, и витрина не обещает звонок:
+ * везде, где нужен контакт, стоит путь через бесплатный аудит. Когда появится
+ * адрес или календарь, достаточно заполнить эту константу — кнопки «Talk to
+ * the founder» появятся сами.
+ */
+export interface SalesContact {
+  /** Текст ссылки, например «Talk to the founder». */
+  label: string;
+  /** mailto: или ссылка на календарь. */
+  href: string;
+}
+
+export const SALES_CONTACT: SalesContact | null = null;
 
 /**
  * Условия тарифов — только утверждённые основателем. Намеренно не сказано,
@@ -16,44 +40,74 @@ import { TYPICAL_CHECKS_FIVE_ASSISTANTS, TYPICAL_CHECKS_PER_CLIENT, int } from "
  * аудита в лимит клиентов: это не решено, и витрина не должна решать за него.
  */
 export const PRICING_NOTES = {
-  unit: "Billed per active client account. Not per seat, not per source, not per prompt.",
+  unit: "Billed per client account. Not per seat, not per source, not per prompt.",
   included:
     "Every plan includes measurement, diagnosis, the actions board, experiments, white-label reports and PDF export.",
   frame: "Priced against the retainer revenue it supports, not against the price of a rank tracker.",
-  checks: `One AI check is one assistant answering one prompt once. A client measured the usual way (around two dozen prompts, three samples each, across three assistants every week) uses roughly ${int(TYPICAL_CHECKS_PER_CLIENT)} checks a month, so each plan carries about 40% headroom on top of its client count.`,
   /**
-   * Сказано прямо: это единственная строка тарифов, о которую агентство
-   * может обжечься, и молчание про перерасход читалось бы как «сколько угодно».
+   * Allowance рассчитан на еженедельный опрос, а по умолчанию продукт опрашивает
+   * раз в две недели — названы оба числа, чтобы запас не выглядел выдуманным.
+   */
+  checks: `One AI check is one assistant answering one prompt once. A client measured the default way (around two dozen prompts, three samples each, three assistants, every two weeks) uses roughly ${int(TYPICAL_CHECKS_BIWEEKLY)} checks a month. Measured weekly, it uses roughly ${int(TYPICAL_CHECKS_PER_CLIENT)} checks, and each plan still covers every client with about 40% to spare.`,
+  /**
+   * Предупреждения о перерасходе нет — есть полоса расхода на дашборде.
+   * Так и сказано; молчание про перерасход читалось бы как «сколько угодно».
    */
   overage:
-    "Going past the allowance does not cut anything off mid-month: you get a warning and we agree on the next step together.",
+    "Going past the allowance does not cut anything off mid-month. The usage bar on your dashboard shows where you stand, and we agree the next step together.",
   clientLimit:
-    "The plan sets how many client accounts can be active at once. Adding a client beyond that means moving to the next plan, and the product asks you to rather than failing quietly.",
+    "The plan sets how many client accounts the workspace can hold at once. Adding one beyond that means moving to the next plan, and the product asks you to rather than failing quietly.",
   seats: "The number of people on your team is not counted, and there is no charge per seat.",
-  extraAssistants: `Claude and Grok have no separate price. Switching them on for a client means five assistants instead of three, so that client uses about 5/3 as many AI checks (roughly ${int(TYPICAL_CHECKS_FIVE_ASSISTANTS)} a month).`,
-  checkout: "There is no self-serve checkout yet. Accounts are set up with us.",
+  extraAssistants: `Claude and Grok have no separate price. Switching them on for a client means five assistants instead of three, so that client uses about 5/3 as many AI checks (roughly ${int(TYPICAL_CHECKS_FIVE_ASSISTANTS)} a month if measured weekly).`,
+  checkout: "There is no self-serve checkout yet. Plans are set up with us directly.",
+  seoSuite:
+    "Keep your SEO suite. Semrush or Ahrefs stay where your keyword and backlink work lives; Citeworthy is the client-facing AI-visibility layer next to them and does not try to replace them.",
 };
 
-export const MANUAL_WORK = [
-  { text: "Write 20–30 buyer prompts per client, and keep them current", when: "ongoing" },
-  { text: "Run each one across three assistants, several times, every week", when: "weekly" },
-  { text: "Read the answers and mark where the brand and its competitors appear", when: "weekly" },
-  { text: "Collect the cited links and work out which kinds of sources drive them", when: "weekly" },
-  { text: "Turn that into a document the client will actually read", when: "monthly" },
-];
+/**
+ * Внешняя цифра о рынке — только с источником и ссылкой рядом. Своих
+ * рыночных цифр витрина не приводит.
+ */
+export const MARKET_NOTE = {
+  text: "66% of agencies named AI search as the top new service their clients ask for.",
+  source: "AgencyAnalytics, 2026 agency benchmarks",
+  href: "https://agencyanalytics.com/agency-benchmarks-2026",
+};
 
-export const AUDIT_STEPS = [
-  "Add a client and mark it as a prospect",
-  "Generate the buyer prompts, then edit the list until it matches how people actually ask",
-  "Run the audit: one pass across all three assistants",
-  "Read the diagnosis: which sources carry the category, and where the client is missing",
-  "Generate the opportunity report and send it under your own brand",
+/** Исследование непостоянства ответов, на которое опирается отказ от «позиции». */
+export const SPARKTORO_STUDY = {
+  label: "SparkToro: AIs are highly inconsistent when recommending brands",
+  href: "https://sparktoro.com/blog/new-research-ais-are-highly-inconsistent-when-recommending-brands-or-products-marketers-should-take-care-when-tracking-ai-visibility/",
+};
+
+/**
+ * Шаги аудита — ровно то, что делает продукт. Срока не обещаем: он зависит
+ * от числа вопросов и очереди.
+ */
+export const AUDIT_STEPS: { text: string; who: { label: string; ours?: boolean }[] }[] = [
+  { text: "Create your agency account. No card is asked for.", who: [{ label: "you" }] },
+  {
+    text: "Add the client and the competitors you want it compared with",
+    who: [{ label: "you" }],
+  },
+  {
+    text: "Generate the buyer questions from templates, or import your own list, then edit them until they read the way buyers ask",
+    who: [{ label: "drafted for you", ours: true }, { label: "you edit" }],
+  },
+  {
+    text: "Run the audit: every question, three times, on ChatGPT, Perplexity and Gemini",
+    who: [{ label: "the product asks", ours: true }],
+  },
+  {
+    text: "Read the diagnosis and the ranked work, then generate the report in your brand and send it when you are ready",
+    who: [{ label: "built for you", ours: true }, { label: "you send" }],
+  },
 ];
 
 export const LIMITS = [
   { title: "A quarter, not a week", body: MARKETING_COPY.limits.quarter },
   { title: "Movement, not attribution", body: MARKETING_COPY.limits.attribution },
-  { title: "Ranges, not single numbers", body: MARKETING_COPY.limits.ranges },
+  { title: "Ranges, not exact numbers", body: MARKETING_COPY.limits.ranges },
   { title: "No revenue figure invented for you", body: MARKETING_COPY.limits.revenue },
   { title: "Only assistants with a public API", body: MARKETING_COPY.notMeasuredSurfaces, offChips: true },
   { title: "Nothing is published for you", body: MARKETING_COPY.limits.nothingPublished },
@@ -72,27 +126,44 @@ export const AUDIENCE = {
   ],
 };
 
-const AFTER_AUDIT =
-  "You get a diagnosis and a ranked list of work with a reason attached to each item, plus a report you can send as it is. Nothing is charged to run it.";
-
-export const LANDING_FAQ = [
+/**
+ * Возражения — словами покупателя (см. исследование голоса клиента), ответы —
+ * без обещаний результата.
+ */
+export const OBJECTIONS = [
   {
-    q: "Which assistants do you measure?",
-    a: `ChatGPT, Perplexity and Gemini by default, each with its own cited sources. Claude and Grok can be switched on for any client. ${MARKETING_COPY.answersStored}`,
+    q: "“AEO, GEO… isn’t this snake oil?”",
+    a: "Some of what is sold under those names is. The part that is not is simple: buyers ask assistants what to use, and you can count how often your client is named in the answers. That is what we measure, with the working shown. No score, and no promise of a placement.",
   },
   {
-    q: "Why several samples per prompt?",
-    a: `${MEASUREMENT_COPY.visibilityBasis} The same question asked twice can get two different answers, so each one is asked at least three times per assistant and the aggregate is reported.`,
+    q: "“AI answers change every time. The numbers are noise.”",
+    a: "One answer is noise, which is why we never report one. No figure rests on fewer than three answers per question per assistant, shares come with their range and a confidence level, and a change the sample cannot tell apart is labelled that way instead of being sold as a win.",
   },
   {
-    q: "Whose brand is on the client report?",
-    a: "Yours. The client opens a link without an account and sees your logo and colour; the product is not named anywhere on the page or in the PDF.",
+    q: "“We don’t need another dashboard.”",
+    a: "Neither does your client. What comes out is ranked work with a reason on every item, and a report in your brand that the client approves by link. The screens are there so your team can check the working.",
   },
   {
-    q: "Does it publish anything on the client's site?",
-    a: `No. ${MARKETING_COPY.limits.nothingPublished}`,
+    q: "“Too expensive for a service we haven’t sold yet.”",
+    a: `Per client it works out at about ${usd(PER_CLIENT_MIN)}–${usd(PER_CLIENT_MAX)} a month depending on the plan, with your whole team included. The audit is free, so you can price your own offer on real output before any plan is agreed.`,
   },
-  { q: "What happens right after the free audit?", a: AFTER_AUDIT },
+  {
+    q: "“We already pay for Semrush and Ahrefs.”",
+    a: `${PRICING_NOTES.seoSuite} It does not do keywords or backlinks, on purpose.`,
+  },
+  {
+    q: "“Will my client see your name?”",
+    a: `${MARKETING_COPY.whiteLabel.page} ${MARKETING_COPY.whiteLabel.link}`,
+  },
 ];
 
-export const AUDIT_FAQ_AFTER = AFTER_AUDIT;
+/** Подписи калькулятора перепродажи: арифметика на числах агентства, не прогноз. */
+export const RESALE = {
+  title: "What the service could bring in, on your numbers",
+  intro:
+    "Type what you would charge a client for AI visibility each month and how many clients might take it. The defaults are illustrative starting values, not a market rate.",
+  caveat:
+    "Arithmetic on the numbers you enter, not a forecast. It leaves out your team’s time and whether clients say yes.",
+  defaultPriceUsd: 1000,
+  defaultClients: 10,
+};

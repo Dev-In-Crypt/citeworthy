@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MARKETING_COPY } from "@repo/core";
 import { Wordmark } from "./logo";
 import "./marketing.css";
 
@@ -14,10 +15,11 @@ import "./marketing.css";
  * клиентский компонент.
  */
 
-export type MarketingSection = "product" | "sample" | "pricing" | "audit";
+export type MarketingSection = "product" | "method" | "sample" | "pricing" | "audit";
 
 const NAV = [
   { id: "product", label: "Product", href: "/product" },
+  { id: "method", label: "Method", href: "/method" },
   { id: "sample", label: "Sample report", href: "/sample-report" },
   { id: "pricing", label: "Pricing", href: "/pricing" },
   { id: "audit", label: "Free audit", href: "/free-audit" },
@@ -74,7 +76,7 @@ export function MarketingFooter() {
           <div className="foot-brand">
             <Wordmark dot="#7C86FF" />
             <p>
-              AI Search measurement, diagnosis and white-label reporting for agencies. Measures
+              AI visibility measurement, diagnosis and white-label reporting for agencies. Measures
               ChatGPT, Perplexity and Gemini by default; Claude and Grok can be switched on per
               client.
             </p>
@@ -102,17 +104,15 @@ export function MarketingFooter() {
           <div className="foot-col">
             <h2>Method</h2>
             <ul>
-              <li><Link href="/#limits">What this does not do</Link></li>
-              <li><Link href="/#evidence">How we measure</Link></li>
+              <li><Link href="/method">How we measure</Link></li>
+              <li><Link href="/method#confidence">What confidence means</Link></li>
+              <li><Link href="/method#never">What we never claim</Link></li>
               <li><Link href="/sample-report/audit">Sample audit report</Link></li>
             </ul>
           </div>
         </div>
         <div className="foot-small">
-          <span>
-            Every figure on this site is estimated from repeated samples of assistant answers.
-            Example agencies, clients, competitors and *.example domains are invented.
-          </span>
+          <span>{MARKETING_COPY.siteBasis}</span>
           <span>© 2026 Citeworthy</span>
         </div>
       </div>
