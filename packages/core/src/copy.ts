@@ -246,7 +246,13 @@ export const MARKETING_COPY = {
 export const EXPERIMENT_COPY = {
   /** Заголовок оценки эффекта: всегда «estimated» — см. инвариант 2. */
   estimatedEffect: "Estimated incremental effect",
-  /** Дисклеймер под результатом эксперимента. */
+  /**
+   * Дисклеймер под результатом эксперимента.
+   *
+   * Называет ровно то, с чем сравнивает `estimateExperiment`: недели до
+   * действия и, если они есть, нетронутые темы за тот же период. Раньше здесь
+   * стояло «platform baseline» — такого сравнения в расчёте нет.
+   */
   attributionLimits:
-    "This is a record of what was done and what followed, shown with a platform baseline. It is evidence, not attribution of cause.",
+    "This is a record of what was done and what followed, compared with the weeks before it and, where there are untouched topics, with how they moved over the same period. It is evidence, not attribution of cause.",
 } as const;
