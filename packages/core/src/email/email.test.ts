@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { inviteEmail, passwordResetEmail } from "./templates";
+import { inviteEmail, passwordResetEmail, reportReadyEmail } from "./templates";
 import { MemoryEmailSender } from "./memory";
-import { ResendEmailSender } from "./resend";
+import { ResendEmailSender, withDisplayName } from "./resend";
 import { createEmailSender, parseEmailMode } from "./registry";
 
 /**
@@ -90,6 +90,38 @@ describe("ResendEmailSender", () => {
     const payload = JSON.parse(String(init.body)) as { from: string; to: string[] };
     expect(payload.from).toBe("Citeworthy <noreply@test>");
     expect(payload.to).toEqual(["x@test"]);
+  });
+
+  it("письмо клиенту уходит под именем агентства, а не продукта", async () => {
+    // Инвариант 3: клиент агентства не должен видеть продукт даже в поле «От».
+    const fetchImpl = vi.fn(async () => okResponse("msg_2"));
+    const sender = new ResendEmailSender({
+      apiKey: "test-key",
+      from: "Citeworthy <noreply@test>",
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+
+    const message = reportReadyEmail({
+      to: "client@test",
+      clientName: "Fernpost",
+      agencyName: "Northwind Studio",
+      periodStart: "2026-04-01",
+      periodEnd: "2026-06-30",
+      reportUrl: "https://example.test/r/abc",
+    });
+    await sender.send(message);
+
+    const [, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    const payload = JSON.parse(String(init.body)) as { from: string };
+    expect(payload.from).toBe('"Northwind Studio" <noreply@test>');
+    expect(payload.from).not.toContain("Citeworthy");
+  });
+
+  it("имя отправителя очищается от того, что ломает заголовок", () => {
+    expect(withDisplayName("noreply@test", 'Evil "Co" <x>\r\nBcc: a@b')).toBe(
+      '"Evil Co xBcc: a@b" <noreply@test>',
+    );
+    expect(withDisplayName("Citeworthy <noreply@test>", '""')).toBe("Citeworthy <noreply@test>");
   });
 
   it("повторяет попытку на 500 и добивается ответа", async () => {

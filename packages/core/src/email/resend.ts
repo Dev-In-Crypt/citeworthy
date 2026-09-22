@@ -51,7 +51,7 @@ export class ResendEmailSender implements EmailSender {
 
   async send(message: EmailMessage): Promise<SentEmail> {
     const payload = {
-      from: this.from,
+      from: message.fromName ? withDisplayName(this.from, message.fromName) : this.from,
       to: [message.to],
       subject: message.subject,
       text: message.text,
@@ -107,4 +107,16 @@ export class ResendEmailSender implements EmailSender {
       await this.sleep(2 ** (attempt - 1) * 500);
     }
   }
+}
+
+/**
+ * Подставляет имя отправителя к адресу: «Имя <адрес>».
+ *
+ * Имя приходит из данных агентства, поэтому из него убирается всё, что
+ * может сломать заголовок: кавычки, угловые скобки и переводы строк.
+ */
+export function withDisplayName(from: string, name: string): string {
+  const address = /<([^>]+)>/.exec(from)?.[1] ?? from.trim();
+  const safe = name.replace(/["<>\r\n\\]/g, "").trim();
+  return safe ? `"${safe}" <${address}>` : from;
 }

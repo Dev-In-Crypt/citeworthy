@@ -102,6 +102,21 @@ test("client report opens without login and carries only the agency brand", asyn
   }
   await expect(anonPage).toHaveTitle(/AI Search report/);
 
+  // Иконка вкладки — агентская: раньше страница наследовала знак продукта из
+  // корня приложения, и его видел клиент агентства.
+  const iconHrefs = await anonPage
+    .locator('link[rel="icon"]')
+    .evaluateAll((links) => links.map((link) => link.getAttribute("href") ?? ""));
+  expect(iconHrefs.length).toBeGreaterThan(0);
+  for (const href of iconHrefs) {
+    expect(href).toContain(`/r/${token}/icon`);
+    const icon = await anonPage.request.get(href);
+    expect(icon.ok()).toBe(true);
+    const svg = await icon.text();
+    expect(svg).toContain("#0ea5e9");
+    expect(svg).toContain(">N<");
+  }
+
   // Содержимое отчёта на месте.
   await expect(anonPage.getByTestId("report-visibility")).toContainText("%");
   await expect(anonPage.getByTestId("report-gap")).toContainText("pp");

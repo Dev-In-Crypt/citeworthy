@@ -109,6 +109,8 @@ export function reportReadyEmail(input: ReportReadyEmailInput): EmailMessage {
 
   return {
     to: input.to,
+    // Клиент видит в поле «От» агентство, а не продукт.
+    fromName: input.agencyName,
     subject: `${input.clientName}: AI answer visibility, ${period}`,
     text,
     html: paragraphs([
