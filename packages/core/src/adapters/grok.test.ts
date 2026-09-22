@@ -9,11 +9,11 @@ import { countGrokSearches, GROK_PRICING, GrokAdapter, grokCostUsd } from "./gro
  * мы правильно читаем ожидаемый формат.
  */
 
-const FAST = GROK_PRICING["grok-4-1-fast-non-reasoning"]!;
+const FAST = GROK_PRICING["grok-4.20-0309-non-reasoning"]!;
 
 function apiResponse(overrides: Record<string, unknown> = {}) {
   return {
-    model: "grok-4-1-fast-non-reasoning",
+    model: "grok-4.20-0309-non-reasoning",
     output: [
       { type: "web_search_call", status: "completed" },
       { type: "web_search_call", status: "completed" },
@@ -62,9 +62,9 @@ function adapter(fetchImpl: typeof fetch, overrides: Record<string, unknown> = {
 
 describe("grokCostUsd", () => {
   it("складывает токены и поиск", () => {
-    // 8000/1e6*0.2 + 600/1e6*0.5 + 2/1000*5 = 0.0016 + 0.0003 + 0.01.
+    // 8000/1e6*1.25 + 600/1e6*2.5 + 2/1000*5 = 0.01 + 0.0015 + 0.01.
     expect(grokCostUsd({ input_tokens: 8_000, output_tokens: 600 }, 2, FAST)).toBeCloseTo(
-      0.0119,
+      0.0215,
       6,
     );
   });
@@ -90,8 +90,8 @@ describe("GrokAdapter", () => {
     expect(result.text).toContain("AcmeCRM");
     // Дубли схлопнуты по URL.
     expect(result.citations).toHaveLength(2);
-    expect(result.modelVersion).toBe("grok-4-1-fast-non-reasoning");
-    expect(result.costUsd).toBeCloseTo(0.0119, 6);
+    expect(result.modelVersion).toBe("grok-4.20-0309-non-reasoning");
+    expect(result.costUsd).toBeCloseTo(0.0215, 6);
   });
 
   it("поиск включён, ключ идёт заголовком авторизации", async () => {

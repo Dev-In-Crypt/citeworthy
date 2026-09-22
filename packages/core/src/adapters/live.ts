@@ -71,6 +71,7 @@ export function registerLiveAdapters(env: NodeJS.ProcessEnv = process.env): stri
     const endpoint = env["CLAUDE_ENDPOINT"]?.trim();
     const searchTool = env["CLAUDE_SEARCH_TOOL"]?.trim();
     const maxSearches = Number(env["CLAUDE_MAX_SEARCHES"]);
+    const workspaceId = env["ANTHROPIC_WORKSPACE_ID"]?.trim();
     registerLiveAdapter(
       "claude",
       () =>
@@ -80,6 +81,7 @@ export function registerLiveAdapters(env: NodeJS.ProcessEnv = process.env): stri
           ...(endpoint ? { endpoint } : {}),
           ...(searchTool ? { searchTool } : {}),
           ...(Number.isInteger(maxSearches) && maxSearches > 0 ? { maxSearches } : {}),
+          ...(workspaceId ? { workspaceId } : {}),
         }),
     );
     registered.push("claude");

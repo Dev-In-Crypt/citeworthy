@@ -4,6 +4,7 @@ import {
   CLAUDE_PRICING,
   claudeCostUsd,
   countClaudeSearches,
+  DEFAULT_CLAUDE_MODEL,
   extractClaudeCitations,
   extractClaudeText,
 } from "./claude";
@@ -84,6 +85,10 @@ function fetchReturning(payload: unknown, status = 200) {
 function adapter(fetchImpl: typeof fetch, overrides: Record<string, unknown> = {}) {
   return new ClaudeAdapter({
     apiKey: "test-key",
+    // Тесты в этом файле проверяют разбор ответа и цены против фикстуры
+    // `apiResponse()`, которая помечена как ответ Haiku, — модель здесь
+    // зафиксирована явно, а дефолт продукта проверяется отдельно ниже.
+    model: "claude-haiku-4-5-20251001",
     fetchImpl,
     sleep: () => Promise.resolve(),
     ...overrides,
@@ -194,6 +199,28 @@ describe("ClaudeAdapter", () => {
     expect(body.max_tokens).toBeGreaterThan(0);
   });
 
+  it("без workspaceId заголовок не отправляется, с ним — отправляется", async () => {
+    // Найдено живым вызовом: ключ, созданный на уровне организации, а не
+    // привязанный к конкретному workspace, отвергает запрос ещё до модели.
+    const bare = fetchReturning(apiResponse());
+    await adapter(bare as unknown as typeof fetch).execute("prompt");
+    expect(
+      ((bare.mock.calls[0] as [string, RequestInit])[1].headers as Record<string, string>)[
+        "anthropic-workspace-id"
+      ],
+    ).toBeUndefined();
+
+    const scoped = fetchReturning(apiResponse());
+    await adapter(scoped as unknown as typeof fetch, { workspaceId: "wrkspc_123" }).execute(
+      "prompt",
+    );
+    expect(
+      ((scoped.mock.calls[0] as [string, RequestInit])[1].headers as Record<string, string>)[
+        "anthropic-workspace-id"
+      ],
+    ).toBe("wrkspc_123");
+  });
+
   it("язык и регион уходят системной инструкцией", async () => {
     const fetchImpl = fetchReturning(apiResponse());
     await adapter(fetchImpl as unknown as typeof fetch).execute("prompt", {
@@ -266,5 +293,30 @@ describe("ClaudeAdapter", () => {
 
   it("модель без прайса отклоняется", () => {
     expect(() => new ClaudeAdapter({ apiKey: "k", model: "claude-future" })).toThrow(/pricing/i);
+  });
+
+  it("без явной модели берётся Sonnet 5, а не Haiku и не Opus/Fable", () => {
+    // Решение фаундера: Haiku хуже держит источники в составных ответах, а
+    // Opus/Fable — просто дороже на порядок без нужды для этой задачи.
+    expect(new ClaudeAdapter({ apiKey: "k" })).toMatchObject({ platform: "claude" });
+    expect(DEFAULT_CLAUDE_MODEL).toBe("claude-sonnet-5");
+    expect(CLAUDE_PRICING["claude-sonnet-5"]).toEqual({
+      inputPerMillion: 2,
+      outputPerMillion: 10,
+      webSearchPerThousandCalls: 10,
+    });
+  });
+
+  it("дефолтная модель считает стоимость по цене Sonnet 5, не Haiku", async () => {
+    const fetchImpl = fetchReturning(apiResponse({ model: "claude-sonnet-5" }));
+    // Без override модели — то, что реально уйдёт в прод без явной настройки.
+    const result = await new ClaudeAdapter({
+      apiKey: "test-key",
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      sleep: () => Promise.resolve(),
+    }).execute("best CRM");
+
+    // 5000/1e6*2 + 700/1e6*10 + 2/1000*10 = 0.01 + 0.007 + 0.02.
+    expect(result.costUsd).toBeCloseTo(0.037, 6);
   });
 });

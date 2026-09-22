@@ -26,8 +26,19 @@ export const CLAUDE_API_VERSION = "2023-06-01";
  */
 export const DEFAULT_CLAUDE_SEARCH_TOOL = "web_search_20250305";
 
-/** Модель по умолчанию — самая дешёвая: нам нужен не стиль, а факт. */
-export const DEFAULT_CLAUDE_MODEL = "claude-haiku-4-5-20251001";
+/**
+ * Модель по умолчанию — Sonnet 5, а не Haiku.
+ *
+ * У ChatGPT и Grok взята самая дешёвая модель в линейке: там важен факт, а не
+ * стиль. Здесь — осознанное отступление от этого правила по прямому решению
+ * фаундера: Haiku слабее читает результаты поиска и заметнее теряет источники
+ * в ответах на составные вопросы, а именно источники — то, ради чего продукт
+ * существует. Sonnet 5 при этом не «дорогая» модель линейки: с 2026-08-31 она
+ * стоит $2/$10 за 1M токенов вход/выход — дешевле Sonnet 4.6 и на порядок
+ * дешевле Opus ($5/$25) и тем более Fable ($10/$50), которые сюда намеренно
+ * не попадают.
+ */
+export const DEFAULT_CLAUDE_MODEL = "claude-sonnet-5";
 
 /**
  * Сколько раз за один ответ модели разрешено ходить в поиск.
@@ -51,6 +62,12 @@ export interface ClaudePricing {
  * Чтобы измерять другой моделью, сначала занесите её прайс.
  */
 export const CLAUDE_PRICING: Record<string, ClaudePricing> = {
+  // Сверено по platform.claude.com/docs/en/about-claude/pricing, 2026-09-22.
+  "claude-sonnet-5": {
+    inputPerMillion: 2,
+    outputPerMillion: 10,
+    webSearchPerThousandCalls: 10,
+  },
   "claude-haiku-4-5-20251001": {
     inputPerMillion: 1,
     outputPerMillion: 5,
@@ -150,6 +167,13 @@ export function countClaudeSearches(payload: ClaudePayload): number {
 
 export interface ClaudeAdapterConfig {
   apiKey: string;
+  /**
+   * Требуется, если ключ создан на уровне организации, а не привязан к
+   * конкретному workspace: без заголовка такой ключ отвергает любой запрос
+   * с `invalid_request_error` ещё до обращения к модели. Взять в консоли —
+   * Settings → Workspaces → нужный workspace → его ID в адресе страницы.
+   */
+  workspaceId?: string;
   model?: string;
   endpoint?: string;
   searchTool?: string;
@@ -256,6 +280,9 @@ export class ClaudeAdapter implements PlatformAdapter {
         // Ключ идёт заголовком, а не в адресе: в адресе он утёк бы в логи прокси.
         "x-api-key": this.config.apiKey,
         "anthropic-version": CLAUDE_API_VERSION,
+        ...(this.config.workspaceId
+          ? { "anthropic-workspace-id": this.config.workspaceId }
+          : {}),
       },
       body,
       fetchImpl: this.fetchImpl,
