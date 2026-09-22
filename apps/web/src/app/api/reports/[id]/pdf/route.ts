@@ -43,7 +43,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       });
     }
 
-    const origin = process.env.NEXT_PUBLIC_APP_URL ?? "http://127.0.0.1:3000";
+    // Страницу открывает браузер на этой же машине, поэтому сначала —
+    // внутренний адрес: публичный изнутри контейнера может быть недоступен
+    // (порт снаружи другой, а за прокси — ещё и лишний круг через интернет).
+    const origin =
+      process.env.INTERNAL_APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://127.0.0.1:3000";
     const key = await storeReportPdf(report.id, `${origin}/r/${share.token}`);
     await setReportPdfKey(db, report.id, key);
 

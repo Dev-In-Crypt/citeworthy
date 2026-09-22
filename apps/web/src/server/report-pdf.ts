@@ -19,8 +19,21 @@ export interface PdfOptions {
   timeoutMs?: number;
 }
 
+/**
+ * Браузер для печати. В разработке и тестах — тот, что ставит Playwright; в
+ * боевом образе — системный Chromium, путь к нему задаёт образ. Песочница
+ * Chromium внутри контейнера без root не поднимается, поэтому для системного
+ * браузера она выключена: страница, которую он открывает, — наша собственная.
+ */
+function launchOptions() {
+  const executablePath = process.env.CHROMIUM_EXECUTABLE_PATH?.trim();
+  return executablePath
+    ? { executablePath, args: ["--no-sandbox", "--disable-dev-shm-usage"] }
+    : {};
+}
+
 export async function renderReportPdf(options: PdfOptions): Promise<Uint8Array> {
-  const browser = await chromium.launch();
+  const browser = await chromium.launch(launchOptions());
 
   try {
     const page = await browser.newPage();

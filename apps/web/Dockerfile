@@ -20,8 +20,8 @@ COPY apps/worker/package.json apps/worker/
 COPY packages/core/package.json packages/core/
 COPY packages/db/package.json packages/db/
 COPY packages/pipeline/package.json packages/pipeline/
-# Браузер Playwright в образ не тянем: он нужен только тестам и печати PDF,
-# которая живёт в отдельном воркере.
+# Браузер Playwright в образ не тянем: его сборка под glibc и на Alpine не
+# запустится. PDF печатает системный Chromium из рантайм-стадии.
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 RUN pnpm install --frozen-lockfile
 
@@ -50,6 +50,13 @@ WORKDIR /app
 # только внешний адрес, снаружи всё работает, а проверка живости изнутри
 # ходит на 127.0.0.1 и не достучится — контейнер вечно unhealthy.
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0
+
+# Chromium для печати отчёта в PDF: печатает веб-процесс, открывая ту же
+# публичную страницу, что видит клиент. Без браузера кнопка PDF в бою
+# падала. Шрифт ttf-freefont — запасной для символов вне Inter; сами шрифты
+# отчёта страница грузит со своего сервера.
+RUN apk add --no-cache chromium nss freetype harfbuzz ttf-freefont
+ENV CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser     INTERNAL_APP_URL=http://127.0.0.1:3000
 
 # Непривилегированный пользователь: процессу приложения root не нужен.
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
