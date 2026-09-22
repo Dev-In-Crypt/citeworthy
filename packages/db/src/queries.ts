@@ -225,6 +225,71 @@ export async function finishRun(
   await db.update(runs).set({ status, finishedAt: new Date() }).where(eq(runs.id, runId));
 }
 
+/**
+ * Забирает ожидающий прогон в работу — ровно один раз.
+ *
+ * Условие на статус стоит в самом UPDATE, а не проверкой перед ним: два
+ * прохода воркера, увидевшие один и тот же pending, иначе оба поставили бы
+ * его в очередь, и ассистентов спросили бы дважды за одни деньги.
+ */
+export async function claimPendingRun(db: Database, runId: string): Promise<boolean> {
+  const rows = await db
+    .update(runs)
+    .set({ status: "running" })
+    .where(and(eq(runs.id, runId), eq(runs.status, "pending")))
+    .returning({ id: runs.id });
+  return rows.length > 0;
+}
+
+/** Возвращает забранный прогон в ожидание, если постановка в очередь сорвалась. */
+export async function releaseRun(db: Database, runId: string): Promise<void> {
+  await db
+    .update(runs)
+    .set({ status: "pending" })
+    .where(and(eq(runs.id, runId), eq(runs.status, "running")));
+}
+
+/**
+ * Прогоны, которые ждут постановки в очередь.
+ *
+ * Ручной запуск и аудит в живом режиме создаются вебом, а в очередь их ставит
+ * воркер: у веба нет очередей, и сотни вызовов к ассистентам не помещаются
+ * в один HTTP-запрос. Режим адаптеров сверяется: прогон, созданный живым,
+ * живым и выполняется.
+ */
+export async function listPendingRuns(
+  db: Database,
+  mode: "mock" | "live",
+  since: Date,
+): Promise<{ id: string; clientId: string }[]> {
+  return db
+    .select({ id: runs.id, clientId: runs.clientId })
+    .from(runs)
+    .where(and(eq(runs.status, "pending"), eq(runs.adaptersMode, mode), gte(runs.startedAt, since)));
+}
+
+/**
+ * Закрывает как неудавшиеся прогоны, прождавшие дольше `before`.
+ *
+ * Такой прогон никто уже не ждёт: запускать его сейчас значило бы потратить
+ * деньги на замер, о котором давно забыли, и подписать его старой датой.
+ * Статус failed честнее вечного pending — в истории прогонов он виден.
+ */
+export async function failStalePendingRuns(
+  db: Database,
+  mode: "mock" | "live",
+  before: Date,
+): Promise<string[]> {
+  const rows = await db
+    .update(runs)
+    .set({ status: "failed", finishedAt: new Date() })
+    .where(
+      and(eq(runs.status, "pending"), eq(runs.adaptersMode, mode), sql`${runs.startedAt} < ${before.toISOString()}::timestamptz`),
+    )
+    .returning({ id: runs.id });
+  return rows.map((row) => row.id);
+}
+
 export async function createResponse(db: Database, values: NewResponse): Promise<Response> {
   const rows = await db.insert(responses).values(values).returning();
   const created = rows[0];

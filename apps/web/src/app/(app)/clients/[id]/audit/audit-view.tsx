@@ -30,19 +30,57 @@ export function AuditView({ clientId }: { clientId: string }) {
   const utils = api.useUtils();
   const prompts = api.prompts.list.useQuery({ clientId });
   const [phase, setPhase] = useState<Phase>("idle");
+  /** Прогон, который выполняет воркер (живой режим); null — выполнен сразу. */
+  const [queuedRunId, setQueuedRunId] = useState<string | null>(null);
+
+  async function refresh(): Promise<void> {
+    await Promise.all([
+      utils.runs.list.invalidate({ clientId }),
+      utils.diagnosis.sourceGraph.invalidate({ clientId }),
+      utils.measurement.visibility.invalidate({ clientId }),
+    ]);
+  }
 
   const audit = api.runs.startAudit.useMutation({
     onMutate: () => setPhase("running"),
-    onSuccess: async () => {
-      await Promise.all([
-        utils.runs.list.invalidate({ clientId }),
-        utils.diagnosis.sourceGraph.invalidate({ clientId }),
-        utils.measurement.visibility.invalidate({ clientId }),
-      ]);
+    onSuccess: async (result) => {
+      /**
+       * В живом режиме сервер только создаёт прогон — выполняет его воркер,
+       * и это минуты. Раньше экран объявлял «готово» сразу после создания и
+       * вёл на пустой список возможностей: аудит, главный путь продажи,
+       * выглядел работающим и не делал ничего.
+       */
+      if (!result.executedInline) {
+        setQueuedRunId(result.runId);
+        return;
+      }
+      await refresh();
       setPhase("done");
     },
     onError: () => setPhase("error"),
   });
+
+  const queuedRun = api.runs.get.useQuery(
+    { id: queuedRunId ?? "" },
+    {
+      enabled: queuedRunId !== null,
+      refetchInterval: (query) => {
+        const status = query.state.data?.status;
+        return status === "done" || status === "failed" ? false : 5000;
+      },
+    },
+  );
+
+  useEffect(() => {
+    const status = queuedRun.data?.status;
+    if (status === "done") {
+      void refresh().then(() => setPhase("done"));
+    } else if (status === "failed") {
+      setPhase("error");
+    }
+    // Зависимость — только статус: refresh лишь сбрасывает кэш запросов
+    // клиента, и перезапускать эффект из-за новой ссылки на него незачем.
+  }, [queuedRun.data?.status]);
 
   // Дойдя до конца, экран сам ведёт к диагностике: аудит не должен
   // заканчиваться вопросом «а дальше куда».
@@ -84,11 +122,11 @@ export function AuditView({ clientId }: { clientId: string }) {
         <button
           type="button"
           data-testid="run-audit"
-          disabled={audit.isPending}
+          disabled={audit.isPending || phase === "running"}
           onClick={() => audit.mutate({ clientId })}
           className={buttonClass("primary", "lg")}
         >
-          {audit.isPending ? "Running audit…" : "Run audit"}
+          {audit.isPending || phase === "running" ? "Running audit…" : "Run audit"}
         </button>
         <span className="text-sm text-muted-foreground">
           <span className="metric">{promptCount}</span> prompts × 3 platforms × 3 samples. Repeated
@@ -98,7 +136,16 @@ export function AuditView({ clientId }: { clientId: string }) {
 
       {phase === "error" && (
         <p role="alert" data-testid="form-error" className="text-sm text-destructive">
-          {audit.error?.message ?? "The audit could not be completed."}
+          {audit.error?.message ??
+            "The audit could not be completed. Some answers did not come back; open the measure screen to see the run and try again."}
+        </p>
+      )}
+
+      {phase === "running" && queuedRunId !== null && (
+        <p data-testid="audit-queued" className="text-sm text-muted-foreground">
+          The assistants are being asked now. This takes a few minutes, because every prompt is
+          asked several times on each assistant. You can leave this page — the results appear on
+          the opportunities screen when the run finishes.
         </p>
       )}
 

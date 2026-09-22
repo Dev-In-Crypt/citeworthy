@@ -1,8 +1,17 @@
 import type { FlowProducer } from "bullmq";
-import { getRunById, getRunSchedule, listActivePromptsForClient, startRun } from "@repo/db";
+import {
+  claimPendingRun,
+  failStalePendingRuns,
+  finishRun,
+  getRunById,
+  getRunSchedule,
+  listActivePromptsForClient,
+  listPendingRuns,
+  releaseRun,
+} from "@repo/db";
 import type { Database } from "@repo/db";
 import { DEFAULT_PLATFORMS } from "@repo/core";
-import type { Platform } from "@repo/core";
+import type { AdaptersMode, Platform } from "@repo/core";
 import { planRunJobs } from "@repo/pipeline";
 import { QUEUE_NAMES, runsQueueName, type FinalizeJobData, type RunJobData } from "./queues";
 
@@ -12,6 +21,11 @@ import { QUEUE_NAMES, runsQueueName, type FinalizeJobData, type RunJobData } fro
  * Flow, а не счётчик выполненных: сборка запускается тогда, когда доехали
  * все ответы, и это гарантирует очередь, а не наша арифметика. Считать
  * готовность самим значило бы однажды собрать прогон на половине данных.
+ *
+ * Прогон забирается из pending ровно один раз (`claimPendingRun`): его
+ * ставят и тик расписания, и подбор ручных прогонов, и два прохода не должны
+ * спросить ассистентов дважды. Возвращает число поставленных задач; 0 —
+ * если ставить нечего или прогон уже забрал кто-то другой.
  */
 export async function enqueueRun(
   db: Database,
@@ -22,6 +36,9 @@ export async function enqueueRun(
   const run = await getRunById(db, runId);
   if (!run) {
     throw new Error(`Run ${runId} not found`);
+  }
+  if (run.status !== "pending") {
+    return 0;
   }
 
   const schedule = run.scheduleId ? await getRunSchedule(db, run.scheduleId) : undefined;
@@ -35,21 +52,78 @@ export async function enqueueRun(
   const jobs = planRunJobs(runId, prompts, platforms, samples);
 
   if (jobs.length === 0) {
+    // Спрашивать нечего — прогон закрывается, а не висит в ожидании: иначе
+    // подбор брал бы его снова каждые несколько секунд.
+    await finishRun(db, runId, "failed");
     return 0;
   }
 
-  await startRun(db, runId);
+  if (!(await claimPendingRun(db, runId))) {
+    return 0;
+  }
 
-  await flow.add({
-    name: "finalize",
-    queueName: QUEUE_NAMES.finalize,
-    data: { runId, clientId, expected: jobs.length } satisfies FinalizeJobData,
-    children: jobs.map((job) => ({
-      name: `${job.platform}-${job.sampleIndex}`,
-      queueName: runsQueueName(job.platform),
-      data: job satisfies RunJobData,
-    })),
-  });
+  try {
+    await flow.add({
+      name: "finalize",
+      queueName: QUEUE_NAMES.finalize,
+      data: { runId, clientId, expected: jobs.length } satisfies FinalizeJobData,
+      children: jobs.map((job) => ({
+        name: `${job.platform}-${job.sampleIndex}`,
+        queueName: runsQueueName(job.platform),
+        data: job satisfies RunJobData,
+      })),
+    });
+  } catch (error) {
+    // Очередь недоступна — прогон возвращается в ожидание и будет подобран
+    // снова, а не остаётся «running» без единой задачи.
+    await releaseRun(db, runId);
+    throw error;
+  }
 
   return jobs.length;
+}
+
+/** Сколько ждёт ручной прогон, прежде чем считаться забытым. */
+export const PENDING_RUN_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+export interface PendingPickup {
+  queuedRuns: number;
+  queuedJobs: number;
+  failedRuns: string[];
+  expiredRuns: string[];
+}
+
+/**
+ * Подбирает прогоны, созданные вебом: ручной «Run now» и аудит.
+ *
+ * В живом режиме веб только создаёт прогон — поставить его в очередь может
+ * лишь воркер. До этого подбора такие прогоны не выполнялись никогда, а
+ * экран аудита всё равно показывал «готово». Заодно подбираются прогоны по
+ * расписанию, для которых постановка сорвалась.
+ */
+export async function pickUpPendingRuns(
+  db: Database,
+  flow: FlowProducer,
+  mode: AdaptersMode,
+  now: Date = new Date(),
+): Promise<PendingPickup> {
+  const cutoff = new Date(now.getTime() - PENDING_RUN_MAX_AGE_MS);
+  const expiredRuns = await failStalePendingRuns(db, mode, cutoff);
+
+  const pending = await listPendingRuns(db, mode, cutoff);
+  const result: PendingPickup = { queuedRuns: 0, queuedJobs: 0, failedRuns: [], expiredRuns };
+
+  for (const run of pending) {
+    try {
+      const jobs = await enqueueRun(db, flow, run.id, run.clientId);
+      if (jobs > 0) {
+        result.queuedRuns++;
+        result.queuedJobs += jobs;
+      }
+    } catch {
+      result.failedRuns.push(run.id);
+    }
+  }
+
+  return result;
 }

@@ -12,13 +12,20 @@ import {
   type RunJobData,
 } from "./queues";
 import { tickSchedules } from "./scheduler";
-import { enqueueRun } from "./enqueue-run";
+import { enqueueRun, pickUpPendingRuns } from "./enqueue-run";
 import { executeRunJob, finalizeRun } from "@repo/pipeline";
 import { errorReporter, logger } from "./observability";
 
 const TICK_QUEUE = "scheduler-tick";
 const TICK_JOB = "find-due-schedules";
 const TICK_EVERY_MS = 5 * 60 * 1000;
+/**
+ * Как часто подбираются прогоны, созданные вебом. Чаще тика расписания:
+ * человек нажал «Run now» или запустил аудит и смотрит на экран — пять минут
+ * тишины он прочтёт как поломку. Запрос дешёвый: индекс по статусу не нужен,
+ * ожидающих прогонов единицы.
+ */
+const PICKUP_EVERY_MS = 15 * 1000;
 
 async function main(): Promise<void> {
   const mode = parseAdaptersMode(ADAPTERS_MODE_RAW);
@@ -137,9 +144,37 @@ async function main(): Promise<void> {
     });
   }
 
+  // Проходы подбора не накладываются: медленный проход не должен встретиться
+  // со следующим на одном и том же прогоне (claim спас бы от двойной
+  // постановки, но лишняя работа и шум в логах ни к чему).
+  let pickingUp = false;
+  async function pickUp(): Promise<void> {
+    if (pickingUp) return;
+    pickingUp = true;
+    try {
+      const result = await pickUpPendingRuns(db, flow, mode);
+      if (result.queuedRuns > 0 || result.failedRuns.length > 0 || result.expiredRuns.length > 0) {
+        logger.info("runs.picked_up", { ...result });
+      }
+      for (const runId of result.failedRuns) {
+        errorReporter.captureError(new Error(`Could not enqueue run ${runId}`), {
+          scope: "runs.pickup",
+          runId,
+        });
+      }
+    } catch (error) {
+      errorReporter.captureError(error, { scope: "runs.pickup" });
+    } finally {
+      pickingUp = false;
+    }
+  }
+  await pickUp();
+  const pickupTimer = setInterval(() => void pickUp(), PICKUP_EVERY_MS);
+
   logger.info("worker.started", {
     adapters: mode,
     tickEverySec: TICK_EVERY_MS / 1000,
+    pickupEverySec: PICKUP_EVERY_MS / 1000,
     runQueues: PLATFORMS,
   });
 
@@ -148,6 +183,7 @@ async function main(): Promise<void> {
     if (shuttingDown) return;
     shuttingDown = true;
     logger.info("worker.shutdown", { signal });
+    clearInterval(pickupTimer);
 
     await Promise.all([
       tickWorker.close(),
