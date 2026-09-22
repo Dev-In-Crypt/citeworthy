@@ -8,42 +8,58 @@ import {
 } from "./perplexity";
 
 /**
- * Verify T14. Сеть не используется: fetch подменяется.
+ * Сеть не используется: fetch подменяется.
  *
- * ВАЖНО: форма ответа взята из документации Perplexity, а не с живого вызова —
- * ключа на момент написания не было. Пока живой прогон не сделан, эти тесты
- * доказывают только то, что мы правильно читаем ожидаемый формат.
+ * Форма ответа снята с живого вызова Agent API (пресет `fast`, 2026-09-22):
+ * аннотаций в тексте нет, источники — отдельный элемент `search_results`, а
+ * текст ссылается на них номерами `[n]`, совпадающими с `id` результата.
  */
 
-const SONAR = PERPLEXITY_PRICING["sonar"]!;
+const FAST = PERPLEXITY_PRICING["fast"]!;
+
+function result(id: number, host: string) {
+  return {
+    id,
+    url: `https://${host}/page`,
+    title: `${host} title`,
+    snippet: "…",
+    source: "web",
+  };
+}
 
 function apiResponse(overrides: Record<string, unknown> = {}) {
   return {
-    id: "resp-1",
-    model: "sonar",
-    choices: [
+    model: "openai/gpt-5.6-luna",
+    status: "completed",
+    output: [
       {
-        index: 0,
-        message: {
-          role: "assistant",
-          content: "For small teams the CRMs most often recommended are Pipedrive and AcmeCRM.",
-        },
+        type: "search_results",
+        queries: ["best CRM for startups"],
+        results: [
+          result(1, "www.reddit.com"),
+          result(2, "never-cited.example"),
+          result(3, "www.hubspot.com"),
+          result(4, "www.g2.com"),
+        ],
+      },
+      {
+        type: "message",
+        role: "assistant",
+        status: "completed",
+        content: [
+          {
+            type: "output_text",
+            text: "HubSpot is the default pick.[3][4] AcmeCRM suits developer-heavy teams.[1] See also HubSpot again.[3]",
+            annotations: [],
+          },
+        ],
       },
     ],
-    search_results: [
-      { title: "Best CRM software", url: "https://www.g2.com/categories/crm", date: "2026-05-01" },
-      { title: "Pipedrive review", url: "https://www.pipedrive.com/en/blog/crm-guide", date: null },
-    ],
-    citations: [
-      "https://www.g2.com/categories/crm",
-      "https://www.capterra.com/crm-software/",
-    ],
     usage: {
-      prompt_tokens: 120,
-      completion_tokens: 480,
-      citation_tokens: 3_400,
-      num_search_queries: 2,
-      search_context_size: "medium",
+      input_tokens: 3000,
+      output_tokens: 331,
+      cost: { currency: "USD", total_cost: 0.00397, tool_calls_cost: 0.0025 },
+      tool_calls_details: { search_web: { cost_usd: 0.0025, invocation: 1 } },
     },
     ...overrides,
   };
@@ -68,124 +84,126 @@ function adapter(fetchImpl: typeof fetch, overrides: Record<string, unknown> = {
 }
 
 describe("perplexityCostUsd", () => {
-  it("предпочитает стоимость, посчитанную провайдером", () => {
-    const cost = perplexityCostUsd(
-      { prompt_tokens: 999_999, completion_tokens: 999_999, cost: { total_cost: 0.0123 } },
-      SONAR,
-    );
-
-    // Своя арифметика дала бы другое число — цифра провайдера точнее и переживёт смену тарифов.
-    expect(cost).toBe(0.0123);
+  it("берёт цифру провайдера, если она есть", () => {
+    expect(perplexityCostUsd(apiResponse(), FAST)).toBeCloseTo(0.00397, 6);
   });
 
-  it("считает сама, когда провайдер стоимость не прислал", () => {
-    // (120 + 3400)/1e6*1 + 480/1e6*1 + 2/1000*8 = 0.00352 + 0.00048 + 0.016.
-    const cost = perplexityCostUsd(
-      {
-        prompt_tokens: 120,
-        completion_tokens: 480,
-        citation_tokens: 3_400,
-        num_search_queries: 2,
-        search_context_size: "medium",
+  it("без цифры провайдера считает сам по верхним ценам, а не пишет ноль", () => {
+    // 3000/1e6*0.4 + 331/1e6*1.8 + 1*0.0025 = 0.0012 + 0.0005958 + 0.0025.
+    const payload = apiResponse({
+      usage: {
+        input_tokens: 3000,
+        output_tokens: 331,
+        tool_calls_details: { search_web: { invocation: 1 } },
       },
-      SONAR,
-    );
+    });
 
-    expect(cost).toBeCloseTo(0.02, 6);
+    expect(perplexityCostUsd(payload, FAST)).toBeCloseTo(0.004296, 6);
   });
 
-  it("размер поискового контекста меняет плату за запрос", () => {
-    const usage = { prompt_tokens: 0, completion_tokens: 0, num_search_queries: 1 };
-
-    expect(perplexityCostUsd({ ...usage, search_context_size: "low" }, SONAR)).toBeCloseTo(0.005, 6);
-    expect(perplexityCostUsd({ ...usage, search_context_size: "high" }, SONAR)).toBeCloseTo(
-      0.012,
-      6,
-    );
-  });
-
-  it("без размера контекста берётся medium, а не ноль", () => {
-    expect(
-      perplexityCostUsd({ prompt_tokens: 0, completion_tokens: 0, num_search_queries: 1 }, SONAR),
-    ).toBeCloseTo(0.008, 6);
-  });
-
-  it("отрицательную стоимость от провайдера игнорирует", () => {
-    const cost = perplexityCostUsd(
-      { prompt_tokens: 1_000_000, completion_tokens: 0, cost: { total_cost: -5 } },
-      SONAR,
-    );
-
-    expect(cost).toBe(1);
+  it("без счётчика вызовов поиски считаются по элементам search_results", () => {
+    const payload = apiResponse({ usage: { input_tokens: 0, output_tokens: 0 } });
+    expect(perplexityCostUsd(payload, FAST)).toBeCloseTo(0.0025, 6);
   });
 });
 
 describe("разбор ответа", () => {
-  it("текст берётся из первого choice", () => {
-    expect(extractPerplexityText(apiResponse())).toContain("Pipedrive and AcmeCRM");
+  it("текст берётся из элемента message", () => {
+    expect(extractPerplexityText(apiResponse())).toContain("AcmeCRM");
   });
 
-  it("источники объединяются из search_results и citations без дублей", () => {
-    const citations = extractPerplexityCitations(apiResponse());
+  it("процитированы только результаты, на которые текст сослался номером", () => {
+    const urls = extractPerplexityCitations(apiResponse()).map((citation) => citation.url);
 
-    expect(citations).toHaveLength(3);
-    // Заголовок из search_results выигрывает у голого URL из citations.
-    expect(citations[0]).toEqual({
-      url: "https://www.g2.com/categories/crm",
-      title: "Best CRM software",
+    // Порядок — порядок первой ссылки в тексте; повторная [3] не дублируется.
+    expect(urls).toEqual([
+      "https://www.hubspot.com/page",
+      "https://www.g2.com/page",
+      "https://www.reddit.com/page",
+    ]);
+    // Найденный, но не упомянутый источник на ответ не влиял.
+    expect(urls).not.toContain("https://never-cited.example/page");
+  });
+
+  it("цитата несёт заголовок результата", () => {
+    expect(extractPerplexityCitations(apiResponse())[0]).toEqual({
+      url: "https://www.hubspot.com/page",
+      title: "www.hubspot.com title",
     });
-    expect(citations.map((c) => c.url)).toContain("https://www.capterra.com/crm-software/");
   });
 
-  it("старый формат без search_results тоже читается", () => {
-    const citations = extractPerplexityCitations(
-      apiResponse({ search_results: undefined }) as Record<string, unknown>,
-    );
+  it("номер без такого результата игнорируется, а не выдумывает источник", () => {
+    const payload = apiResponse();
+    const message = payload.output[1] as { content: { text: string }[] };
+    message.content[0]!.text = "An answer that cites a result that does not exist.[42]";
 
-    expect(citations).toHaveLength(2);
-    expect(citations.every((c) => c.title === undefined)).toBe(true);
+    expect(extractPerplexityCitations(payload)).toEqual([]);
+  });
+
+  it("аннотации url_citation тоже засчитываются, если провайдер их пришлёт", () => {
+    const payload = apiResponse();
+    const message = payload.output[1] as { content: { text: string; annotations: unknown[] }[] };
+    message.content[0]!.text = "No numeric markers here.";
+    message.content[0]!.annotations = [
+      { type: "url_citation", url: "https://www.capterra.com/crm", title: "Capterra" },
+    ];
+
+    expect(extractPerplexityCitations(payload)).toEqual([
+      { url: "https://www.capterra.com/crm", title: "Capterra" },
+    ]);
   });
 });
 
 describe("PerplexityAdapter", () => {
   it("возвращает результат по контракту C1", async () => {
-    const fetchImpl = fetchReturning(apiResponse());
-    const result = await adapter(fetchImpl as unknown as typeof fetch).execute("best CRM");
+    const result = await adapter(fetchReturning(apiResponse()) as unknown as typeof fetch).execute(
+      "best CRM",
+    );
 
-    expect(result.text).toContain("Pipedrive");
+    expect(result.text).toContain("HubSpot");
     expect(result.citations).toHaveLength(3);
-    expect(result.modelVersion).toBe("sonar");
-    expect(result.costUsd).toBeCloseTo(0.02, 6);
+    expect(result.costUsd).toBeCloseTo(0.00397, 6);
   });
 
-  it("промпт уходит сообщением пользователя выбранной модели", async () => {
+  it("в версии — настоящая модель из ответа и пресет", async () => {
+    // Пресет отвечает моделью OpenAI: колонка «Perplexity» не должна выдавать
+    // её за собственную модель провайдера.
+    const result = await adapter(fetchReturning(apiResponse()) as unknown as typeof fetch).execute(
+      "best CRM",
+    );
+
+    expect(result.modelVersion).toBe("openai/gpt-5.6-luna (perplexity preset: fast)");
+  });
+
+  it("запрос уходит в Agent API с пресетом, ключ — заголовком", async () => {
     const fetchImpl = fetchReturning(apiResponse());
     await adapter(fetchImpl as unknown as typeof fetch).execute("best CRM for startups");
 
     const [url, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
-    const body = JSON.parse(init.body as string) as {
-      model: string;
-      messages: { role: string; content: string }[];
-    };
+    const body = JSON.parse(init.body as string) as Record<string, unknown>;
 
-    expect(url).toBe("https://api.perplexity.ai/v1/sonar");
-    expect(body.model).toBe("sonar");
-    expect(body.messages).toEqual([{ role: "user", content: "best CRM for startups" }]);
+    expect(url).toBe("https://api.perplexity.ai/v1/agent");
+    expect((init.headers as Record<string, string>)["Authorization"]).toBe("Bearer test-key");
+    expect(body).toEqual({ preset: "fast", input: "best CRM for startups" });
   });
 
-  it("эндпоинт переопределяется: у провайдера идёт миграция на Agent API", async () => {
+  it("язык и регион уходят инструкцией", async () => {
     const fetchImpl = fetchReturning(apiResponse());
-    await adapter(fetchImpl as unknown as typeof fetch, {
-      endpoint: "https://api.perplexity.ai/v1/other",
-    }).execute("prompt");
+    await adapter(fetchImpl as unknown as typeof fetch).execute("prompt", {
+      lang: "German",
+      geo: "DE",
+    });
 
-    expect(fetchImpl.mock.calls[0]?.[0]).toBe("https://api.perplexity.ai/v1/other");
+    const body = JSON.parse(
+      (fetchImpl.mock.calls[0] as [string, RequestInit])[1].body as string,
+    ) as { instructions: string };
+    expect(body.instructions).toBe("Answer in German. Assume the user is in DE.");
   });
 
-  it("повторяет попытку на 429 и отдаёт результат", async () => {
+  it("повторяет попытку на 429", async () => {
     const fetchImpl = vi
       .fn()
-      .mockResolvedValueOnce({ ok: false, status: 429, text: () => Promise.resolve("slow down") })
+      .mockResolvedValueOnce({ ok: false, status: 429, text: () => Promise.resolve("limit") })
       .mockResolvedValueOnce({
         ok: true,
         status: 200,
@@ -199,16 +217,7 @@ describe("PerplexityAdapter", () => {
     expect(result.citations).toHaveLength(3);
   });
 
-  it("сдаётся после трёх попыток на 503", async () => {
-    const fetchImpl = fetchReturning("upstream down", 503);
-
-    await expect(adapter(fetchImpl as unknown as typeof fetch).execute("prompt")).rejects.toThrow(
-      /503/,
-    );
-    expect(fetchImpl).toHaveBeenCalledTimes(3);
-  });
-
-  it("на 401 не повторяет: ключ не станет годным сам собой", async () => {
+  it("на 401 не повторяет: ключ сам не заработает", async () => {
     const fetchImpl = fetchReturning("unauthorized", 401);
 
     await expect(adapter(fetchImpl as unknown as typeof fetch).execute("prompt")).rejects.toThrow(
@@ -217,8 +226,16 @@ describe("PerplexityAdapter", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
-  it("пустой ответ — ошибка, а не пустое измерение", async () => {
-    const fetchImpl = fetchReturning(apiResponse({ choices: [] }));
+  it("незавершённый ответ — ошибка, а не обрубок в измерении", async () => {
+    const fetchImpl = fetchReturning(apiResponse({ status: "incomplete" }));
+
+    await expect(adapter(fetchImpl as unknown as typeof fetch).execute("prompt")).rejects.toThrow(
+      /incomplete/,
+    );
+  });
+
+  it("ответ без текста — ошибка, а не пустое измерение", async () => {
+    const fetchImpl = fetchReturning(apiResponse({ output: [] }));
 
     await expect(adapter(fetchImpl as unknown as typeof fetch).execute("prompt")).rejects.toThrow(
       /no answer text/,
@@ -229,7 +246,7 @@ describe("PerplexityAdapter", () => {
     expect(() => new PerplexityAdapter({ apiKey: "" })).toThrow(/PERPLEXITY_API_KEY/);
   });
 
-  it("модель без прайса отклоняется", () => {
-    expect(() => new PerplexityAdapter({ apiKey: "k", model: "sonar-future" })).toThrow(/pricing/i);
+  it("пресет без прайса отклоняется", () => {
+    expect(() => new PerplexityAdapter({ apiKey: "k", preset: "xhigh" })).toThrow(/pricing/i);
   });
 });

@@ -1,121 +1,170 @@
 import type { AdapterOptions, AdapterResult, Citation, PlatformAdapter } from "./types";
 import { adapterResultSchema } from "./types";
+import { defaultSleep, postJson } from "./http";
 
 /**
- * Живой адаптер Perplexity (Sonar).
+ * Живой адаптер Perplexity: Agent API (`POST /v1/agent`) с пресетом.
  *
- * Поиск здесь не опция, а сам продукт: Sonar всегда отвечает по свежей выдаче
- * и возвращает список источников. Поэтому, в отличие от OpenAI, включать
- * инструмент не нужно — нужно правильно прочитать то, что уже пришло.
+ * Раньше адаптер ходил в Sonar Chat Completions, но провайдер поддерживает его
+ * только до 2026-09-27 и называет Agent API прямой заменой: обычному `sonar`
+ * соответствует пресет `fast`.
  *
- * Эндпоинт вынесен в конфиг: у Perplexity сейчас соседствуют Sonar
- * (`/v1/sonar`) и новый Agent API, а в документации у Sonar стоит пометка о
- * миграции. Когда путь сменится, это правка переменной окружения, а не релиз.
+ * Что это значит для измерения. Пресеты Agent API отвечают моделями OpenAI:
+ * `fast` работает на `openai/gpt-5.6-luna`. От Perplexity здесь поиск и выбор
+ * источников, а текст пишет чужая модель. Поэтому настоящая модель берётся из
+ * ответа и вместе с пресетом пишется в `model_version`: колонка «Perplexity»
+ * не должна выдавать себя за собственную модель провайдера (инвариант 6).
+ *
+ * Форма ответа снята с живого вызова 2026-09-22, а не взята из документации:
+ * у `fast` в тексте нет аннотаций `url_citation`, о которых пишет справочник.
+ * Источники приходят отдельным элементом `search_results`, а текст ссылается
+ * на них номерами вида `[3]`, совпадающими с `id` результата.
  */
 
-export const DEFAULT_PERPLEXITY_ENDPOINT = "https://api.perplexity.ai/v1/sonar";
+export const DEFAULT_PERPLEXITY_ENDPOINT = "https://api.perplexity.ai/v1/agent";
 
-/** Модель по умолчанию — базовая: нам нужен типичный ответ, а не исследование. */
-export const DEFAULT_PERPLEXITY_MODEL = "sonar";
+/**
+ * Пресет по умолчанию — `fast`, преемник обычного `sonar`: один поиск, один
+ * шаг. Более тяжёлые пресеты ходят по страницам и делают много шагов — ответ
+ * становится исследованием, а не тем, что увидит спросивший покупатель.
+ */
+export const DEFAULT_PERPLEXITY_PRESET = "fast";
 
 export interface PerplexityPricing {
   inputPerMillion: number;
   outputPerMillion: number;
-  /** Плата за запрос зависит от размера поискового контекста. */
-  requestPerThousand: { low: number; medium: number; high: number };
+  /** Плата за один вызов веб-поиска. */
+  webSearchPerCall: number;
 }
 
+/**
+ * Запасной прайс — только на случай, если провайдер не пришлёт свою цифру.
+ *
+ * Провайдер считает стоимость сам (`usage.cost.total_cost`), и она точнее
+ * любого нашего расчёта. Здесь взяты верхние значения диапазона цен luna из
+ * страницы цен ($0.40 / $1.80 за 1M токенов) и $0.0025 за поиск: занизить
+ * расход опаснее, чем завысить, — на этих цифрах агентство назначает цену.
+ */
 export const PERPLEXITY_PRICING: Record<string, PerplexityPricing> = {
-  sonar: {
-    inputPerMillion: 1,
-    outputPerMillion: 1,
-    requestPerThousand: { low: 5, medium: 8, high: 12 },
-  },
-  "sonar-pro": {
-    inputPerMillion: 3,
-    outputPerMillion: 15,
-    requestPerThousand: { low: 6, medium: 10, high: 14 },
+  fast: {
+    inputPerMillion: 0.4,
+    outputPerMillion: 1.8,
+    webSearchPerCall: 0.0025,
   },
 };
 
 export interface PerplexityUsage {
-  prompt_tokens?: number;
-  completion_tokens?: number;
-  citation_tokens?: number;
-  num_search_queries?: number;
-  search_context_size?: string;
-  /** Perplexity считает стоимость сама; форма объекта в документации не закреплена. */
+  input_tokens?: number;
+  output_tokens?: number;
   cost?: { total_cost?: number } & Record<string, unknown>;
+  tool_calls_details?: Record<string, { invocation?: number } | undefined>;
 }
 
-/**
- * Стоимость ответа.
- *
- * Если провайдер прислал свою цифру — берём её: она точнее любого нашего
- * прайса и переживёт смену тарифов. Свой расчёт остаётся запасным путём,
- * потому что записать ноль вместо стоимости нельзя (это скрытый убыток).
- */
-export function perplexityCostUsd(usage: PerplexityUsage, pricing: PerplexityPricing): number {
-  const reported = usage.cost?.total_cost;
-  if (typeof reported === "number" && Number.isFinite(reported) && reported >= 0) {
-    return Math.round(reported * 1_000_000) / 1_000_000;
-  }
+interface PerplexitySearchResult {
+  id?: number;
+  url?: string;
+  title?: string;
+}
 
-  const input = usage.prompt_tokens ?? 0;
-  const output = usage.completion_tokens ?? 0;
-  // Токены цитат тарифицируются как входные: они и есть подтянутый в контекст текст.
-  const citation = usage.citation_tokens ?? 0;
-  const requests = usage.num_search_queries ?? 0;
-
-  const context = usage.search_context_size?.toLowerCase();
-  const perThousand =
-    context === "high"
-      ? pricing.requestPerThousand.high
-      : context === "low"
-        ? pricing.requestPerThousand.low
-        : pricing.requestPerThousand.medium;
-
-  const total =
-    ((input + citation) / 1_000_000) * pricing.inputPerMillion +
-    (output / 1_000_000) * pricing.outputPerMillion +
-    (requests / 1000) * perThousand;
-
-  return Math.round(total * 1_000_000) / 1_000_000;
+interface PerplexityOutputItem {
+  type: string;
+  results?: PerplexitySearchResult[];
+  content?: { type: string; text?: string; annotations?: unknown[] }[];
 }
 
 interface PerplexityPayload {
   model?: string;
-  choices?: { message?: { content?: string } }[];
-  /** Старый формат: просто список URL. */
-  citations?: string[];
-  /** Новый формат: объекты с заголовком и датой. */
-  search_results?: { url?: string; title?: string }[];
+  status?: string;
+  output?: PerplexityOutputItem[];
   usage?: PerplexityUsage;
 }
 
-export function extractPerplexityText(payload: PerplexityPayload): string {
-  return (payload.choices?.[0]?.message?.content ?? "").trim();
+function countSearchCalls(payload: PerplexityPayload): number {
+  const details = payload.usage?.tool_calls_details ?? {};
+  const reported = Object.entries(details)
+    .filter(([name]) => name.includes("search"))
+    .reduce((sum, [, entry]) => sum + (entry?.invocation ?? 0), 0);
+  if (reported > 0) return reported;
+
+  return (payload.output ?? []).filter((item) => item.type === "search_results").length;
 }
 
 /**
- * Источники читаются из обоих полей: `search_results` даёт заголовки, а
- * `citations` остаётся у старых ответов. Дубли схлопываются по URL — нам
- * важен факт цитирования, а не сколько раз модель на него сослалась.
+ * Стоимость ответа. Цифра провайдера берётся, если она есть; свой расчёт —
+ * запасной путь, потому что записать ноль вместо стоимости нельзя.
+ */
+export function perplexityCostUsd(payload: PerplexityPayload, pricing: PerplexityPricing): number {
+  const reported = payload.usage?.cost?.total_cost;
+  if (typeof reported === "number" && Number.isFinite(reported) && reported >= 0) {
+    return Math.round(reported * 1_000_000) / 1_000_000;
+  }
+
+  const usage = payload.usage ?? {};
+  const total =
+    ((usage.input_tokens ?? 0) / 1_000_000) * pricing.inputPerMillion +
+    ((usage.output_tokens ?? 0) / 1_000_000) * pricing.outputPerMillion +
+    countSearchCalls(payload) * pricing.webSearchPerCall;
+
+  return Math.round(total * 1_000_000) / 1_000_000;
+}
+
+function messageParts(payload: PerplexityPayload) {
+  return (payload.output ?? [])
+    .filter((item) => item.type === "message")
+    .flatMap((item) => item.content ?? [])
+    .filter((part) => part.type === "output_text");
+}
+
+export function extractPerplexityText(payload: PerplexityPayload): string {
+  return messageParts(payload)
+    .map((part) => part.text ?? "")
+    .join("")
+    .trim();
+}
+
+/**
+ * Процитированные источники — то, на что ответ сослался, а не всё найденное.
+ *
+ * Поиск возвращает десяток результатов, а ответ ссылается на часть из них.
+ * Засчитать все значило бы приписать источнику влияние на ответ, которого не
+ * было, — и граф источников соврал бы. Так же читаются ответы остальных
+ * платформ, и доли по ним остаются сравнимыми.
+ *
+ * Два способа сослаться, оба поддержаны: аннотации `url_citation` (их обещает
+ * справочник) и номера `[n]` в тексте, указывающие на `id` результата (так
+ * отвечает `fast` на деле). Дубли схлопываются по URL.
  */
 export function extractPerplexityCitations(payload: PerplexityPayload): Citation[] {
   const seen = new Map<string, Citation>();
 
-  for (const result of payload.search_results ?? []) {
-    if (!result.url || seen.has(result.url)) continue;
-    seen.set(result.url, {
-      url: result.url,
-      ...(result.title ? { title: result.title } : {}),
-    });
+  function add(url: string | undefined, title: string | undefined): void {
+    if (!url || seen.has(url)) return;
+    seen.set(url, { url, ...(title ? { title } : {}) });
   }
 
-  for (const url of payload.citations ?? []) {
-    if (!url || seen.has(url)) continue;
-    seen.set(url, { url });
+  const parts = messageParts(payload);
+
+  for (const part of parts) {
+    for (const raw of part.annotations ?? []) {
+      const annotation = raw as { type?: string; url?: string; title?: string };
+      if (annotation.type === "url_citation") add(annotation.url, annotation.title);
+    }
+  }
+
+  // Номер — это `id` результата. Если поисков было несколько и номера
+  // повторяются, берётся первый: так их нумерует сам ответ.
+  const byId = new Map<number, PerplexitySearchResult>();
+  for (const item of payload.output ?? []) {
+    if (item.type !== "search_results") continue;
+    for (const result of item.results ?? []) {
+      if (typeof result.id === "number" && !byId.has(result.id)) byId.set(result.id, result);
+    }
+  }
+
+  const text = parts.map((part) => part.text ?? "").join("");
+  for (const match of text.matchAll(/\[(\d{1,3})\]/g)) {
+    const result = byId.get(Number(match[1]));
+    if (result) add(result.url, result.title);
   }
 
   return [...seen.values()];
@@ -123,7 +172,7 @@ export function extractPerplexityCitations(payload: PerplexityPayload): Citation
 
 export interface PerplexityAdapterConfig {
   apiKey: string;
-  model?: string;
+  preset?: string;
   endpoint?: string;
   pricing?: PerplexityPricing;
   /** Подменяется в тестах: сеть в них не используется никогда. */
@@ -133,16 +182,10 @@ export interface PerplexityAdapterConfig {
   timeoutMs?: number;
 }
 
-const RETRYABLE_STATUSES = new Set([408, 409, 429, 500, 502, 503, 504]);
-
-function defaultSleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 export class PerplexityAdapter implements PlatformAdapter {
   readonly platform = "perplexity" as const;
 
-  private readonly model: string;
+  private readonly preset: string;
   private readonly endpoint: string;
   private readonly pricing: PerplexityPricing;
   private readonly fetchImpl: typeof fetch;
@@ -155,11 +198,11 @@ export class PerplexityAdapter implements PlatformAdapter {
       throw new Error("PERPLEXITY_API_KEY is not set. Use ADAPTERS_MODE=mock or provide the key.");
     }
 
-    this.model = config.model ?? DEFAULT_PERPLEXITY_MODEL;
-    const pricing = config.pricing ?? PERPLEXITY_PRICING[this.model];
+    this.preset = config.preset ?? DEFAULT_PERPLEXITY_PRESET;
+    const pricing = config.pricing ?? PERPLEXITY_PRICING[this.preset];
     if (!pricing) {
       throw new Error(
-        `No pricing for Perplexity model "${this.model}". Add it to PERPLEXITY_PRICING, otherwise cost per answer cannot be recorded.`,
+        `No pricing for Perplexity preset "${this.preset}". Add it to PERPLEXITY_PRICING, otherwise cost per answer cannot be recorded.`,
       );
     }
 
@@ -175,6 +218,11 @@ export class PerplexityAdapter implements PlatformAdapter {
     const startedAt = Date.now();
     const payload = await this.request(prompt, opts);
 
+    // Недописанный ответ — не измерение: доля считалась бы по обрубку.
+    if (payload.status && payload.status !== "completed") {
+      throw new Error(`Perplexity returned status "${payload.status}"`);
+    }
+
     const text = extractPerplexityText(payload);
     if (text === "") {
       throw new Error("Perplexity returned no answer text");
@@ -183,13 +231,15 @@ export class PerplexityAdapter implements PlatformAdapter {
     return adapterResultSchema.parse({
       text,
       citations: extractPerplexityCitations(payload),
-      modelVersion: payload.model ?? this.model,
-      costUsd: perplexityCostUsd(payload.usage ?? {}, this.pricing),
+      // Модель — из ответа: провайдер вправе сменить модель пресета, и без
+      // отметки это выглядело бы как «изменение видимости».
+      modelVersion: `${payload.model ?? "unknown"} (perplexity preset: ${this.preset})`,
+      costUsd: perplexityCostUsd(payload, this.pricing),
       latencyMs: Date.now() - startedAt,
     });
   }
 
-  private async request(prompt: string, opts?: AdapterOptions): Promise<PerplexityPayload> {
+  private request(prompt: string, opts?: AdapterOptions): Promise<PerplexityPayload> {
     const instructions = [
       opts?.lang ? `Answer in ${opts.lang}.` : "",
       opts?.geo ? `Assume the user is in ${opts.geo}.` : "",
@@ -197,55 +247,19 @@ export class PerplexityAdapter implements PlatformAdapter {
       .filter(Boolean)
       .join(" ");
 
-    const body = JSON.stringify({
-      model: this.model,
-      messages: [
-        ...(instructions ? [{ role: "system", content: instructions }] : []),
-        { role: "user", content: prompt },
-      ],
+    return postJson<PerplexityPayload>({
+      provider: "Perplexity",
+      url: this.endpoint,
+      headers: { Authorization: `Bearer ${this.config.apiKey}` },
+      body: JSON.stringify({
+        preset: this.preset,
+        input: prompt,
+        ...(instructions ? { instructions } : {}),
+      }),
+      fetchImpl: this.fetchImpl,
+      maxAttempts: this.maxAttempts,
+      sleep: this.sleep,
+      timeoutMs: this.timeoutMs,
     });
-
-    let lastError: Error | undefined;
-
-    for (let attempt = 1; attempt <= this.maxAttempts; attempt++) {
-      try {
-        const response = await this.fetchImpl(this.endpoint, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${this.config.apiKey}`,
-            "Content-Type": "application/json",
-          },
-          body,
-          signal: AbortSignal.timeout(this.timeoutMs),
-        });
-
-        if (response.ok) {
-          return (await response.json()) as PerplexityPayload;
-        }
-
-        const detail = (await response.text()).slice(0, 500);
-        const error = new Error(`Perplexity responded ${response.status}: ${detail}`);
-
-        // 4xx кроме перечисленных — наша ошибка: повтор даст тот же ответ.
-        if (!RETRYABLE_STATUSES.has(response.status)) {
-          throw error;
-        }
-        lastError = error;
-      } catch (error) {
-        if (error instanceof Error && /^Perplexity responded [45]\d\d/.test(error.message)) {
-          const status = Number(error.message.slice(21, 24));
-          if (!RETRYABLE_STATUSES.has(status)) {
-            throw error;
-          }
-        }
-        lastError = error instanceof Error ? error : new Error(String(error));
-      }
-
-      if (attempt < this.maxAttempts) {
-        await this.sleep(2 ** (attempt - 1) * 1000);
-      }
-    }
-
-    throw lastError ?? new Error("Perplexity request failed");
   }
 }

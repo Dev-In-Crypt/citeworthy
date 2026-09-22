@@ -18,7 +18,7 @@ export {
 export type { OpenAiAdapterConfig, OpenAiPricing, ReasoningEffort } from "./adapters/openai";
 export {
   DEFAULT_PERPLEXITY_ENDPOINT,
-  DEFAULT_PERPLEXITY_MODEL,
+  DEFAULT_PERPLEXITY_PRESET,
   PerplexityAdapter,
   PERPLEXITY_PRICING,
   perplexityCostUsd,

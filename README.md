@@ -58,8 +58,12 @@ Five assistants have adapters: ChatGPT, Perplexity, Gemini, Claude and Grok. A n
 measured on the first three; Claude and Grok are switched on per client in the schedule, because
 each one adds answers to every run and needs its own key (`ANTHROPIC_API_KEY`, `XAI_API_KEY`).
 Copilot and Google's AI surfaces have no public answer API, so they stay listed as not measured.
-The Claude and Grok adapters are written from documentation and have not made a live call yet —
-run `live-check` (see `packages/core/src/adapters/live-check.ts`) with a key before trusting them.
+ChatGPT, Perplexity, Claude and Grok have been checked with live calls; Gemini has not — run
+`live-check` (see `packages/core/src/adapters/live-check.ts`) with a key before trusting it.
+
+Perplexity is measured through its Agent API (`fast` preset), which replaced Sonar on 2026-09-27.
+That preset answers with an OpenAI model over Perplexity's own search, so each answer records the
+actual model in its version string rather than passing it off as Perplexity's.
 
 ## Commands
 

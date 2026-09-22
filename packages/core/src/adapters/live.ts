@@ -35,14 +35,14 @@ export function registerLiveAdapters(env: NodeJS.ProcessEnv = process.env): stri
 
   const perplexityKey = env["PERPLEXITY_API_KEY"]?.trim();
   if (perplexityKey) {
-    const model = env["PERPLEXITY_MODEL"]?.trim();
+    const preset = env["PERPLEXITY_PRESET"]?.trim();
     const endpoint = env["PERPLEXITY_ENDPOINT"]?.trim();
     registerLiveAdapter(
       "perplexity",
       () =>
         new PerplexityAdapter({
           apiKey: perplexityKey,
-          ...(model ? { model } : {}),
+          ...(preset ? { preset } : {}),
           ...(endpoint ? { endpoint } : {}),
         }),
     );
