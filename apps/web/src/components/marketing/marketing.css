@@ -166,7 +166,8 @@
 .mk .prop span { font-family: var(--font-mono); font-size: 10.5px; color: var(--cw-muted); }
 
 /* FAQ */
-.mk .faq { border-top: 1px solid var(--cw-ink); max-width: 860px; }
+/* Во всю ширину, как остальные блоки; узким остаётся только текст ответа. */
+.mk .faq { border-top: 1px solid var(--cw-ink); }
 .mk .faq details { border-bottom: 1px dashed var(--cw-rule); }
 .mk .faq summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 20px 0; font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
 .mk .faq summary::-webkit-details-marker { display: none; }
