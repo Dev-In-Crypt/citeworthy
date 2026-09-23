@@ -222,8 +222,10 @@ export function SchedulePanel({ clientId }: { clientId: string }) {
       {/*
         Цена выбора — до сохранения, а не в счёте в конце месяца. Всё здесь
         помечено как оценка: число ответов считается точно, а деньги — по
-        измеренной средней цене ответа, и настоящая стоимость каждого ответа
-        пишется в базу адаптером.
+        единственной измеренной цене ответа, и она замерена на ChatGPT, а не
+        усреднена по ассистентам (docs/cost-model.md §1). Экран так и говорит:
+        обещать среднюю цену данные не позволяют. Настоящая стоимость каждого
+        ответа пишется в базу адаптером.
       */}
       {options && (
         <div
@@ -249,9 +251,11 @@ export function SchedulePanel({ clientId }: { clientId: string }) {
               </p>
               <p className="text-xs text-muted-foreground">
                 Estimated measurement cost ≈{" "}
-                <span className="metric">${estimate.estimatedCostUsd.toFixed(2)}</span> a month, at
-                an average of ${options.estimatedCostPerAnswerUsd.toFixed(4)} per answer measured on
-                live calls. What each answer actually costs is recorded per answer.
+                <span className="metric">${estimate.estimatedCostUsd.toFixed(2)}</span> a month. It
+                counts every answer at ${options.estimatedCostPerAnswerUsd.toFixed(4)} — a single
+                live measurement, taken on ChatGPT. Other assistants cost more or less per answer,
+                so read this as a rough figure. What each answer actually costs is recorded per
+                answer.
               </p>
             </>
           ) : (
