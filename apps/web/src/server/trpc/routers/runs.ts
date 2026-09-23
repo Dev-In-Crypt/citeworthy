@@ -22,6 +22,7 @@ import {
   upsertRunSchedule,
 } from "@repo/db";
 import { assertTenant, protectedProcedure, roleProcedure, router } from "../trpc";
+import type { TrpcContext } from "../context";
 import { entitlementsForAgency } from "../../subscription";
 
 // Литеральный кортеж, а не PLATFORMS: иначе zod выводит string[] и теряет union,
@@ -37,6 +38,28 @@ const cadenceSchema = z.custom<Cadence>(
   (value) => typeof value === "string" && isCadence(value),
   { message: "Unknown cadence." },
 );
+
+/**
+ * Прогон стоит денег, поэтому его начало проверяется по подписке.
+ *
+ * Заведение клиента такую проверку уже проходит, а запуск измерения — нет:
+ * отменившееся агентство продолжало бы тратить наши деньги на вызовы
+ * ассистентов. Просрочка платежа в пределах отсрочки измерение не
+ * останавливает — у карты мог кончиться срок, и это не отказ от продукта
+ * (`PAST_DUE_GRACE_DAYS`).
+ *
+ * Публичный отчёт `/r/[token]` этой проверки не получает намеренно: клиент
+ * агентства не отвечает за его карту и не должен видеть закрытую дверь.
+ */
+async function assertMeasurementAllowed(db: TrpcContext["db"], agencyId: string): Promise<void> {
+  const entitlements = await entitlementsForAgency(db, agencyId);
+
+  if (!entitlements.active) {
+    // Причина отдаётся как есть: человек должен понять, что делать дальше,
+    // а не гадать над кодом ошибки.
+    throw new TRPCError({ code: "FORBIDDEN", message: entitlements.reason });
+  }
+}
 
 export const runsRouter = router({
   schedule: protectedProcedure
@@ -161,6 +184,7 @@ export const runsRouter = router({
     .mutation(async ({ ctx, input }) => {
       const client = await getClientById(ctx.db, input.clientId);
       assertTenant(client, ctx.user.agencyId);
+      await assertMeasurementAllowed(ctx.db, ctx.user.agencyId);
 
       const prompts = await listActivePromptsForClient(ctx.db, input.clientId);
       if (prompts.length === 0) {
@@ -205,6 +229,7 @@ export const runsRouter = router({
     .mutation(async ({ ctx, input }) => {
       const client = await getClientById(ctx.db, input.clientId);
       assertTenant(client, ctx.user.agencyId);
+      await assertMeasurementAllowed(ctx.db, ctx.user.agencyId);
 
       const prompts = await listActivePromptsForClient(ctx.db, input.clientId);
       if (prompts.length === 0) {
