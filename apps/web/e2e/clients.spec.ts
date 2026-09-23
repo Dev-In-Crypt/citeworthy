@@ -84,14 +84,15 @@ test("client screens are tabs: the current one is marked and the way back is the
     "page",
   );
 
-  // Приборы — на втором уровне: измерения и источники живут внутри Analytics,
-  // а не в одном ряду с решениями.
-  await tabs.getByRole("link", { name: "Analytics" }).click();
+  // Приборы — на втором уровне: измерения и источники живут внутри Measure,
+  // а не в одном ряду с решениями. Подписи вкладки, подвкладки и заголовка
+  // экрана совпадают намеренно — одно понятие, одно имя.
+  await tabs.getByRole("link", { name: "Measure" }).first().click();
   await expect(page).toHaveURL(/\/measure$/);
   const subtabs = page.getByTestId("client-subtabs");
-  await subtabs.getByRole("link", { name: "Sources" }).click();
+  await subtabs.getByRole("link", { name: "Diagnose" }).click();
   await expect(page).toHaveURL(/\/diagnose$/);
-  await expect(tabs.getByRole("link", { name: "Analytics" })).toHaveAttribute(
+  await expect(tabs.getByRole("link", { name: "Measure" }).first()).toHaveAttribute(
     "aria-current",
     "page",
   );
