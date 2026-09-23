@@ -952,6 +952,10 @@ export async function upsertSubscription(
         status: values.status,
         currentPeriodEnd: values.currentPeriodEnd ?? null,
         cancelAtPeriodEnd: values.cancelAtPeriodEnd ?? false,
+        // Отметка о событии обновляется вместе с состоянием, а не только при
+        // первой записи: по ней отбрасывается задержавшийся повтор более
+        // раннего события, а первая запись у подписки ровно одна.
+        lastEventAt: values.lastEventAt ?? null,
         updatedAt: new Date(),
       },
     })
