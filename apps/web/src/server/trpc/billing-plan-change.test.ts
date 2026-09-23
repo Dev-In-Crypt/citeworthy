@@ -7,7 +7,7 @@ import {
   type CheckoutInput,
   type PaymentProvider,
 } from "@repo/core";
-import { createAgency, createDb, deleteAgency, upsertSubscription } from "@repo/db";
+import { createAgency, createClient, createDb, deleteAgency, upsertSubscription } from "@repo/db";
 import { appRouter } from "./root";
 import type { SessionUser, TrpcContext } from "./context";
 import { setPaymentProvider } from "../payments";
@@ -119,6 +119,44 @@ describe("billing plan changes", () => {
 
   it("даунгрейд идёт тем же путём", async () => {
     await giveSubscription({ plan: "scale" });
+
+    await caller(agencyId).billing.changePlan({ plan: "starter" });
+
+    expect(calls.changePlan).toHaveBeenCalledWith({
+      subscriptionId: "sub_live",
+      plan: "starter",
+    });
+  });
+
+  it("даунгрейд ниже числа заведённых клиентов не проходит", async () => {
+    await giveSubscription({ plan: "scale" });
+    // Starter держит троих — заводим четвёртого.
+    for (const index of [1, 2, 3, 4]) {
+      await createClient(db, {
+        agencyId,
+        name: `Client ${index}`,
+        domain: `client-${index}-${agencyId.slice(0, 8)}.test`,
+      });
+    }
+
+    await expect(caller(agencyId).billing.changePlan({ plan: "starter" })).rejects.toThrow(
+      /Archive 1 client/,
+    );
+
+    // Провайдера не трогаем вовсе: отказ должен случиться до списания, а не
+    // после — иначе агентство уже заплатило за тариф, в который не влезает.
+    expect(calls.changePlan).not.toHaveBeenCalled();
+  });
+
+  it("даунгрейд ровно под лимит проходит", async () => {
+    await giveSubscription({ plan: "scale" });
+    for (const index of [1, 2, 3]) {
+      await createClient(db, {
+        agencyId,
+        name: `Fits ${index}`,
+        domain: `fits-${index}-${agencyId.slice(0, 8)}.test`,
+      });
+    }
 
     await caller(agencyId).billing.changePlan({ plan: "starter" });
 

@@ -3,6 +3,7 @@ import { PLAN_LIMITS } from "./period";
 import {
   PAST_DUE_GRACE_DAYS,
   canAddClient,
+  canSwitchToPlan,
   entitlementsFor,
   type SubscriptionSnapshot,
 } from "./entitlements";
@@ -119,5 +120,39 @@ describe("canAddClient", () => {
 
     expect(decision.allowed).toBe(false);
     expect(decision.message).toMatch(/cancelled/i);
+  });
+});
+
+describe("canSwitchToPlan", () => {
+  const starter = { plan: "starter" as const, clientLimit: PLAN_LIMITS.starter.clientLimit };
+
+  it("понижение в пределах нового лимита проходит", () => {
+    expect(canSwitchToPlan(starter, PLAN_LIMITS.starter.clientLimit).allowed).toBe(true);
+  });
+
+  it("понижение ниже числа заведённых клиентов не проходит", () => {
+    // Иначе агентство платит за трёх, а меряется пятеро: отключить чужих
+    // клиентов за него мы не можем, а мерить больше купленного не будем.
+    const decision = canSwitchToPlan(starter, PLAN_LIMITS.starter.clientLimit + 2);
+
+    expect(decision.allowed).toBe(false);
+    expect(decision.message).toContain("starter");
+  });
+
+  it("отказ называет, скольких убрать", () => {
+    // «Уберите лишних» без числа — задача без условия.
+    const decision = canSwitchToPlan(starter, PLAN_LIMITS.starter.clientLimit + 2);
+    expect(decision.message).toContain("Archive 2 clients");
+
+    const one = canSwitchToPlan(starter, PLAN_LIMITS.starter.clientLimit + 1);
+    expect(one.message).toContain("Archive 1 client");
+  });
+
+  it("повышение не блокируется числом клиентов", () => {
+    const decision = canSwitchToPlan(
+      { plan: "scale", clientLimit: PLAN_LIMITS.scale.clientLimit },
+      PLAN_LIMITS.growth.clientLimit,
+    );
+    expect(decision.allowed).toBe(true);
   });
 });

@@ -137,3 +137,29 @@ export function canAddClient(entitlements: Entitlements, currentClients: number)
 
   return { allowed: true, message: "" };
 }
+
+/**
+ * Можно ли перейти на тариф, который держит меньше клиентов, чем заведено.
+ *
+ * Отказ, а не предупреждение: иначе агентство оказывается в состоянии, для
+ * которого у продукта нет честного поведения. Отключить чужих клиентов за
+ * понижение тарифа нельзя — это данные, за которые агентство отвечает перед
+ * своими; оставить их всех работать значит отдавать больше, чем куплено.
+ * Поэтому решает человек, и решает до оплаты, а не после.
+ *
+ * Отказ называет число: «убрать лишних» без цифры — это задача без условия.
+ */
+export function canSwitchToPlan(
+  target: { plan: PlanId; clientLimit: number },
+  currentClients: number,
+): LimitDecision {
+  if (currentClients <= target.clientLimit) {
+    return { allowed: true, message: "" };
+  }
+
+  const extra = currentClients - target.clientLimit;
+  return {
+    allowed: false,
+    message: `The ${target.plan} plan covers ${target.clientLimit} clients and you have ${currentClients}. Archive ${extra} ${extra === 1 ? "client" : "clients"} first — switching would not remove them, and we will not measure more clients than the plan covers.`,
+  };
+}

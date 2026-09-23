@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import {
   billingPeriod,
   billingPeriodBounds,
+  canSwitchToPlan,
   PLAN_LIMITS,
   sumCostUsd,
   usageStatus,
@@ -126,6 +127,25 @@ export const billingRouter = router({
 
       if (subscription.plan === input.plan) {
         return { plan: input.plan, changed: false };
+      }
+
+      /**
+       * Понижение ниже числа заведённых клиентов не пропускается.
+       *
+       * Иначе агентство платит за три клиента, а меряется пять: отключить
+       * лишних за него мы не можем (это его данные и его обязательства
+       * перед своими клиентами), а оставить — значит отдавать больше, чем
+       * куплено. Решение остаётся за человеком и принимается до списания.
+       */
+      const clientsUsed = await countClientsByAgency(ctx.db, ctx.user.agencyId);
+      const target = PLAN_LIMITS[input.plan];
+      const decision = canSwitchToPlan(
+        { plan: input.plan, clientLimit: target.clientLimit },
+        clientsUsed,
+      );
+
+      if (!decision.allowed) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: decision.message });
       }
 
       await payments.changePlan({
