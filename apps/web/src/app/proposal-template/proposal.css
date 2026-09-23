@@ -1,0 +1,288 @@
+/**
+ * Шаблон предложения: экранный вид и печать на A4.
+ *
+ * Файл подключается только страницей /proposal-template, поэтому правила
+ * печати, прячущие шапку и подвал витрины, не достают до остальных страниц.
+ * Всё экранное живёт под `.proposal` внутри `.mk` — токены и типографика те же,
+ * что на витрине, новых цветов страница не заводит.
+ */
+
+/* ===== экран ===== */
+
+.mk .proposal {
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.mk .pt-doc {
+  display: grid;
+  gap: 40px;
+}
+
+/* Шапка документа: её агентство заменяет своим именем и именем клиента. */
+.mk .pt-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px 24px;
+  flex-wrap: wrap;
+  padding-bottom: 14px;
+  border-bottom: 2px solid var(--cw-ink);
+}
+
+.mk .pt-sec {
+  display: grid;
+  gap: 14px;
+}
+
+.mk .pt-sec > h2 {
+  font: 500 26px/1.2 var(--font-serif);
+  letter-spacing: -0.01em;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 6px;
+}
+
+.mk .pt-sec > h2 .n {
+  font: italic 500 20px/1 var(--font-serif);
+  color: var(--cw-indigo);
+}
+
+/* Подсказка «что здесь писать»: остаётся и на бумаге — это рабочий шаблон. */
+.mk .pt-guide {
+  font-size: 15.5px;
+  line-height: 1.6;
+  color: var(--cw-ink-2);
+  max-width: 680px;
+}
+
+.mk .pt-guide + .pt-guide {
+  margin-top: -4px;
+}
+
+/* Блок с выдуманными значениями. Рамка и метка — чтобы его нельзя было
+   принять за часть предложения и отправить клиенту как есть. */
+.mk .pt-ex {
+  border: 1px dashed var(--cw-rule);
+  border-left: 3px solid var(--cw-indigo);
+  border-radius: 0 8px 8px 0;
+  background: var(--cw-surface);
+  padding: 16px 18px;
+  display: grid;
+  gap: 10px;
+}
+
+.mk .pt-tag {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cw-indigo);
+}
+
+.mk .pt-ex p,
+.mk .pt-ex li {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--cw-ink);
+}
+
+.mk .pt-ex ul {
+  display: grid;
+  gap: 7px;
+}
+
+.mk .pt-ex ul li {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 6px;
+}
+
+.mk .pt-ex ul li::before {
+  content: "\2014";
+  color: var(--cw-muted);
+}
+
+/* Блок «оставьте как есть»: то, чем измерение является на самом деле. */
+.mk .pt-fixed {
+  border: 1px solid var(--cw-border);
+  border-radius: 8px;
+  background: var(--cw-paper-3);
+  padding: 16px 18px;
+  display: grid;
+  gap: 10px;
+}
+
+.mk .pt-fixed .pt-tag {
+  color: var(--cw-muted);
+}
+
+.mk .pt-fixed p {
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--cw-ink-2);
+}
+
+.mk table.pt-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14.5px;
+}
+
+.mk .pt-table th,
+.mk .pt-table td {
+  text-align: left;
+  padding: 9px 12px 9px 0;
+  border-bottom: 1px solid var(--cw-border);
+  vertical-align: top;
+}
+
+.mk .pt-table th {
+  font: 500 10.5px/1.4 var(--font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--cw-muted);
+}
+
+.mk .pt-table td:last-child,
+.mk .pt-table th:last-child {
+  text-align: right;
+  padding-right: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.mk .pt-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.mk .pt-note {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--cw-muted);
+  border-top: 1px dashed var(--cw-border);
+  padding-top: 10px;
+}
+
+.mk .pt-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border: 1px solid var(--cw-border);
+  border-radius: 8px;
+  background: var(--cw-paper-3);
+}
+
+.mk .pt-print {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--cw-border);
+  border-radius: 8px;
+  background: var(--cw-surface);
+  color: var(--cw-ink);
+  font: 500 14px/1 var(--font-sans);
+  cursor: pointer;
+}
+
+.mk .pt-print:hover {
+  border-color: var(--cw-rule);
+}
+
+@media (max-width: 760px) {
+  .mk .pt-sec > h2 {
+    font-size: 22px;
+    grid-template-columns: 26px minmax(0, 1fr);
+  }
+  .mk .pt-ex,
+  .mk .pt-fixed,
+  .mk .pt-bar {
+    padding: 14px;
+  }
+  /* Таблица на 375px: колонки складываются, горизонтальной прокрутки нет. */
+  .mk .pt-table th {
+    display: none;
+  }
+  .mk .pt-table tr {
+    display: grid;
+    gap: 2px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--cw-border);
+  }
+  .mk .pt-table td {
+    border-bottom: 0;
+    padding: 0;
+  }
+  .mk .pt-table td:last-child {
+    text-align: left;
+    font-weight: 600;
+  }
+}
+
+/* ===== печать: A4 ===== */
+
+@page {
+  size: A4;
+  margin: 16mm 15mm;
+}
+
+@media print {
+  /* Обрамление витрины на бумаге не нужно — на листе документ агентства. */
+  .mk.site-head,
+  .mk.site-foot,
+  .pt-screen {
+    display: none !important;
+  }
+
+  .mk .wrap {
+    max-width: none;
+    padding: 0;
+  }
+
+  .mk .sec {
+    padding: 0;
+    border-top: 0;
+  }
+
+  .mk .proposal {
+    max-width: none;
+    color: #000;
+    font-size: 10.5pt;
+  }
+
+  .mk .pt-doc {
+    gap: 9mm;
+  }
+
+  .mk .pt-sec > h2 {
+    font-size: 15pt;
+  }
+
+  .mk .pt-guide,
+  .mk .pt-ex p,
+  .mk .pt-ex li,
+  .mk .pt-fixed p,
+  .mk table.pt-table {
+    font-size: 10pt;
+    color: #000;
+  }
+
+  /* Раздел не должен разрываться посреди примера. */
+  .mk .pt-sec,
+  .mk .pt-ex,
+  .mk .pt-fixed {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Ссылки на бумаге печатаются текстом: чужой URL в скобках только мешает. */
+  .mk .proposal a {
+    color: #000;
+    text-decoration: none;
+  }
+}
