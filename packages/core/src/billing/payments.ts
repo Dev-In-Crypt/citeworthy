@@ -28,6 +28,24 @@ export interface PortalInput {
   returnUrl: string;
 }
 
+/**
+ * Переход между тарифами у уже платящего агентства.
+ *
+ * Отдельно от checkout намеренно: второй checkout заводит вторую подписку,
+ * и агентство начинает платить дважды за один продукт. Смена тарифа — это
+ * правка цены в уже существующей подписке.
+ */
+export interface ChangePlanInput {
+  subscriptionId: string;
+  plan: PlanId;
+}
+
+export interface CancelInput {
+  subscriptionId: string;
+  /** `true` — доработать оплаченный период, `false` — вернуть подписку в строй. */
+  cancelAtPeriodEnd: boolean;
+}
+
 /** Слепок подписки из события провайдера — то, что нужно записать в базу. */
 export interface SubscriptionChange {
   kind: "subscription";
@@ -39,7 +57,19 @@ export interface SubscriptionChange {
   status: SubscriptionStatus;
   currentPeriodEnd: Date | null;
   cancelAtPeriodEnd: boolean;
+  /**
+   * Поля, о которых событие ничего не говорит.
+   *
+   * Счёт не знает ни тарифа, ни конца периода, и записать по нему `null`
+   * значит стереть срок, по которому считается отсрочка при сбое платежа.
+   * Тот, кто пишет в базу, обязан оставить эти поля как есть.
+   *
+   * Необязательное: событие, которое знает всё, ничего не перечисляет.
+   */
+  unknownFields?: readonly SubscriptionField[];
 }
+
+export type SubscriptionField = "plan" | "currentPeriodEnd" | "cancelAtPeriodEnd";
 
 /** Событие, которое продукт сознательно не обрабатывает. */
 export interface IgnoredEvent {
@@ -50,13 +80,93 @@ export interface IgnoredEvent {
 
 export type PaymentEvent = SubscriptionChange | IgnoredEvent;
 
+/**
+ * Конверт события провайдера.
+ *
+ * Идентификатор и время лежат снаружи разобранного события: применить
+ * событие ровно один раз нужно независимо от того, что в нём написано, — и
+ * событие, которое продукт игнорирует, тоже должно быть отмечено как
+ * доставленное.
+ */
+export interface PaymentEventEnvelope {
+  eventId: string;
+  type: string;
+  occurredAt: Date;
+  event: PaymentEvent;
+}
+
 export interface PaymentProvider {
   /** Настроен ли приём денег. Интерфейс не должен показывать кнопку, которая не сработает. */
   readonly configured: boolean;
   createCheckout(input: CheckoutInput): Promise<CheckoutSession>;
   createPortal(input: PortalInput): Promise<{ url: string }>;
+  /** Переводит подписку на другой тариф, не заводя вторую. */
+  changePlan(input: ChangePlanInput): Promise<void>;
+  /** Отмена в конце оплаченного периода и возврат из неё. */
+  setCancelAtPeriodEnd(input: CancelInput): Promise<void>;
   /** Проверяет подпись и переводит событие провайдера в наши термины. */
-  parseEvent(payload: string, signature: string): Promise<PaymentEvent>;
+  parseEvent(payload: string, signature: string): Promise<PaymentEventEnvelope>;
+}
+
+export type EventClaim = { claimed: true } | { claimed: false; reason: string };
+
+/**
+ * Журнал обработанных событий.
+ *
+ * Провайдер доставляет событие «хотя бы один раз»: повтор после таймаута
+ * или после нашего 500 — это штатная работа Stripe, а не сбой. Применённое
+ * дважды событие второй раз меняет тариф и второй раз шлёт письмо, поэтому
+ * событие занимается по идентификатору до того, как что-то записано.
+ *
+ * За интерфейсом, потому что в одном процессе достаточно памяти, а в
+ * нескольких — нужна общая таблица, и выбор не должен менять код вебхука.
+ */
+export interface PaymentEventLedger {
+  /** Занимает событие. `claimed: false` — оно уже обработано, повторять нечего. */
+  claim(eventId: string, occurredAt: Date): Promise<EventClaim>;
+  /**
+   * Отпускает событие, которое применить не удалось.
+   *
+   * Без этого сбой базы превращался бы в потерянное событие: провайдер
+   * повторит доставку, а журнал скажет, что всё уже сделано.
+   */
+  release(eventId: string): Promise<void>;
+}
+
+/**
+ * Журнал в памяти — умолчание.
+ *
+ * Держит один процесс честным и не требует схемы. Переживает перезапуск
+ * ровно никак: на нескольких экземплярах нужен общий журнал в базе.
+ */
+export class InMemoryPaymentEventLedger implements PaymentEventLedger {
+  private readonly seen = new Map<string, Date>();
+
+  constructor(private readonly capacity = 5_000) {}
+
+  claim(eventId: string, occurredAt: Date): Promise<EventClaim> {
+    if (this.seen.has(eventId)) {
+      return Promise.resolve({ claimed: false, reason: "The event was already processed." });
+    }
+
+    this.seen.set(eventId, occurredAt);
+    // Журнал не должен расти вечно: события старше нескольких тысяч
+    // провайдер уже не повторит.
+    while (this.seen.size > this.capacity) {
+      const oldest = this.seen.keys().next();
+      if (oldest.done) {
+        break;
+      }
+      this.seen.delete(oldest.value);
+    }
+
+    return Promise.resolve({ claimed: true });
+  }
+
+  release(eventId: string): Promise<void> {
+    this.seen.delete(eventId);
+    return Promise.resolve();
+  }
 }
 
 export class PaymentsNotConfiguredError extends Error {
@@ -85,7 +195,15 @@ export class UnconfiguredPaymentProvider implements PaymentProvider {
     return Promise.reject(new PaymentsNotConfiguredError());
   }
 
-  parseEvent(): Promise<PaymentEvent> {
+  changePlan(): Promise<void> {
+    return Promise.reject(new PaymentsNotConfiguredError());
+  }
+
+  setCancelAtPeriodEnd(): Promise<void> {
+    return Promise.reject(new PaymentsNotConfiguredError());
+  }
+
+  parseEvent(): Promise<PaymentEventEnvelope> {
     return Promise.reject(new PaymentsNotConfiguredError());
   }
 }

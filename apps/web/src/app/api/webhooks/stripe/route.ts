@@ -1,6 +1,6 @@
 import { createDb } from "@repo/db";
-import { getPaymentProvider } from "@/server/payments";
-import { applySubscriptionChange } from "@/server/subscription";
+import { getPaymentEventLedger, getPaymentProvider } from "@/server/payments";
+import { applyPaymentEvent } from "./apply";
 
 /**
  * Вебхук платёжного провайдера — единственный вход, который меняет права
@@ -9,6 +9,10 @@ import { applySubscriptionChange } from "@/server/subscription";
  * Тело читается сырым: подпись считается по байтам запроса, и любая
  * нормализация JSON её сломает. Неподтверждённая подпись — 400 и ничего
  * больше: без этой проверки план агентства мог бы выдать себе кто угодно.
+ *
+ * Коды ответа читает сам провайдер: 2xx — «доставлено, не повторять»,
+ * 5xx — «повторить». Поэтому событие, которое мы сознательно не применяем,
+ * отвечает 200, а сбой базы — 500.
  */
 
 /**
@@ -24,28 +28,36 @@ export async function POST(request: Request): Promise<Response> {
 
   const payload = await request.text();
 
-  let event;
+  let envelope;
   try {
-    event = await getPaymentProvider().parseEvent(payload, signature);
+    envelope = await getPaymentProvider().parseEvent(payload, signature);
   } catch (error) {
     console.error("[stripe] rejected webhook", error);
     return Response.json({ error: "Signature rejected" }, { status: 400 });
   }
 
-  if (event.kind === "ignored") {
-    // 200 намеренно: провайдер иначе будет слать это событие снова и снова.
-    return Response.json({ received: true, applied: false, reason: event.reason });
-  }
-
   const { db, close } = createDb();
 
   try {
-    const outcome = await applySubscriptionChange(db, event);
-    if (!outcome.applied) {
-      console.error("[stripe] unlinked subscription event", outcome.reason);
+    const result = await applyPaymentEvent(db, envelope, getPaymentEventLedger());
+
+    if (result.status !== "applied") {
+      // 200 намеренно: провайдер иначе будет слать это событие снова и снова.
+      // В логе только тип и идентификатор события — ни карты, ни ключей.
+      console.info(
+        `[stripe] ${envelope.type} ${envelope.eventId} not applied: ${result.reason}`,
+      );
     }
 
-    return Response.json({ received: true, applied: outcome.applied });
+    return Response.json({
+      received: true,
+      applied: result.status === "applied",
+      status: result.status,
+    });
+  } catch (error) {
+    // 500 — просьба повторить: событие отпущено, и повтор его применит.
+    console.error("[stripe] failed to apply webhook", error);
+    return Response.json({ error: "Could not apply the event" }, { status: 500 });
   } finally {
     await close();
   }
