@@ -1,27 +1,29 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { DEFAULT_PLATFORMS, measurableAssistants, type Platform } from "@repo/core";
+import { DEFAULT_PLATFORMS, type Platform } from "@repo/core";
+import { estimateSchedule, type Cadence } from "@repo/core/adapters/capacity";
 import { api } from "@/trpc/react";
 import { buttonClass } from "@/components/ui/button";
 import { inputClass } from "@/components/ui/field";
 
-type Cadence = "daily" | "weekly" | "biweekly";
-
-/**
- * Что можно включить — берётся из каталога, а не пишется здесь ещё раз:
- * новый ассистент появляется в расписании сам, как только для него есть
- * адаптер.
- */
-const PLATFORM_OPTIONS = measurableAssistants().map((assistant) => ({
-  id: assistant.id as Platform,
-  label: assistant.label,
-}));
+function cadenceLabelOf(
+  options: { id: string; label: string }[],
+  cadence: Cadence,
+): string {
+  return options.find((option) => option.id === cadence)?.label ?? cadence;
+}
 
 export function SchedulePanel({ clientId }: { clientId: string }) {
   const utils = api.useUtils();
   const schedule = api.runs.schedule.useQuery({ clientId });
   const runs = api.runs.list.useQuery({ clientId });
+  /**
+   * Что тариф разрешает измерять и сколько проверок в месяц он даёт. Форма не
+   * знает ни одного тарифа по имени: и список частот, и список ассистентов
+   * приходят с сервера — из конфига измерения, а не из литералов здесь.
+   */
+  const capacity = api.runs.capacity.useQuery({ clientId });
 
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
 
@@ -67,8 +69,12 @@ export function SchedulePanel({ clientId }: { clientId: string }) {
   }, [saved, hydrated]);
   const save = api.runs.saveSchedule.useMutation({
     onSuccess: async () => {
+      setError(null);
       await utils.runs.schedule.invalidate({ clientId });
     },
+    // Отказ тарифа — не молчаливая неудача: сервер объясняет словами, что
+    // именно не разрешено, и это должно попасть на экран.
+    onError: (e) => setError(e.message),
   });
 
   const trigger = api.runs.triggerManual.useMutation({
@@ -88,6 +94,46 @@ export function SchedulePanel({ clientId }: { clientId: string }) {
     );
   }
 
+  const options = capacity.data;
+  /**
+   * Сохранённая частота показывается, даже если тариф её больше не разрешает:
+   * подменить выбор молча — значит соврать о том, что настроено. Выбрать её
+   * заново нельзя, а при сохранении сервер объяснит отказ.
+   */
+  const cadenceOptions = options
+    ? options.cadences.some((option) => option.id === cadence)
+      ? options.cadences.map((option) => ({ ...option, allowed: true }))
+      : [...options.cadences.map((option) => ({ ...option, allowed: true })), {
+          id: cadence,
+          label: cadence,
+          allowed: false,
+        }]
+    : [];
+
+  /**
+   * То же и с ассистентами: включённый, но больше не разрешённый тарифом
+   * остаётся видимым, чтобы его можно было снять. Заново поставить нельзя.
+   */
+  const assistantOptions = options
+    ? [
+        ...options.assistants.map((option) => ({ ...option, allowed: true })),
+        ...platforms
+          .filter((id) => !options.assistants.some((option) => option.id === id))
+          .map((id) => ({ id, label: id, allowed: false })),
+      ]
+    : [];
+
+  const estimate =
+    options && platforms.length > 0 && options.promptCount > 0
+      ? estimateSchedule({
+          plan: options.plan,
+          prompts: options.promptCount,
+          assistants: platforms.length,
+          samplesPerPrompt: samples,
+          cadence,
+        })
+      : null;
+
   return (
     <section className="flex flex-col gap-4 rounded-lg border p-4">
       <div className="flex flex-col gap-1">
@@ -106,9 +152,11 @@ export function SchedulePanel({ clientId }: { clientId: string }) {
             onChange={(e) => setCadence(e.target.value as Cadence)}
             className={inputClass}
           >
-            <option value="biweekly">Every two weeks</option>
-            <option value="weekly">Weekly</option>
-            <option value="daily">Daily</option>
+            {cadenceOptions.map((option) => (
+              <option key={option.id} value={option.id} disabled={!option.allowed}>
+                {option.label}
+              </option>
+            ))}
           </select>
         </label>
 
@@ -127,11 +175,12 @@ export function SchedulePanel({ clientId }: { clientId: string }) {
         <fieldset className="flex flex-col gap-1.5">
           <legend className="text-sm font-medium">Platforms</legend>
           <div className="flex flex-wrap gap-x-4 gap-y-1.5">
-            {PLATFORM_OPTIONS.map(({ id, label }) => (
+            {assistantOptions.map(({ id, label, allowed }) => (
               <label key={id} className="flex items-center gap-1.5 text-sm">
                 <input
                   type="checkbox"
                   checked={platforms.includes(id)}
+                  disabled={!allowed && !platforms.includes(id)}
                   onChange={() => togglePlatform(id)}
                 />
                 {label}
@@ -164,6 +213,50 @@ export function SchedulePanel({ clientId }: { clientId: string }) {
           {trigger.isPending ? "Running…" : "Run now"}
         </button>
       </div>
+
+      {/*
+        Цена выбора — до сохранения, а не в счёте в конце месяца. Всё здесь
+        помечено как оценка: число ответов считается точно, а деньги — по
+        измеренной средней цене ответа, и настоящая стоимость каждого ответа
+        пишется в базу адаптером.
+      */}
+      {options && (
+        <div
+          data-testid="schedule-estimate"
+          className="flex flex-col gap-1 rounded-md bg-secondary/50 p-3 text-sm"
+        >
+          {estimate ? (
+            <>
+              <p>
+                <span className="font-medium">Estimated</span>{" "}
+                <span className="metric">{estimate.answersPerMonth.toLocaleString("en-US")}</span>{" "}
+                answers per month — {options.promptCount} prompts × {platforms.length} assistants ×{" "}
+                {samples} samples, {cadenceLabelOf(cadenceOptions, cadence).toLowerCase()}.
+              </p>
+              <p className={estimate.overAllowance ? "text-destructive" : "text-muted-foreground"}>
+                {estimate.overAllowance ? "Above" : "About"}{" "}
+                <span className="metric">{Math.round(estimate.ratio * 100)}%</span> of the{" "}
+                <span className="metric">{estimate.allowance.toLocaleString("en-US")}</span> checks
+                a month this plan includes.
+                {estimate.overAllowance
+                  ? " Lower the cadence, the samples, or the number of assistants to fit."
+                  : ""}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Estimated measurement cost ≈{" "}
+                <span className="metric">${estimate.estimatedCostUsd.toFixed(2)}</span> a month, at
+                an average of ${options.estimatedCostPerAnswerUsd.toFixed(4)} per answer measured on
+                live calls. What each answer actually costs is recorded per answer.
+              </p>
+            </>
+          ) : (
+            <p className="text-muted-foreground">
+              Add prompts and pick at least one assistant to see how many answers a month this
+              setting comes to.
+            </p>
+          )}
+        </div>
+      )}
 
       {saved && (
         <p data-testid="schedule-summary" className="text-sm text-muted-foreground">
