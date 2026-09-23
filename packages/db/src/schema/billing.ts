@@ -1,5 +1,6 @@
 import {
   boolean,
+  index,
   integer,
   pgEnum,
   pgTable,
@@ -90,3 +91,35 @@ export const subscriptions = pgTable(
 
 export type Subscription = typeof subscriptions.$inferSelect;
 export type NewSubscription = typeof subscriptions.$inferInsert;
+
+/**
+ * Журнал обработанных событий платёжного провайдера.
+ *
+ * Stripe повторяет доставку до трёх суток, и повтор обязан ничего не менять
+ * во второй раз: иначе одно событие смены тарифа применится дважды. Защита —
+ * сам первичный ключ: событие «занимается» вставкой до того, как что-то
+ * записано, и вторая вставка падает на конфликте.
+ *
+ * Журнала в памяти для этого мало: он не переживает перезапуск и не общий у
+ * двух экземпляров веба, а повтор приходит как раз тогда, когда первый раз
+ * что-то пошло не так.
+ *
+ * `agency_id` здесь намеренно нет: событие занимается раньше, чем известно,
+ * чьё оно, и сама запись — технический след без данных агентства.
+ */
+export const paymentEvents = pgTable(
+  "payment_events",
+  {
+    /** Идентификатор события у провайдера (evt_…). */
+    eventId: text("event_id").primaryKey(),
+    provider: text("provider").notNull().default("stripe"),
+    /** Момент создания события у провайдера, а не у нас: доставка не упорядочена. */
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+    processedAt: timestamp("processed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  // Для уборки старых записей. Возраст считается по времени события у
+  // провайдера, а не по нашему: повторять он перестаёт по своему сроку.
+  (table) => [index("payment_events_occurred_at_idx").on(table.occurredAt)],
+);
+
+export type PaymentEvent = typeof paymentEvents.$inferSelect;

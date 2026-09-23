@@ -6,7 +6,7 @@ import { apiKeys, invitations } from "./schema/auth";
 import type { ApiKey, NewApiKey } from "./schema/auth";
 import { assistantTraffic } from "./schema/analytics";
 import type { AssistantTraffic, NewAssistantTraffic } from "./schema/analytics";
-import { subscriptions, usageCounters } from "./schema/billing";
+import { paymentEvents, subscriptions, usageCounters } from "./schema/billing";
 import { citationSources, sources } from "./schema/sources";
 import { actions } from "./schema/actions";
 import { activityLog } from "./schema/activity";
@@ -2361,4 +2361,52 @@ export async function listAgencyReports(
     createdAt: row.createdAt,
     awaitingApproval: row.shareId !== null && row.approvedAt === null,
   }));
+}
+
+/**
+ * Занимает событие платёжного провайдера под обработку.
+ *
+ * Защита от повторной доставки — первичный ключ: вторая вставка того же
+ * идентификатора ничего не вставляет, и вызывающий понимает, что событие уже
+ * применено. Занимать нужно до записи чего бы то ни было, иначе между
+ * проверкой и записью проскочит повтор.
+ */
+export async function claimPaymentEvent(
+  db: Database,
+  eventId: string,
+  occurredAt: Date,
+  provider = "stripe",
+): Promise<boolean> {
+  const rows = await db
+    .insert(paymentEvents)
+    .values({ eventId, provider, occurredAt })
+    .onConflictDoNothing({ target: paymentEvents.eventId })
+    .returning({ eventId: paymentEvents.eventId });
+  return rows.length > 0;
+}
+
+/**
+ * Освобождает событие, если применить его не удалось.
+ *
+ * Без этого сбой базы превращался бы в потерянное событие: повтор от
+ * провайдера пришёл бы, увидел занятый идентификатор и не сделал ничего.
+ */
+export async function releasePaymentEvent(db: Database, eventId: string): Promise<void> {
+  await db.delete(paymentEvents).where(eq(paymentEvents.eventId, eventId));
+}
+
+/**
+ * Убирает старые записи журнала.
+ *
+ * Возраст считается по времени события у провайдера: именно по нему он
+ * решает, повторять доставку или нет (Stripe — до трёх суток). Наше время
+ * обработки для этого не годится: запись, сделанная сегодня по вчерашнему
+ * событию, всё равно уже не повторится.
+ */
+export async function prunePaymentEvents(db: Database, before: Date): Promise<number> {
+  const rows = await db
+    .delete(paymentEvents)
+    .where(sql`${paymentEvents.occurredAt} < ${before.toISOString()}::timestamptz`)
+    .returning({ eventId: paymentEvents.eventId });
+  return rows.length;
 }
