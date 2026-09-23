@@ -79,6 +79,17 @@ export const subscriptions = pgTable(
     /** До какого момента оплачен период — по нему решается доступ при сбое платежа. */
     currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
     cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
+    /**
+     * Время события провайдера, которым записано это состояние.
+     *
+     * Доставка вебхуков не упорядочена: задержавшийся повтор более раннего
+     * события приходит после более позднего и откатывает тариф назад —
+     * агентство, только что перешедшее на Scale, видит лимит Starter.
+     * Защита по `payment_events` от этого не спасает: у событий разные id.
+     * Пусто — состояние записано до того, как счёт появился (или не из
+     * события вовсе); такое состояние перезаписывается любым событием.
+     */
+    lastEventAt: timestamp("last_event_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
