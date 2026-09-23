@@ -61,7 +61,7 @@ test("one audit run leads straight to a ready diagnosis", async ({ page }) => {
   await page.goto(`/clients/${clientId}/diagnose`);
   await expect(page.getByTestId("diagnosis-statement")).toBeVisible();
   const table = page.getByTestId("sources-table");
-  await expect(table).toContainText("g2.com");
+  await expect(table).toContainText("reviewgrid.example");
   await expect(table).toContainText("Review platforms");
   await expect(page.getByTestId("gap-summary")).toContainText(/Client in \d+ of \d+/);
 

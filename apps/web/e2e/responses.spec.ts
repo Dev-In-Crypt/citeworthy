@@ -58,7 +58,7 @@ test("raw answers show highlighted client and competitor mentions", async ({ pag
   await expect(page.getByTestId("mention-competitor").first()).toContainText(/HubSpot|Pipedrive/);
 
   // Ссылки платформы показаны — на них строится диагностика источников.
-  await expect(page.getByTestId("response-citations").first()).toContainText("g2.com");
+  await expect(page.getByTestId("response-citations").first()).toContainText("reviewgrid.example");
 
   // У каждого ответа видно не только «назван ли», но и каким по счёту:
   // четвёртым в списке «а ещё бывают» — это не то же, что первым.

@@ -64,9 +64,9 @@ test("diagnose screen shows source mix, presence matrix and reasoned recommendat
   expect(total).toBeGreaterThan(99);
   expect(total).toBeLessThan(101);
 
-  // Таблица источников: g2.com классифицирован как площадка отзывов.
+  // Таблица источников: reviewgrid.example классифицирован как площадка отзывов.
   const table = page.getByTestId("sources-table");
-  await expect(table).toContainText("g2.com");
+  await expect(table).toContainText("reviewgrid.example");
   await expect(table).toContainText("Review platforms");
   // Собственный домен клиента опознан.
   await expect(table).toContainText("acmecrm.test");

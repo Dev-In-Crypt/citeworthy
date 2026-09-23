@@ -76,7 +76,7 @@ describe("parseRun", () => {
 
     expect(citations.length).toBeGreaterThan(0);
     // Домен нормализован — на нём строится классификация источников (T30).
-    expect(citations.map((c) => c.domain)).toContain("g2.com");
+    expect(citations.map((c) => c.domain)).toContain("reviewgrid.example");
   });
 
   it("разбор наполняет упоминания клиента и конкурентов", async () => {

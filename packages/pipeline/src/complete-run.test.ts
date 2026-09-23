@@ -86,7 +86,7 @@ describe("completeRun", () => {
     // Главная проверка: типы проставлены. Часть доменов остаётся без типа
     // по замыслу (словарь их не знает) — но известные обязаны быть узнаны.
     const byDomain = new Map(facts.map((fact) => [fact.domain, fact.sourceType]));
-    expect(byDomain.get("g2.com")).toBe("review");
+    expect(byDomain.get("reviewgrid.example")).toBe("review");
     expect(byDomain.get("acmecrm.test")).toBe("owned");
     expect(facts.some((fact) => fact.sourceType !== null)).toBe(true);
   });
