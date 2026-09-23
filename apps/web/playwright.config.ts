@@ -70,7 +70,7 @@ export default defineConfig({
        * полной и ведёт на этот домен — токен из неё берут отрезанием по
        * «/r/», а не по началу строки.
        */
-      NEXT_PUBLIC_REPORT_HOST: "reports.northwind-agency.test",
+      NEXT_PUBLIC_REPORT_HOST: "client-reports.test",
     },
   },
 });

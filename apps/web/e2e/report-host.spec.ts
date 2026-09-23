@@ -16,7 +16,7 @@ import { expect, test } from "@playwright/test";
  * работает в бою.
  */
 
-const REPORT_HOST = "reports.northwind-agency.test";
+const REPORT_HOST = "client-reports.test";
 
 const asAgencyDomain = { headers: { "x-forwarded-host": REPORT_HOST } };
 
