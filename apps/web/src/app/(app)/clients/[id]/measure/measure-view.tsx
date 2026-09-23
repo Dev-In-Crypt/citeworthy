@@ -8,6 +8,7 @@ import { SchedulePanel } from "./schedule-panel";
 import { GeneratePrompts } from "./generate-prompts";
 import { buttonClass } from "@/components/ui/button";
 import { inputClass } from "@/components/ui/field";
+import { FileInput } from "@/components/ui/file-input";
 import { SkeletonCards } from "@/components/ui/skeleton";
 import { MessageSquare } from "lucide-react";
 
@@ -262,13 +263,16 @@ function CsvImport({ clientId, onImported }: { clientId: string; onImported: () 
         Columns: <code>cluster, intent, prompt, is_control</code>. Rows with problems are reported
         rather than silently dropped.
       </p>
-      <input
-        type="file"
+      {/*
+        Подпись остаётся дословно «Prompts CSV»: по ней экран находят
+        e2e-сценарии, а у самого поля она и была — менялся только вид.
+      */}
+      <FileInput
+        label="Prompts CSV"
         accept=".csv,text/csv"
-        aria-label="Prompts CSV"
-        className="text-sm"
-        onChange={async (event) => {
-          const file = event.target.files?.[0];
+        disabled={importCsv.isPending}
+        buttonText="Choose CSV"
+        onSelect={async (file) => {
           if (!file) return;
           setSummary(null);
           setErrors([]);
