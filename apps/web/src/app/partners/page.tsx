@@ -3,7 +3,8 @@ import Link from "next/link";
 import { MARKETING_COPY, METHOD_COPY } from "@repo/core";
 import { Faq, MethodLink, SecHead } from "@/components/marketing/bits";
 import { MarketingShell } from "@/components/marketing/chrome";
-import { PRICING_NOTES, RESALE } from "@/components/marketing/content";
+import { checkoutCopy, PRICING_NOTES, RESALE } from "@/components/marketing/content";
+import { getPaymentProvider } from "@/server/payments";
 import { PER_CLIENT_MAX, PER_CLIENT_MIN, PLANS, usd } from "@/components/marketing/data";
 import { ResaleCalculator } from "@/components/marketing/resale-calculator";
 import { SalesCta } from "./sales-cta";
@@ -84,7 +85,8 @@ const START_STEPS = [
   "If the client says yes, add the rest of your book on a plan that covers them.",
 ];
 
-const FAQ = [
+function faqItems(paymentsOn: boolean) {
+  return [
   {
     q: "Can we put our own logo on everything the client sees?",
     a: `${MARKETING_COPY.whiteLabel.page} ${MARKETING_COPY.whiteLabel.email} ${MARKETING_COPY.whiteLabel.link}`,
@@ -99,7 +101,7 @@ const FAQ = [
   },
   {
     q: "What does it cost us per client?",
-    a: `With the plan full: ${PLANS.map((p) => `${p.name} about ${usd(p.perClientUsd)}`).join(", ")} per client a month, your whole team included. ${PRICING_NOTES.checkout}`,
+    a: `With the plan full: ${PLANS.map((p) => `${p.name} about ${usd(p.perClientUsd)}`).join(", ")} per client a month, your whole team included. ${checkoutCopy(paymentsOn).note}`,
   },
   {
     q: "Can we show a client the measurement before they buy?",
@@ -113,9 +115,13 @@ const FAQ = [
     q: "Do we need a specialist to run it?",
     a: "Someone on the team has to read the diagnosis and decide what work is worth doing — the product ranks opportunities and writes the reason for each, but it does not choose for you, and it never changes a client's site.",
   },
-];
+  ];
+}
 
 export default function PartnersPage() {
+  // Признак тот же, что рисует кнопку оплаты в продукте.
+  const paymentsOn = getPaymentProvider().configured;
+
   return (
     <MarketingShell>
       <div className="wrap">
@@ -350,7 +356,7 @@ export default function PartnersPage() {
       <section className="sec">
         <div className="wrap">
           <SecHead n={6} title="Questions agencies ask first" />
-          <Faq items={FAQ} testId="partners-faq" />
+          <Faq items={faqItems(paymentsOn)} testId="partners-faq" />
         </div>
       </section>
 

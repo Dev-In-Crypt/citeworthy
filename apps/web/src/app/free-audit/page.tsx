@@ -3,7 +3,8 @@ import Link from "next/link";
 import { MARKETING_COPY, REPORT_COPY, SAMPLE_AUDIT_REPORT } from "@repo/core";
 import { Faq, MethodLink, SecHead, TalkOrAudit } from "@/components/marketing/bits";
 import { MarketingShell } from "@/components/marketing/chrome";
-import { AUDIT_STEPS, PRICING_NOTES, SALES_CONTACT } from "@/components/marketing/content";
+import { AUDIT_STEPS, checkoutCopy, SALES_CONTACT } from "@/components/marketing/content";
+import { getPaymentProvider } from "@/server/payments";
 import { ReportPreview } from "@/components/marketing/report-preview";
 
 /**
@@ -25,7 +26,8 @@ export const metadata: Metadata = {
     "Audit one of your own clients for free: what ChatGPT, Perplexity and Gemini say about it, which sources they cite, ranked work with reasons, and an opportunity report in your brand.",
 };
 
-const FAQ = [
+function faqItems(paymentsOn: boolean) {
+  return [
   {
     q: "How long does it take?",
     a: `Longer than a page load, and we do not promise a time. ${MARKETING_COPY.auditTakesTime}`,
@@ -42,14 +44,18 @@ const FAQ = [
     q: "What if we want to keep measuring the client?",
     a: (
       <>
-        Ongoing measurement is what the plans cover. {PRICING_NOTES.checkout}{" "}
+        Ongoing measurement is what the plans cover. {checkoutCopy(paymentsOn).note}{" "}
         <Link href="/pricing">See pricing</Link>.
       </>
     ),
   },
-];
+  ];
+}
 
 export default function FreeAuditPage() {
+  // Признак тот же, что рисует кнопку оплаты в продукте.
+  const paymentsOn = getPaymentProvider().configured;
+
   return (
     <MarketingShell active="audit">
       <div className="wrap">
@@ -241,7 +247,7 @@ export default function FreeAuditPage() {
       <section className="sec">
         <div className="wrap">
           <SecHead n={4} title="Before you start" />
-          <Faq items={FAQ} testId="audit-faq" />
+          <Faq items={faqItems(paymentsOn)} testId="audit-faq" />
         </div>
       </section>
 

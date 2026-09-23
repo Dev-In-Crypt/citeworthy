@@ -74,6 +74,8 @@ export const agencyRouter = router({
             role: input.role,
             inviteUrl: `${appUrl()}/invite/${token}`,
             invitedByName: ctx.user.name,
+            // Отвечают приглашённые тому, кто позвал, а не адресу отправки.
+            invitedByEmail: ctx.user.email,
           }),
         );
         delivered = true;

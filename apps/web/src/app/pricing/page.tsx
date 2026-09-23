@@ -3,7 +3,8 @@ import Link from "next/link";
 import { MARKETING_COPY } from "@repo/core";
 import { Faq, SecHead, TalkOrAudit } from "@/components/marketing/bits";
 import { MarketingShell } from "@/components/marketing/chrome";
-import { PRICING_NOTES, RESALE, SALES_CONTACT } from "@/components/marketing/content";
+import { checkoutCopy, PRICING_NOTES, RESALE, SALES_CONTACT } from "@/components/marketing/content";
+import { getPaymentProvider } from "@/server/payments";
 import {
   PER_CLIENT_MAX,
   PER_CLIENT_MIN,
@@ -55,7 +56,8 @@ const INCLUDED = [
   { title: "PDF export", body: "Download the same report as a PDF, for clients who forward documents rather than links." },
 ];
 
-const FAQ = [
+function faqItems(paymentsOn: boolean) {
+  return [
   {
     q: "What does it cost per client?",
     a: `With the plan full: ${PLANS.map((p) => `${p.name} about ${usd(p.perClientUsd)}`).join(", ")} per client a month. Your team is not counted.`,
@@ -66,14 +68,20 @@ const FAQ = [
   { q: "What if we need more clients than the plan allows?", a: PRICING_NOTES.clientLimit },
   { q: "Do Claude and Grok cost extra?", a: PRICING_NOTES.extraAssistants },
   { q: "Do we have to drop Semrush or Ahrefs?", a: `No. ${PRICING_NOTES.seoSuite}` },
-  { q: "Can we pay by card on the site?", a: `Not yet. ${PRICING_NOTES.checkout}` },
+  { q: "Can we pay by card on the site?", a: checkoutCopy(paymentsOn).faqAnswer },
   {
     q: "Is the free audit really free?",
     a: "Yes. Creating an agency account and running the audit costs nothing, and no card is asked for.",
   },
-];
+  ];
+}
 
 export default function PricingPage() {
+  // Тот же признак, что рисует кнопку оплаты в продукте: витрина не должна
+  // обещать ни больше, ни меньше того, что агентство увидит после входа.
+  const paymentsOn = getPaymentProvider().configured;
+  const buying = checkoutCopy(paymentsOn);
+
   return (
     <MarketingShell active="pricing">
       <div className="wrap">
@@ -89,11 +97,8 @@ export default function PricingPage() {
           </div>
           <aside className="card howbuy">
             <div className="cap">How buying works today</div>
-            <p className="h4">No self-serve checkout yet</p>
-            <p className="small">
-              Start with the free audit on one of your clients. Plans and billing are then set up with
-              us directly; there is no “Buy now” button to pretend with.
-            </p>
+            <p className="h4">{buying.heading}</p>
+            <p className="small">{buying.lead}</p>
             <Link className="btn primary" href="/free-audit">
               Start with the free audit
             </Link>
@@ -258,7 +263,7 @@ export default function PricingPage() {
       <section className="sec">
         <div className="wrap">
           <SecHead n={4} title="How to start">
-            There is no self-serve checkout yet. This is the actual path.
+            {buying.note} This is the actual path.
           </SecHead>
           <ol className="buy">
             <li className="card">
@@ -292,7 +297,7 @@ export default function PricingPage() {
       <section className="sec">
         <div className="wrap">
           <SecHead n={5} title="Billing questions" />
-          <Faq items={FAQ} testId="pricing-faq" />
+          <Faq items={faqItems(paymentsOn)} testId="pricing-faq" />
         </div>
       </section>
 

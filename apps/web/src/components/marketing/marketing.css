@@ -182,7 +182,7 @@
 /* ---------- footer: единственная тёмная полоса ---------- */
 .mk.site-foot { background: var(--cw-dark-bg); color: var(--cw-dark-text); padding: 64px 0 40px; }
 .mk.site-foot a { color: var(--cw-dark-text); }
-.mk .foot-top { display: grid; grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr)); gap: 40px; padding-bottom: 40px; border-bottom: 1px dashed var(--cw-dark-rule); }
+.mk .foot-top { display: grid; grid-template-columns: minmax(0, 1.4fr) repeat(4, minmax(0, 1fr)); gap: 32px; padding-bottom: 40px; border-bottom: 1px dashed var(--cw-dark-rule); }
 .mk .foot-brand svg { width: 150px; height: auto; color: var(--cw-dark-text); }
 .mk .foot-brand p { margin-top: 16px; font-size: 14px; color: var(--cw-dark-muted); max-width: 340px; }
 .mk .foot-col h2 { font: 500 11px/1.4 var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--cw-dark-muted); margin-bottom: 14px; }
@@ -535,7 +535,7 @@
   .mk .tape-item { border-right: 0; border-bottom: 1px solid var(--cw-border); }
   .mk .tape-item:last-child { border-bottom: 0; }
   .mk .nav { gap: 18px; margin-left: 4px; }
-  .mk .foot-top { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .mk .foot-top { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .mk .foot-brand { grid-column: 1 / -1; }
   .mk .hero { grid-template-columns: minmax(0, 1fr); gap: 48px; }
   .mk .ev-grid { grid-template-columns: minmax(0, 1fr); }

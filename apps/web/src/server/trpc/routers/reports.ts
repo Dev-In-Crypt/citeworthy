@@ -40,7 +40,8 @@ import {
 } from "@repo/db";
 import { assertTenant, protectedProcedure, roleProcedure, router } from "../trpc";
 import { experimentOutcomes } from "../../experiment-results";
-import { appUrl, getEmailSender } from "../../email";
+import { getEmailSender } from "../../email";
+import { reportUrl } from "@/app/r/report-url";
 
 /** Та же схлопка, что в роутере диагностики: один факт на пару (ответ, домен). */
 function toFacts(
@@ -566,11 +567,28 @@ export const reportsRouter = router({
         clientName: client.name,
         periodStart: report.periodStart.toISOString().slice(0, 10),
         periodEnd: report.periodEnd.toISOString().slice(0, 10),
-        reportUrl: `${appUrl()}/r/${share.token}`,
+        // Ссылка — на домене агентства, если он настроен. Это единственное
+        // место, где адрес видит клиент агентства: отправить сюда наш домен
+        // значило бы поставить свою подпись под чужим отчётом.
+        reportUrl: reportUrl(share.token),
+        // Отвечают на такое письмо тому, кто его прислал, а не техническому
+        // адресу отправки: в поле «Кому» встанет человек из агентства.
+        agencyReplyTo: ctx.user.email,
         ...(input.note ? { note: input.note } : {}),
       });
 
-      await getEmailSender().send(message);
+      /**
+       * Отказ почты не отменяет уже выданную ссылку — как и у приглашения.
+       * Ссылка возвращается в любом случае, и агентство отдаёт её само;
+       * иначе сбой транспорта съедал бы готовый отчёт.
+       */
+      let delivered = false;
+      try {
+        await getEmailSender().send(message);
+        delivered = true;
+      } catch (error) {
+        console.error(`[report] delivery failed for report ${report.id}`, error);
+      }
 
       await logActivity(ctx.db, {
         agencyId: ctx.user.agencyId,
@@ -579,9 +597,9 @@ export const reportsRouter = router({
         // строка живёт дольше учётной записи, которая её создала.
         actorUserId: null,
         eventType: "report_shared",
-        payload: { reportId: report.id, to: input.to },
+        payload: { reportId: report.id, to: input.to, delivered },
       });
 
-      return { sent: true, token: share.token };
+      return { sent: delivered, delivered, token: share.token, url: reportUrl(share.token) };
     }),
 });
