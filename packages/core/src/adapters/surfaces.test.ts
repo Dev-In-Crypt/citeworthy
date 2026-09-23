@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ASSISTANTS } from "./catalogue";
+import { isPlatform } from "./registry";
+import { PLATFORM_IDS } from "./types";
 import {
   SurfaceProviderNotConfiguredError,
   UnconfiguredSerpProvider,
@@ -41,6 +43,28 @@ describe("surfaceCapabilities", () => {
   it("остальная система готова принять поверхность, как только появится провайдер", () => {
     for (const surface of surfaceCapabilities()) {
       expect(surface.pipelineReady).toBe(true);
+    }
+  });
+
+  it("Copilot тоже ждёт поставщика выдачи, а не ключа", () => {
+    // Bing Search API отключён 11.08.2025, а Grounding with Bing — инструмент
+    // для своего агента, а не ответ Copilot (см. docs/cost-model.md, §5).
+    // Ключ здесь не поможет: поверхность не отдаёт свой ответ программно.
+    const copilot = surfaceCapabilities().find((entry) => entry.id === "copilot");
+
+    expect(copilot?.measurable).toBe(false);
+    expect(copilot?.requirement).toBe("serp-provider");
+  });
+
+  it("неизмеряемую поверхность нельзя поставить в расписание", () => {
+    // Самая дешёвая защита от выдуманной цифры: поверхность без адаптера
+    // просто не существует для прогонов, очередей и enum в БД.
+    const unmeasured = surfaceCapabilities().filter((entry) => !entry.measurable);
+
+    expect(unmeasured.length).toBeGreaterThan(0);
+    for (const surface of unmeasured) {
+      expect(PLATFORM_IDS as readonly string[]).not.toContain(surface.id);
+      expect(isPlatform(surface.id)).toBe(false);
     }
   });
 

@@ -1,6 +1,12 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { parseAdaptersMode, PLATFORM_IDS } from "@repo/core";
+import {
+  capacityOptions,
+  isCadence,
+  refuseScheduleForPlan,
+  type Cadence,
+} from "@repo/core/adapters/capacity";
 import { completeRun } from "@repo/pipeline";
 import {
   createRun,
@@ -16,10 +22,44 @@ import {
   upsertRunSchedule,
 } from "@repo/db";
 import { assertTenant, protectedProcedure, roleProcedure, router } from "../trpc";
+import type { TrpcContext } from "../context";
+import { entitlementsForAgency } from "../../subscription";
 
 // Литеральный кортеж, а не PLATFORMS: иначе zod выводит string[] и теряет union,
 // который ждёт схема БД.
 const platformEnum = z.enum(PLATFORM_IDS);
+
+/**
+ * Частоты перечисляет конфиг измерения, а не этот файл: список литералов здесь
+ * означал бы вторую точку правды, и добавленная в конфиг частота молча не
+ * проходила бы валидацию входа.
+ */
+const cadenceSchema = z.custom<Cadence>(
+  (value) => typeof value === "string" && isCadence(value),
+  { message: "Unknown cadence." },
+);
+
+/**
+ * Прогон стоит денег, поэтому его начало проверяется по подписке.
+ *
+ * Заведение клиента такую проверку уже проходит, а запуск измерения — нет:
+ * отменившееся агентство продолжало бы тратить наши деньги на вызовы
+ * ассистентов. Просрочка платежа в пределах отсрочки измерение не
+ * останавливает — у карты мог кончиться срок, и это не отказ от продукта
+ * (`PAST_DUE_GRACE_DAYS`).
+ *
+ * Публичный отчёт `/r/[token]` этой проверки не получает намеренно: клиент
+ * агентства не отвечает за его карту и не должен видеть закрытую дверь.
+ */
+async function assertMeasurementAllowed(db: TrpcContext["db"], agencyId: string): Promise<void> {
+  const entitlements = await entitlementsForAgency(db, agencyId);
+
+  if (!entitlements.active) {
+    // Причина отдаётся как есть: человек должен понять, что делать дальше,
+    // а не гадать над кодом ошибки.
+    throw new TRPCError({ code: "FORBIDDEN", message: entitlements.reason });
+  }
+}
 
 export const runsRouter = router({
   schedule: protectedProcedure
@@ -30,11 +70,36 @@ export const runsRouter = router({
       return (await getScheduleForClient(ctx.db, input.clientId)) ?? null;
     }),
 
+  /**
+   * Что тариф разрешает измерять и во что обойдётся текущая настройка.
+   *
+   * Одним запросом, потому что форма расписания должна и предлагать только
+   * разрешённое, и показывать цену выбора до сохранения. Возможности берутся
+   * из конфига измерения — форма не знает ни одного тарифа по имени.
+   */
+  capacity: protectedProcedure
+    .input(z.object({ clientId: z.uuid() }))
+    .query(async ({ ctx, input }) => {
+      const client = await getClientById(ctx.db, input.clientId);
+      assertTenant(client, ctx.user.agencyId);
+
+      const [entitlements, prompts] = await Promise.all([
+        entitlementsForAgency(ctx.db, ctx.user.agencyId),
+        listActivePromptsForClient(ctx.db, input.clientId),
+      ]);
+
+      return {
+        ...capacityOptions(entitlements.plan),
+        /** Активные вопросы клиента — множитель, на который считается оценка. */
+        promptCount: prompts.length,
+      };
+    }),
+
   saveSchedule: roleProcedure("member")
     .input(
       z.object({
         clientId: z.uuid(),
-        cadence: z.enum(["daily", "weekly", "biweekly"]),
+        cadence: cadenceSchema,
         platforms: z.array(platformEnum).min(1),
         samplesPerPrompt: z.number().int().min(1).max(10),
         active: z.boolean().default(true),
@@ -43,6 +108,25 @@ export const runsRouter = router({
     .mutation(async ({ ctx, input }) => {
       const client = await getClientById(ctx.db, input.clientId);
       assertTenant(client, ctx.user.agencyId);
+
+      /**
+       * Тариф проверяется на сервере, а не только формой: форма отражает
+       * возможности, но расписание можно сохранить и в обход неё. Сегодня
+       * конфиг разрешает всё, и ни один вызов сюда не упирается, — проверка
+       * стоит заранее, чтобы ограничение было решением, а не доработкой.
+       */
+      const entitlements = await entitlementsForAgency(ctx.db, ctx.user.agencyId);
+      const prompts = await listActivePromptsForClient(ctx.db, input.clientId);
+
+      const refusal = refuseScheduleForPlan(entitlements.plan, {
+        cadence: input.cadence,
+        assistants: input.platforms,
+        promptCount: prompts.length,
+      });
+
+      if (refusal) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: refusal.message });
+      }
 
       const { clientId, ...values } = input;
       return upsertRunSchedule(ctx.db, clientId, values);
@@ -100,6 +184,7 @@ export const runsRouter = router({
     .mutation(async ({ ctx, input }) => {
       const client = await getClientById(ctx.db, input.clientId);
       assertTenant(client, ctx.user.agencyId);
+      await assertMeasurementAllowed(ctx.db, ctx.user.agencyId);
 
       const prompts = await listActivePromptsForClient(ctx.db, input.clientId);
       if (prompts.length === 0) {
@@ -144,6 +229,7 @@ export const runsRouter = router({
     .mutation(async ({ ctx, input }) => {
       const client = await getClientById(ctx.db, input.clientId);
       assertTenant(client, ctx.user.agencyId);
+      await assertMeasurementAllowed(ctx.db, ctx.user.agencyId);
 
       const prompts = await listActivePromptsForClient(ctx.db, input.clientId);
       if (prompts.length === 0) {
