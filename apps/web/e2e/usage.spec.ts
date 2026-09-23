@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 /**
- * Verify T55: страница usage показывает стоимость измерений за период.
+ * Verify T55: страница usage показывает израсходованные проверки за период.
  */
 
 const CSV = [
@@ -9,7 +9,7 @@ const CSV = [
   "CRM comparison,comparison,best CRM for startups,false",
 ].join("\n");
 
-test("usage page shows cost from the answers that were measured", async ({ page }) => {
+test("usage page shows the checks the answers used", async ({ page }) => {
   const email = `usage-${Math.random().toString(36).slice(2, 10)}@northwind-agency.test`;
 
   await page.goto("/signup");
@@ -21,7 +21,7 @@ test("usage page shows cost from the answers that were measured", async ({ page 
 
   // Пустое состояние до первых измерений — экранов без содержимого быть не должно.
   await page.goto("/settings/usage");
-  await expect(page.getByText("No measurement cost in this period")).toBeVisible();
+  await expect(page.getByText("No checks used in this period")).toBeVisible();
 
   await page.goto("/clients/new");
   await page.getByLabel("Client name").fill("AcmeCRM");
@@ -49,10 +49,11 @@ test("usage page shows cost from the answers that were measured", async ({ page 
   await expect(answers).toHaveCount(9); // 3 платформы × 3 сэмпла
   const answerCount = await answers.count();
 
-  // Прогон шёл на фикстурах: денег он не стоил, и страница расходов не должна
-  // выдавать его за трату. Ответы посчитаны отдельной строкой, в счёт не идут.
+  // Прогон шёл на фикстурах: проверок он не стоил, и страница расхода не
+  // должна выдавать его за израсходованное. Ответы посчитаны отдельной
+  // строкой, в лимит не идут.
   await page.goto("/settings/usage");
   await expect(page.getByTestId("usage-fixtures")).toContainText(String(answerCount));
-  await expect(page.getByText("No measurement cost in this period")).toBeVisible();
+  await expect(page.getByText("No checks used in this period")).toBeVisible();
   await expect(page.getByTestId("usage-total")).toHaveCount(0);
 });

@@ -1,12 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import { ASSISTANTS, billingPeriod, formatUsd } from "@repo/core";
+import { ASSISTANTS, billingPeriod } from "@repo/core";
 import { api } from "@/trpc/react";
 import { EmptyState } from "@/components/page-header";
 import { controlClass } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
 import { Wallet } from "lucide-react";
+
+/**
+ * Расход тарифа: сколько проверок ушло и на что.
+ *
+ * В долларах здесь ничего нет намеренно. Сколько ответ стоит нам — наша
+ * цифра, а не агентства: агентство платит за тариф, и решать ему надо в
+ * проверках — сколько их даёт план, сколько съел какой клиент и какой
+ * ассистент. Доллары на этом экране отвечали бы на вопрос, которого
+ * агентство не задаёт, и открывали бы нашу себестоимость.
+ *
+ * Настоящая цена каждого ответа по-прежнему пишется на сам ответ — она
+ * нужна нам для тарифов, просто не показывается здесь.
+ */
 
 // Подписи берутся из каталога: новый ассистент не требует правки в каждом экране.
 const PLATFORM_LABELS: Record<string, string> = Object.fromEntries(
@@ -24,8 +37,10 @@ function recentPeriods(count = 12): string[] {
 export function UsageView() {
   const [period, setPeriod] = useState(() => billingPeriod());
   const costs = api.billing.costs.useQuery({ period });
+  const usage = api.billing.usage.useQuery({ period });
 
   const data = costs.data;
+  const allowance = usage.data?.aiChecks;
 
   return (
     <div className="flex flex-col gap-6">
@@ -50,33 +65,53 @@ export function UsageView() {
 
       {data && data.fixtureAnswers > 0 && (
         <p data-testid="usage-fixtures" className="text-sm text-muted-foreground">
-          {/* Прогоны на фикстурах ничего не стоят: показывать их в счёте
-              значило бы называть расходом то, чего не было. */}
+          {/* Прогоны на фикстурах не стоят проверок: показывать их в расходе
+              значило бы называть израсходованным то, чего не было. */}
           <span className="metric">{data.fixtureAnswers}</span> answers in this period came from
-          fixtures — no assistant was asked and nothing was charged, so they are not in the totals
+          fixtures — no assistant was asked and nothing was counted, so they are not in the totals
           below.
         </p>
       )}
 
       {data && data.rows.length === 0 ? (
         <EmptyState
-          title="No measurement cost in this period"
-        icon={Wallet}
-          description="Cost appears once checks have run against the live assistants. Every answer stores what it cost, so this page always matches the raw responses."
+          title="No checks used in this period"
+          icon={Wallet}
+          description="Checks appear once measurement has run against the live assistants. Every answer is counted as it happens, so this page always matches the raw responses."
         />
       ) : (
         <>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-1 rounded-lg border p-5">
-              <span className="text-sm text-muted-foreground">Total cost</span>
+              <span className="text-sm text-muted-foreground">Checks used</span>
               <span data-testid="usage-total" className="metric text-3xl font-semibold tracking-tight">
-                {data ? formatUsd(data.totalCostUsd) : "—"}
+                {data ? data.totalResponses.toLocaleString("en-US") : "—"}
               </span>
+              {allowance && (
+                <span
+                  className={cn(
+                    "text-sm",
+                    allowance.overAllowance ? "text-destructive" : "text-muted-foreground",
+                  )}
+                >
+                  {allowance.overAllowance ? "Above the " : "of the "}
+                  <span className="metric">{allowance.allowance.toLocaleString("en-US")}</span> this
+                  plan includes
+                </span>
+              )}
             </div>
             <div className="flex flex-col gap-1 rounded-lg border p-5">
-              <span className="text-sm text-muted-foreground">Answers measured</span>
-              <span data-testid="usage-responses" className="metric text-3xl font-semibold tracking-tight">
-                {data ? data.totalResponses : "—"}
+              <span className="text-sm text-muted-foreground">Share of the plan</span>
+              <span
+                data-testid="usage-share"
+                className="metric text-3xl font-semibold tracking-tight"
+              >
+                {allowance ? `${Math.round(allowance.ratio * 100)}%` : "—"}
+              </span>
+              <span className="text-sm text-muted-foreground">
+                {/* Перерасход ничего не отключает посреди месяца — так сказано
+                    и на странице тарифов; молчание читалось бы как отключение. */}
+                Going past it does not cut anything off mid-month.
               </span>
             </div>
           </div>
@@ -87,20 +122,24 @@ export function UsageView() {
               <thead className="text-left text-muted-foreground">
                 <tr className="border-b">
                   <th className="py-2 font-medium">Client</th>
-                  <th className="py-2 text-right font-medium">Answers</th>
-                  <th className="py-2 text-right font-medium">Cost</th>
+                  <th className="py-2 text-right font-medium">Checks</th>
+                  <th className="py-2 text-right font-medium">Share</th>
                 </tr>
               </thead>
               <tbody>
                 {(data?.clients ?? []).map((row) => (
                   <tr key={row.clientId} className="border-b last:border-0">
                     <td className="py-2">{row.clientName}</td>
-                    <td className="metric py-2 text-right">{row.responses}</td>
                     <td
                       data-testid={`usage-client-${row.clientId}`}
                       className="metric py-2 text-right"
                     >
-                      {formatUsd(row.costUsd)}
+                      {row.responses.toLocaleString("en-US")}
+                    </td>
+                    <td className="metric py-2 text-right text-muted-foreground">
+                      {data && data.totalResponses > 0
+                        ? `${Math.round((row.responses / data.totalResponses) * 100)}%`
+                        : "—"}
                     </td>
                   </tr>
                 ))}
@@ -109,14 +148,13 @@ export function UsageView() {
           </div>
 
           <div className="flex flex-col gap-3">
-            <h2 className="text-lg font-medium">By client and platform</h2>
+            <h2 className="text-lg font-medium">By client and assistant</h2>
             <table data-testid="usage-by-platform" className="w-full text-sm">
               <thead className="text-left text-muted-foreground">
                 <tr className="border-b">
                   <th className="py-2 font-medium">Client</th>
-                  <th className="py-2 font-medium">Platform</th>
-                  <th className="py-2 text-right font-medium">Answers</th>
-                  <th className="py-2 text-right font-medium">Cost</th>
+                  <th className="py-2 font-medium">Assistant</th>
+                  <th className="py-2 text-right font-medium">Checks</th>
                 </tr>
               </thead>
               <tbody>
@@ -124,8 +162,9 @@ export function UsageView() {
                   <tr key={`${row.clientId}-${row.platform}`} className="border-b last:border-0">
                     <td className="py-2">{row.clientName}</td>
                     <td className="py-2">{PLATFORM_LABELS[row.platform] ?? row.platform}</td>
-                    <td className="metric py-2 text-right">{row.responses}</td>
-                    <td className="metric py-2 text-right">{formatUsd(row.costUsd)}</td>
+                    <td className="metric py-2 text-right">
+                      {row.responses.toLocaleString("en-US")}
+                    </td>
                   </tr>
                 ))}
               </tbody>
