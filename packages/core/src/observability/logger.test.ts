@@ -156,6 +156,46 @@ describe("error reporter", () => {
     });
   });
 
+  it("вычищает секреты и почту из контекста, сообщения и стека", () => {
+    // Строка лога уезжает в сборщик хостинга, то есть наружу: «это всего лишь
+    // лог» не делает секрет менее секретом.
+    const { logger, parsed } = collectingLogger({ service: "worker" });
+    const reporter = createLoggingErrorReporter(logger);
+    const error = new Error("auth failed for owner@agency.example");
+    error.stack = "Error: auth failed for owner@agency.example\n    at send (/app/mail.ts:4:2)";
+
+    reporter.captureError(error, {
+      scope: "worker.job",
+      apiKey: "abc123def456",
+      client: { contact: { email: "owner@agency.example" } },
+      runId: "r1",
+    });
+
+    const [record] = parsed() as Array<Record<string, unknown>>;
+    expect(record).toMatchObject({
+      scope: "worker.job",
+      apiKey: "[redacted]",
+      client: { contact: { email: "[redacted]" } },
+      runId: "r1",
+      message: "auth failed for [email]",
+    });
+    expect(JSON.stringify(record)).not.toContain("owner@agency.example");
+    expect(JSON.stringify(record)).not.toContain("abc123def456");
+  });
+
+  it("добавляет отпечаток: одинаковые падения группируются и в логе", () => {
+    const { logger, parsed } = collectingLogger();
+    const reporter = createLoggingErrorReporter(logger);
+
+    reporter.captureError(new Error("run 1 timed out"), { scope: "worker.job" });
+    reporter.captureError(new Error("run 2 timed out"), { scope: "worker.job" });
+    reporter.captureError(new Error("redis is down"), { scope: "worker.job" });
+
+    const records = parsed() as Array<Record<string, unknown>>;
+    expect(records[0]!["fingerprint"]).toBe(records[1]!["fingerprint"]);
+    expect(records[2]!["fingerprint"]).not.toBe(records[0]!["fingerprint"]);
+  });
+
   it("составной репортер отдаёт ошибку каждому приёмнику", () => {
     const seen: string[] = [];
     const spy = (name: string) => ({
