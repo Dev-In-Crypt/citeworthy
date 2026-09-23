@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   hmacSha256Hex,
   InMemoryPaymentEventLedger,
+  PAST_DUE_GRACE_DAYS,
   PLAN_LIMITS,
   StripePaymentProvider,
 } from "@repo/core";
@@ -17,7 +18,20 @@ import {
   setPaymentProvider,
   getPaymentEventLedger,
 } from "@/server/payments";
+import { appRouter } from "@/server/trpc/root";
+import type { SessionUser, TrpcContext } from "@/server/trpc/context";
 import { POST } from "./route";
+
+function caller(agencyId: string) {
+  const user: SessionUser = {
+    id: crypto.randomUUID(),
+    email: "owner@test.local",
+    name: "Owner",
+    agencyId,
+    role: "owner",
+  };
+  return appRouter.createCaller({ db, user } as TrpcContext);
+}
 
 /**
  * Вебхук — единственный вход, который меняет права агентства без участия
@@ -294,6 +308,46 @@ describe("stripe webhook", () => {
     const response = await post(event);
     await expect(response.json()).resolves.toMatchObject({ applied: true });
     expect((await getSubscriptionByAgency(db, agencyId))?.plan).toBe("scale");
+  });
+
+  it("просроченная оплата в пределах отсрочки не мешает работать", async () => {
+    // Период кончился вчера: банк отклонил списание, но это ещё клиент.
+    const yesterday = Math.floor((Date.now() - 86_400_000) / 1000);
+    await post(
+      subscriptionEvent({
+        id: "evt_grace",
+        agencyId,
+        customerId,
+        price: "price_growth",
+        status: "past_due",
+        periodEnd: yesterday,
+      }),
+    );
+
+    const created = await caller(agencyId).clients.create({
+      name: "Client inside grace",
+      domain: "inside-grace.test",
+    });
+
+    expect(created.id).toBeTruthy();
+  });
+
+  it("после отсрочки продукт закрывается, а не молчит", async () => {
+    const longAgo = Math.floor((Date.now() - (PAST_DUE_GRACE_DAYS + 5) * 86_400_000) / 1000);
+    await post(
+      subscriptionEvent({
+        id: "evt_lapsed",
+        agencyId,
+        customerId,
+        price: "price_growth",
+        status: "past_due",
+        periodEnd: longAgo,
+      }),
+    );
+
+    await expect(
+      caller(agencyId).clients.create({ name: "Too late", domain: "too-late.test" }),
+    ).rejects.toThrow(/suspended/i);
   });
 
   it("чужая отмена не трогает наше агентство", async () => {

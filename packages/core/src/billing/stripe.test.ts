@@ -419,14 +419,16 @@ describe("changePlan", () => {
 
 describe("setCancelAtPeriodEnd", () => {
   it("отмена и возврат — один запрос с разным значением", async () => {
-    const fetchImpl = vi.fn(async () => jsonResponse(SUBSCRIPTION_FIXTURE));
+    const fetchImpl = vi.fn(async (_url: string, _init?: RequestInit) =>
+      jsonResponse(SUBSCRIPTION_FIXTURE),
+    );
     const payments = provider({ fetchImpl: fetchImpl as unknown as typeof fetch });
 
     await payments.setCancelAtPeriodEnd({ subscriptionId: "sub_1", cancelAtPeriodEnd: true });
     await payments.setCancelAtPeriodEnd({ subscriptionId: "sub_1", cancelAtPeriodEnd: false });
 
     const bodies = fetchImpl.mock.calls.map(([, init]) =>
-      new URLSearchParams(String((init as RequestInit).body)).get("cancel_at_period_end"),
+      new URLSearchParams(String(init?.body)).get("cancel_at_period_end"),
     );
     expect(bodies).toEqual(["true", "false"]);
   });
