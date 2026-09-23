@@ -1,0 +1,39 @@
+/**
+ * Настройки сайта, которые зависят от окружения, а не от кода.
+ *
+ * Контакт основателя — единственное место, где сайт обещает живого человека.
+ * Пока адреса нет, обещания нет: кнопки ведут на бесплатный аудит. Поэтому
+ * значение читается из переменной окружения и может отсутствовать.
+ *
+ * Переменные с префиксом NEXT_PUBLIC_ попадают в бандл — здесь это осознанно:
+ * контакт для продаж и так публичный, его печатают на странице.
+ */
+
+export interface SalesContact {
+  /** Что написано на кнопке. */
+  label: string;
+  /** Куда она ведёт: mailto: или ссылка на календарь. */
+  href: string;
+}
+
+function readContact(): SalesContact | null {
+  const email = process.env.NEXT_PUBLIC_SALES_EMAIL?.trim();
+  const url = process.env.NEXT_PUBLIC_SALES_URL?.trim();
+  const label = process.env.NEXT_PUBLIC_SALES_LABEL?.trim() || "Talk to the founder";
+
+  if (url) return { label, href: url };
+  if (email) return { label, href: `mailto:${email}` };
+  return null;
+}
+
+/** null — контакта нет, и обещать звонок нельзя. */
+export const SALES_CONTACT: SalesContact | null = readContact();
+
+/**
+ * Домен, на котором отдаются клиентские отчёты.
+ *
+ * Пусто — отчёты живут на том же домене, что и продукт. Свой домен агентства
+ * — это то, ради чего white-label существует: ссылка, которую клиент
+ * открывает, не должна вести на чужой бренд.
+ */
+export const REPORT_HOST: string | null = process.env.NEXT_PUBLIC_REPORT_HOST?.trim() || null;
