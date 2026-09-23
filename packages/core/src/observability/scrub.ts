@@ -8,6 +8,25 @@
  * Принцип — отбрасывать значения, а не имена. `promptId`, `runId`, имя поля
  * `password` в отчёте полезны: по ним видно, где сломалось. Ценность имеет
  * только значение, и именно оно заменяется на маркер.
+ *
+ * Правил два, и они разной силы.
+ *
+ * 1. **По имени поля** (`password`, `api_key`, `cookie`, `email`, ...) —
+ *    надёжно: имя приходит вместе со значением, и решение не зависит от того,
+ *    как значение выглядит.
+ * 2. **По форме значения** (адрес почты, `Bearer …`, JWT, ключ с узнаваемым
+ *    префиксом, токен в пути или в параметре URL) — **неполно по устройству**.
+ *
+ * Названный предел второго правила: **секрет без узнаваемой формы не ловится**.
+ * Строка `auth failed for key a1b2c3d4e5f6a7b8c9d0` уедет как есть — в ней нет
+ * ни имени поля, ни префикса, ни разделителя, по которому видно, где ключ, а
+ * где обычный идентификатор. Список префиксов (`PREFIXED_SECRET_RE`) закрывает
+ * только тех поставщиков, которых мы знаем сегодня, и отстаёт от нового ключа
+ * ровно до того дня, когда его сюда допишут.
+ *
+ * Отсюда практическое правило для кода: секрет кладут **отдельным полем**
+ * (`{ apiKey }`), а не вклеивают в текст сообщения; на склейку руками скраббер
+ * не рассчитан и рассчитывать не может.
  */
 
 export const REDACTED = "[redacted]";
@@ -91,24 +110,99 @@ const HEADER_SECRET_RE =
 const AUTH_SCHEME_RE = /\b(bearer|basic)\s+[A-Za-z0-9._~+/=-]{6,}/gi;
 const JWT_RE = /\beyJ[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}/g;
 /**
- * Ключи с узнаваемым префиксом: Stripe, OpenAI, Slack, GitHub, Google, Resend.
- * Ловится форма, а не конкретный провайдер: `xx_живое-значение`.
+ * Ключи с узнаваемым префиксом: Stripe, OpenAI, Slack, GitHub, Google, Resend,
+ * xAI. Ловится форма, а не конкретный провайдер: `xx_живое-значение`.
  */
 const PREFIXED_SECRET_RE =
-  /\b(?:sk|pk|rk|ak|whsec|re|xox[abceoprs]|ghp|gho|ghu|ghs|github_pat|AIza|SG|shpat|npm)[-_][A-Za-z0-9_-]{8,}/g;
+  /\b(?:sk|pk|rk|ak|whsec|re|xai|xox[abceoprs]|ghp|gho|ghu|ghs|github_pat|AIza|SG|shpat|npm)[-_][A-Za-z0-9_-]{8,}/g;
 
-/** Значения параметров запроса не нужны: там токены отчётов и адреса почты. */
-function scrubUrl(url: string): string {
-  const queryAt = url.indexOf("?");
-  if (queryAt === -1) return url;
+/**
+ * Сегменты пути, после которых идёт токен доступа, а не идентификатор ресурса.
+ *
+ * `/r/<токен>` — анонимный вход в отчёт клиента агентства вместе с кнопкой
+ * approve, `/invite/<токен>` — вступление в агентство. Это не «id, по которому
+ * удобно искать», это сам доступ: у кого ссылка, у того и права. После этих
+ * сегментов чистится всё без разбора — других значений там не бывает.
+ */
+const TOKEN_ROUTES = new Set(["r", "invite"]);
 
-  const head = url.slice(0, queryAt);
-  const rest = url.slice(queryAt + 1);
-  const hashAt = rest.indexOf("#");
-  const query = hashAt === -1 ? rest : rest.slice(0, hashAt);
-  const tail = hashAt === -1 ? "" : rest.slice(hashAt);
+/** `550e8400-e29b-41d4-a716-446655440000` — id ресурса, доступа не даёт. */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-  const scrubbed = query
+/**
+ * Похоже ли на токен то, что стоит в пути вне известных маршрутов.
+ *
+ * Вторая линия за `TOKEN_ROUTES`: маршрут могут завести завтра и сюда не
+ * дописать. Порог намеренно высокий — лучше пропустить чужой токен, чем
+ * вычистить `/proposal-template` и `/clients/<uuid>` и оставить разбор
+ * поломки без пути. UUID остаётся: он ничего не открывает, каждый запрос всё
+ * равно проходит через `assertTenant`.
+ */
+function looksLikeToken(segment: string): boolean {
+  if (segment.length < 16) return false;
+  // Точка — признак имени файла: `4f2a9b8c1d3e5f7a.js` в стеке нужен целиком.
+  if (!/^[A-Za-z0-9_-]+$/.test(segment)) return false;
+  if (UUID_RE.test(segment)) return false;
+
+  const classes =
+    Number(/[a-z]/.test(segment)) + Number(/[A-Z]/.test(segment)) + Number(/[0-9]/.test(segment));
+  // Смесь регистров и цифр — так выглядит случайная строка, а не слово.
+  if (classes >= 3) return true;
+  if (classes >= 2 && /[0-9]/.test(segment)) return true;
+  // Длинный набор согласных словом тоже не бывает.
+  return !/[aeiou]/i.test(segment);
+}
+
+/** Путь без схемы и хоста: `/r/<токен>/…`. */
+function scrubPathname(pathname: string): string {
+  const segments = pathname.split("/");
+  return segments
+    .map((segment, index) => {
+      if (segment === "") return segment;
+      const previous = segments[index - 1];
+      if (previous !== undefined && TOKEN_ROUTES.has(previous.toLowerCase())) return REDACTED;
+      return looksLikeToken(segment) ? REDACTED : segment;
+    })
+    .join("/");
+}
+
+/**
+ * Адрес целиком: и путь, и параметры.
+ *
+ * Значения параметров не нужны никогда — там токены и адреса почты. В пути
+ * чистятся только сегменты-токены: остальной путь и есть ответ на вопрос
+ * «где сломалось», снимать его целиком значит выбросить сам смысл отчёта.
+ *
+ * Принимает и абсолютный URL, и голый путь: из навигационных хлебных крошек
+ * и от `onRequestError` приходит именно путь, без схемы и хоста.
+ */
+export function scrubUrl(url: string): string {
+  const hashAt = url.indexOf("#");
+  const tail = hashAt === -1 ? "" : url.slice(hashAt);
+  const withoutHash = hashAt === -1 ? url : url.slice(0, hashAt);
+
+  const queryAt = withoutHash.indexOf("?");
+  const head = queryAt === -1 ? withoutHash : withoutHash.slice(0, queryAt);
+  const query = queryAt === -1 ? null : withoutHash.slice(queryAt + 1);
+
+  const schemeAt = head.indexOf("://");
+  let origin = "";
+  let pathname = head;
+  if (schemeAt !== -1) {
+    const pathAt = head.indexOf("/", schemeAt + 3);
+    if (pathAt === -1) {
+      origin = head;
+      pathname = "";
+    } else {
+      origin = head.slice(0, pathAt);
+      pathname = head.slice(pathAt);
+    }
+  }
+
+  const scrubbedHead = `${origin}${scrubPathname(pathname)}`;
+  if (query === null) return `${scrubbedHead}${tail}`;
+
+  const scrubbedQuery = query
     .split("&")
     .map((pair) => {
       if (pair === "") return pair;
@@ -118,7 +212,7 @@ function scrubUrl(url: string): string {
     })
     .join("&");
 
-  return `${head}?${scrubbed}${tail}`;
+  return `${scrubbedHead}?${scrubbedQuery}${tail}`;
 }
 
 /**
@@ -252,12 +346,37 @@ export function scrubFields(
 }
 
 /**
+ * Адреса внутри одной хлебной крошки: куда ушли, откуда, что запросили.
+ *
+ * `to`/`from` навигации — это путь приложения: `/r/<токен>` попадает сюда,
+ * когда отчёт открывают из интерфейса агентства.
+ */
+function scrubCrumbUrls(crumb: unknown): void {
+  if (crumb === null || typeof crumb !== "object") return;
+  const data = (crumb as Record<string, unknown>)["data"];
+  if (data === null || typeof data !== "object") return;
+
+  const fields = data as Record<string, unknown>;
+  for (const key of ["to", "from", "url"]) {
+    const value = fields[key];
+    if (typeof value === "string") fields[key] = scrubUrl(value);
+  }
+}
+
+/**
  * Событие Sentry перед отправкой.
  *
  * Помимо общей чистки здесь снимаются куски, которые SDK собирает сам и
  * которые целиком слать нельзя: заголовки и тело запроса, куки, профиль
  * пользователя. Из профиля остаётся только `id` — по нему разработчик поймёт,
  * что упало у одного и того же человека, и не узнает, у кого именно.
+ *
+ * Отдельно — адреса: `request.url` и пути в хлебных крошках навигации. В них
+ * токен стоит в пути, а не в параметре, и общей чисткой строк он не снимается:
+ * `/r/<токен>` приходит голым путём, под `URL_RE` не подходит.
+ *
+ * Функция принимает и целое событие, и одну хлебную крошку: браузерный
+ * `beforeBreadcrumb` зовёт её именно так.
  */
 export function scrubEvent<T extends Record<string, unknown>>(
   event: T,
@@ -274,6 +393,10 @@ export function scrubEvent<T extends Record<string, unknown>>(
     delete safe["data"];
     if (typeof safe["url"] === "string") safe["url"] = scrubUrl(safe["url"]);
   }
+
+  scrubCrumbUrls(scrubbed);
+  const crumbs = scrubbed["breadcrumbs"];
+  if (Array.isArray(crumbs)) for (const crumb of crumbs) scrubCrumbUrls(crumb);
 
   const user = scrubbed["user"];
   if (user !== null && typeof user === "object") {

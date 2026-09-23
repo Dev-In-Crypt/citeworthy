@@ -25,11 +25,16 @@ export const onRequestError: Instrumentation.onRequestError = async (error, requ
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
 
   const { errorReporter } = await import("@/server/observability");
-  const { requestIdFrom } = await import("@repo/core");
+  const { requestIdFrom, scrubUrl } = await import("@repo/core");
 
   errorReporter.captureError(error, {
     scope: "web.request",
-    path: request.path,
+    /**
+     * Путь приходит с токеном в себе: `/r/<токен>` — это сам доступ к отчёту
+     * клиента агентства. Общая чистка строк его не снимает (голый путь не
+     * похож на URL), поэтому он чистится здесь, до отчёта.
+     */
+    path: scrubUrl(request.path),
     method: request.method,
     /**
      * Единственное, что берётся из заголовков. Целиком их слать нельзя —

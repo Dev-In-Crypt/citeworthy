@@ -63,13 +63,55 @@ describe("scrubString", () => {
     },
     {
       name: "значения параметров запроса, имена остаются",
-      input: "GET https://app.example/r/share?token=abc&email=x@y.co failed",
-      expected: `GET https://app.example/r/share?token=${REDACTED}&email=${REDACTED} failed`,
+      input: "GET https://app.example/api/upload?token=abc&email=x@y.co failed",
+      expected: `GET https://app.example/api/upload?token=${REDACTED}&email=${REDACTED} failed`,
     },
     {
-      name: "путь без параметров не трогается",
+      name: "обычный путь не трогается",
       input: "GET https://app.example/clients/42 failed",
       expected: "GET https://app.example/clients/42 failed",
+    },
+    {
+      name: "токен отчёта в пути: ссылка даёт доступ, значит это секрет",
+      input: "GET https://app.example/r/9f2b7c1d4e6a8b3f failed",
+      expected: `GET https://app.example/r/${REDACTED} failed`,
+    },
+    {
+      name: "токен приглашения в пути",
+      input: "open https://app.example/invite/9f2b7c1d4e6a8b3f",
+      expected: `open https://app.example/invite/${REDACTED}`,
+    },
+    {
+      name: "случайная строка в пути чужого маршрута тоже снимается",
+      input: "GET https://app.example/share/Xy7Kp2Qr9Tv4Bn6Lm3 failed",
+      expected: `GET https://app.example/share/${REDACTED} failed`,
+    },
+    {
+      name: "id ресурса остаётся: по нему ищут, доступа он не даёт",
+      input: "GET https://app.example/clients/550e8400-e29b-41d4-a716-446655440000/measure failed",
+      expected: "GET https://app.example/clients/550e8400-e29b-41d4-a716-446655440000/measure failed",
+    },
+    {
+      name: "длинное имя маршрута словом остаётся",
+      input: "GET https://app.example/proposal-template failed",
+      expected: "GET https://app.example/proposal-template failed",
+    },
+    {
+      name: "имя файла в стеке остаётся целиком",
+      input: "at https://app.example/_next/static/chunks/4f2a9b8c1d3e5f7a.js:1:1",
+      expected: "at https://app.example/_next/static/chunks/4f2a9b8c1d3e5f7a.js:1:1",
+    },
+    {
+      name: "ключ xAI узнаётся по префиксу",
+      input: "xai request failed with xai-abc123def456ghi",
+      expected: `xai request failed with ${REDACTED}`,
+    },
+    {
+      name: "названный предел: безымянный ключ без префикса не ловится",
+      // Ни имени поля, ни префикса, ни разделителя — от обычного id такую
+      // строку не отличить. Записано в шапке scrub.ts как предел замысла.
+      input: "auth failed for key a1b2c3d4e5f6a7b8c9d0",
+      expected: "auth failed for key a1b2c3d4e5f6a7b8c9d0",
     },
     {
       name: "postgres-строка подключения",
@@ -138,6 +180,15 @@ describe("isSensitiveKey", () => {
 });
 
 describe("scrubValue", () => {
+  it("ключ с префиксом в массиве строк снимается, безымянный — нет", () => {
+    // Оба лежат без имени поля, решает только форма. `xai-` узнаётся,
+    // голая шестнадцатеричная строка — нет: это названный предел скраббера.
+    expect(scrubValue(["9f2b7c1d4e6a8b3f0000", "xai-abc123def456ghi"])).toEqual([
+      "9f2b7c1d4e6a8b3f0000",
+      REDACTED,
+    ]);
+  });
+
   it("чистит вложенные объекты на любой глубине", () => {
     const input = {
       run: {
@@ -279,6 +330,33 @@ describe("scrubEvent", () => {
     expect(scrubEvent(event)).toEqual({
       request: { url: `https://app.example/api?token=${REDACTED}`, method: "POST" },
     });
+  });
+
+  it("токен в пути request.url снимается, остальной путь остаётся", () => {
+    expect(scrubEvent({ request: { url: "https://app.example/r/9f2b7c1d4e6a8b3f" } })).toEqual({
+      request: { url: `https://app.example/r/${REDACTED}` },
+    });
+  });
+
+  it("токен в пути навигационной крошки снимается", () => {
+    // Сюда `/r/<токен>` приходит голым путём: на URL он не похож, и общей
+    // чисткой строк не снимается — за этим отдельный проход по крошкам.
+    expect(
+      scrubEvent({
+        breadcrumbs: [
+          { category: "navigation", data: { to: "/r/9f2b7c1d4e6a8b3f", from: "/clients" } },
+        ],
+      }),
+    ).toEqual({
+      breadcrumbs: [{ category: "navigation", data: { to: `/r/${REDACTED}`, from: "/clients" } }],
+    });
+  });
+
+  it("отдельная крошка чистится так же, как крошка внутри события", () => {
+    // Браузерный beforeBreadcrumb зовёт scrubEvent на одной крошке.
+    expect(
+      scrubEvent({ category: "navigation", data: { to: "/invite/9f2b7c1d4e6a8b3f" } }),
+    ).toEqual({ category: "navigation", data: { to: `/invite/${REDACTED}` } });
   });
 
   it("от пользователя остаётся только идентификатор", () => {
