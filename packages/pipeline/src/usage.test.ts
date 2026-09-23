@@ -29,7 +29,7 @@ describe("usage counters", () => {
       name: "AcmeCRM",
       domain: "acmecrm.test",
       brandNames: ["AcmeCRM"],
-      competitorNames: ["HubSpot"],
+      competitorNames: ["Northstack"],
     });
 
     const clusterId = (
@@ -41,7 +41,7 @@ describe("usage counters", () => {
 
     await db.insert(prompts).values([
       { clusterId, text: "best CRM for startups" },
-      { clusterId, text: "HubSpot alternatives" },
+      { clusterId, text: "Northstack alternatives" },
     ]);
 
     const scheduleId = (

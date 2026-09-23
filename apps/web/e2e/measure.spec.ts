@@ -6,7 +6,7 @@ import type { Page } from "@playwright/test";
 const CSV_10 = [
   "cluster,intent,prompt,is_control",
   "CRM comparison,comparison,best CRM for startups,false",
-  "CRM comparison,comparison,HubSpot alternatives,false",
+  "CRM comparison,comparison,Northstack alternatives,false",
   "CRM comparison,comparison,easiest CRM for a small sales team,false",
   "CRM comparison,comparison,CRM with an open API,false",
   "CRM comparison,comparison,best project management tool for agencies,true",

@@ -40,7 +40,7 @@ test("an agency goes from signup to a client-ready report with no external keys"
   await page.getByLabel("Client name").fill("AcmeCRM");
   await page.getByLabel("Domain").fill("acmecrm.test");
   await page.getByLabel("Brand names").fill("AcmeCRM, Acme");
-  await page.getByLabel("Competitors").fill("HubSpot, Pipedrive");
+  await page.getByLabel("Competitors").fill("Northstack, Pipewell");
   await page.getByRole("button", { name: "Create client" }).click();
   await expect(page).toHaveURL(/\/onboarding$/);
   const clientId = page.url().split("/").at(-2)!;

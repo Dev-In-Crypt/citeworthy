@@ -36,7 +36,7 @@ test("opportunity report and its PDF are produced for a prospect", async ({ page
   await page.getByLabel("Domain").fill("northwind-crm.test");
   await page.getByLabel("Industry").fill("CRM software");
   await page.getByLabel("Brand names").fill("Northwind CRM, Northwind");
-  await page.getByLabel("Competitors").fill("HubSpot, Pipedrive, Close");
+  await page.getByLabel("Competitors").fill("Northstack, Pipewell, Clasp");
   await page.getByLabel("Prospect (free audit)").check();
   await page.getByRole("button", { name: "Create client" }).click();
   // Заведение клиента ведёт на второй шаг онбординга, а не в список.

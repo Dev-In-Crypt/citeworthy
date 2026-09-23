@@ -22,7 +22,7 @@ test("one audit run leads straight to a ready diagnosis", async ({ page }) => {
   await page.getByLabel("Domain").fill("acmecrm.test");
   await page.getByLabel("Industry").fill("CRM software");
   await page.getByLabel("Brand names").fill("AcmeCRM, Acme");
-  await page.getByLabel("Competitors").fill("HubSpot, Pipedrive, Close");
+  await page.getByLabel("Competitors").fill("Northstack, Pipewell, Clasp");
   await page.getByLabel("Prospect (free audit)").check();
   await page.getByRole("button", { name: "Create client" }).click();
   // Заведение клиента ведёт на второй шаг онбординга, а не в список.

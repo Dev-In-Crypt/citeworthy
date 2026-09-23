@@ -24,7 +24,7 @@ test("raw answers show highlighted client and competitor mentions", async ({ pag
   await page.getByLabel("Client name").fill("AcmeCRM");
   await page.getByLabel("Domain").fill("acmecrm.test");
   await page.getByLabel("Brand names").fill("AcmeCRM, Acme CRM, Acme");
-  await page.getByLabel("Competitors").fill("HubSpot, Pipedrive, Close");
+  await page.getByLabel("Competitors").fill("Northstack, Pipewell, Clasp");
   await page.getByRole("button", { name: "Create client" }).click();
   // Заведение клиента ведёт на второй шаг онбординга, а не в список.
   await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}\/onboarding$/);
@@ -55,7 +55,7 @@ test("raw answers show highlighted client and competitor mentions", async ({ pag
 
   // Главная проверка: клиент и конкуренты подсвечены в сыром тексте.
   await expect(page.getByTestId("mention-client").first()).toContainText(/Acme/);
-  await expect(page.getByTestId("mention-competitor").first()).toContainText(/HubSpot|Pipedrive/);
+  await expect(page.getByTestId("mention-competitor").first()).toContainText(/Northstack|Pipewell/);
 
   // Ссылки платформы показаны — на них строится диагностика источников.
   await expect(page.getByTestId("response-citations").first()).toContainText("reviewgrid.example");

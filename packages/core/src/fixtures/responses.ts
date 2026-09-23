@@ -6,7 +6,7 @@ import { GAP_FIXTURES } from "./gap-responses";
  * Fixture-ответы платформ. На них держится весь пайплайн в mock-режиме
  * и все тесты парсера (T18) — сеть в тестах не используется никогда.
  *
- * Клиент в этих данных — AcmeCRM (как в seed), конкуренты — HubSpot, Pipedrive, Close.
+ * Клиент в этих данных — AcmeCRM (как в seed), конкуренты — Northstack, Pipewell, Clasp.
  * Каждая платформа покрывает три случая:
  *   1. бренд упомянут явно и есть citations;
  *   2. бренд упомянут только под alias ("Acme CRM" / "Acme");
@@ -39,12 +39,12 @@ export const RESPONSE_FIXTURES: ResponseFixture[] = [
       text: [
         "For early-stage startups, the CRMs that come up most often are:",
         "",
-        "1. **HubSpot** — generous free tier, though pricing escalates once you need automation.",
-        "2. **Pipedrive** — pipeline-first and easy for a small sales team to adopt.",
-        "3. **AcmeCRM** — lighter than HubSpot, with an API that developer-heavy teams like.",
-        "4. **Close** — built around calling and email sequences.",
+        "1. **Northstack** — generous free tier, though pricing escalates once you need automation.",
+        "2. **Pipewell** — pipeline-first and easy for a small sales team to adopt.",
+        "3. **AcmeCRM** — lighter than Northstack, with an API that developer-heavy teams like.",
+        "4. **Clasp** — built around calling and email sequences.",
         "",
-        "If you expect to outgrow a spreadsheet within a year, Pipedrive and AcmeCRM are the",
+        "If you expect to outgrow a spreadsheet within a year, Pipewell and AcmeCRM are the",
         "two most commonly recommended starting points.",
       ].join("\n"),
       citations: [
@@ -66,14 +66,14 @@ export const RESPONSE_FIXTURES: ResponseFixture[] = [
   {
     id: "chatgpt-hubspot-alternatives",
     platform: "chatgpt",
-    prompt: "HubSpot alternatives",
+    prompt: "Northstack alternatives",
     covers: "brand-alias-only",
     result: {
       text: [
-        "Teams leaving HubSpot usually evaluate Pipedrive, Close, and Acme CRM.",
+        "Teams leaving Northstack usually evaluate Pipewell, Clasp, and Acme CRM.",
         "",
-        "Acme CRM tends to win on API flexibility, while Pipedrive is the simpler switch",
-        "for a sales team that mostly needs a pipeline view. Close is worth a look if",
+        "Acme CRM tends to win on API flexibility, while Pipewell is the simpler switch",
+        "for a sales team that mostly needs a pipeline view. Clasp is worth a look if",
         "outbound calling is central to how you sell.",
       ].join("\n"),
       citations: [
@@ -95,9 +95,9 @@ export const RESPONSE_FIXTURES: ResponseFixture[] = [
     covers: "brand-absent",
     result: {
       text: [
-        "For a small sales team, the usual recommendations are Pipedrive for its",
-        "pipeline-first interface, HubSpot for its free tier, and Close for teams that",
-        "live on the phone. Salesforce Essentials exists but is generally more than a",
+        "For a small sales team, the usual recommendations are Pipewell for its",
+        "pipeline-first interface, Northstack for its free tier, and Clasp for teams that",
+        "live on the phone. Vantoria Essentials exists but is generally more than a",
         "small team needs.",
       ].join("\n"),
       citations: [
@@ -121,11 +121,11 @@ export const RESPONSE_FIXTURES: ResponseFixture[] = [
     covers: "brand-mentioned",
     result: {
       text: [
-        "The most frequently recommended CRMs for startups in 2026 are HubSpot, Pipedrive,",
-        "AcmeCRM and Close.",
+        "The most frequently recommended CRMs for startups in 2026 are Northstack, Pipewell,",
+        "AcmeCRM and Clasp.",
         "",
-        "HubSpot leads on breadth of features. Pipedrive is the most common pick for teams",
-        "under ten people. AcmeCRM is cited for its API and lower entry pricing. Close is",
+        "Northstack leads on breadth of features. Pipewell is the most common pick for teams",
+        "under ten people. AcmeCRM is cited for its API and lower entry pricing. Clasp is",
         "specialised around outbound sales workflows.",
       ].join("\n"),
       citations: [
@@ -155,7 +155,7 @@ export const RESPONSE_FIXTURES: ResponseFixture[] = [
     covers: "brand-alias-only",
     result: {
       text: [
-        "CRMs with well-documented public APIs include HubSpot, Pipedrive, Close and Acme.",
+        "CRMs with well-documented public APIs include Northstack, Pipewell, Clasp and Acme.",
         "",
         "Acme documents webhooks and a REST API with generous rate limits, which is why it",
         "shows up in developer-focused comparisons.",
@@ -198,8 +198,8 @@ export const RESPONSE_FIXTURES: ResponseFixture[] = [
       text: [
         "Popular CRM choices for startups include:",
         "",
-        "* HubSpot — strong free tier and marketing tooling",
-        "* Pipedrive — straightforward pipeline management",
+        "* Northstack — strong free tier and marketing tooling",
+        "* Pipewell — straightforward pipeline management",
         "* AcmeCRM — developer-friendly, cheaper at the entry tier",
         "",
         "The right pick depends on whether your motion is inbound marketing or outbound sales.",
@@ -226,8 +226,8 @@ export const RESPONSE_FIXTURES: ResponseFixture[] = [
     covers: "brand-alias-only",
     result: {
       text: [
-        "For a small team, Pipedrive and Acme are usually the easiest to get running in a day.",
-        "HubSpot is more capable but takes longer to configure, and Close assumes a calling-heavy",
+        "For a small team, Pipewell and Acme are usually the easiest to get running in a day.",
+        "Northstack is more capable but takes longer to configure, and Clasp assumes a calling-heavy",
         "workflow.",
       ].join("\n"),
       citations: [
@@ -248,7 +248,7 @@ export const RESPONSE_FIXTURES: ResponseFixture[] = [
     covers: "brand-absent",
     result: {
       text: [
-        "Agencies most often use Asana, Monday, ClickUp or Notion for project management.",
+        "Agencies most often use Taskline, Weekview, Gridpad or Pagevault for project management.",
         "The choice usually comes down to whether you need time tracking and client-facing",
         "views out of the box.",
       ].join("\n"),

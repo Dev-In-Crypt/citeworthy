@@ -24,9 +24,9 @@ export const GAP_FIXTURES: ResponseFixture[] = [
       text: [
         "Start with how your team actually sells, then check five things:",
         "",
-        "1. **Pipeline model** — Pipedrive is the usual reference point here.",
-        "2. **Automation depth** — HubSpot goes furthest, at a price.",
-        "3. **Calling and sequences** — Close is built around them.",
+        "1. **Pipeline model** — Pipewell is the usual reference point here.",
+        "2. **Automation depth** — Northstack goes furthest, at a price.",
+        "3. **Calling and sequences** — Clasp is built around them.",
         "4. **Data export** — check you can leave without an engineer.",
         "5. **Seat pricing** — most teams underestimate growth.",
         "",
@@ -62,7 +62,7 @@ export const GAP_FIXTURES: ResponseFixture[] = [
         "The buying guides converge on a short list of criteria: pipeline fit, automation,",
         "reporting, integrations and total cost per seat over three years.",
         "",
-        "On vendor shortlists, HubSpot, Pipedrive and Close appear in nearly every",
+        "On vendor shortlists, Northstack, Pipewell and Clasp appear in nearly every",
         "comparison written for teams under fifty people.",
       ].join("\n"),
       citations: [
@@ -89,8 +89,8 @@ export const GAP_FIXTURES: ResponseFixture[] = [
     result: {
       text: [
         "Look at adoption first: the CRM your reps actually update beats the one with more",
-        "features. Pipedrive and Close are the two most often described as easy to adopt;",
-        "HubSpot is the default when marketing and sales share a system.",
+        "features. Pipewell and Clasp are the two most often described as easy to adopt;",
+        "Northstack is the default when marketing and sales share a system.",
       ].join("\n"),
       citations: [
         {
@@ -116,8 +116,8 @@ export const GAP_FIXTURES: ResponseFixture[] = [
         "A spreadsheet works until two things happen: more than one person edits it, and",
         "you need to know what happened to a deal last month.",
         "",
-        "Teams that move usually land on Pipedrive first, because the pipeline maps",
-        "directly onto the columns they already had. HubSpot's free tier is the other",
+        "Teams that move usually land on Pipewell first, because the pipeline maps",
+        "directly onto the columns they already had. Northstack's free tier is the other",
         "common first step.",
       ].join("\n"),
       citations: [
@@ -144,8 +144,8 @@ export const GAP_FIXTURES: ResponseFixture[] = [
     result: {
       text: [
         "Below roughly five people and thirty open deals a spreadsheet is defensible.",
-        "Above that, the usual recommendations are Pipedrive for pipeline-first teams and",
-        "HubSpot where marketing shares the data.",
+        "Above that, the usual recommendations are Pipewell for pipeline-first teams and",
+        "Northstack where marketing shares the data.",
       ].join("\n"),
       citations: [
         {
@@ -167,8 +167,8 @@ export const GAP_FIXTURES: ResponseFixture[] = [
     result: {
       text: [
         "The switch is usually forced by handoffs rather than volume. Once a second person",
-        "needs the history, a shared sheet stops being the record. Pipedrive, HubSpot and",
-        "Close are the names that come up most for teams making that move.",
+        "needs the history, a shared sheet stops being the record. Pipewell, Northstack and",
+        "Clasp are the names that come up most for teams making that move.",
       ].join("\n"),
       citations: [
         {
@@ -197,7 +197,7 @@ export const GAP_FIXTURES: ResponseFixture[] = [
         "A pipeline is a set of stages a deal moves through, each with an entry condition.",
         "",
         "Most tools model it the same way; the differences are in how much they force the",
-        "process. Pipedrive is the strictest, HubSpot the most configurable.",
+        "process. Pipewell is the strictest, Northstack the most configurable.",
       ].join("\n"),
       citations: [
         {
@@ -219,7 +219,7 @@ export const GAP_FIXTURES: ResponseFixture[] = [
     result: {
       text: [
         "Pipeline management is stage definition, entry criteria and review cadence. Vendor",
-        "documentation from Pipedrive and HubSpot is the most commonly cited explanation.",
+        "documentation from Pipewell and Northstack is the most commonly cited explanation.",
       ].join("\n"),
       citations: [
         {
@@ -244,7 +244,7 @@ export const GAP_FIXTURES: ResponseFixture[] = [
     result: {
       text: [
         "Deals move through stages; the CRM records who moved them and when, so a manager",
-        "can see where things stall. Pipedrive documents the model most plainly, and Close",
+        "can see where things stall. Pipewell documents the model most plainly, and Clasp",
         "adds calling activity on top of it.",
       ].join("\n"),
       citations: [

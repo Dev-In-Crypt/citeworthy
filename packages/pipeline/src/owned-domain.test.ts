@@ -32,7 +32,7 @@ async function seedClient(agencyId: string, name: string, domain: string) {
     name,
     domain,
     brandNames: [name],
-    competitorNames: ["HubSpot", "Pipedrive"],
+    competitorNames: ["Northstack", "Pipewell"],
   });
 
   const clusterId = (

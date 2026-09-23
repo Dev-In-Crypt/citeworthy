@@ -46,7 +46,7 @@ const SPEND_PURCHASE_PROMPTS: { text: string; isControl: boolean }[] = [
 /** Промпты кластера сравнения — коммерческий интент, где и решается видимость. */
 const COMPARISON_PROMPTS: { text: string; isControl: boolean }[] = [
   { text: "best CRM for startups", isControl: false },
-  { text: "HubSpot alternatives", isControl: false },
+  { text: "Northstack alternatives", isControl: false },
   { text: "easiest CRM for a small sales team", isControl: false },
   { text: "CRM with an open API", isControl: false },
   // Контрольный промпт: действия по кластеру сравнения его не касаются (см. T43).
@@ -104,7 +104,7 @@ export async function seed(db: Database): Promise<void> {
         domain: "acmecrm.test",
         industry: "B2B SaaS / CRM",
         brandNames: ["AcmeCRM", "Acme CRM", "Acme"],
-        competitorNames: ["HubSpot", "Pipedrive", "Close", "Salesforce"],
+        competitorNames: ["Northstack", "Pipewell", "Clasp", "Vantoria"],
         status: "active",
       },
       {

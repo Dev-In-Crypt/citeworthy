@@ -30,7 +30,7 @@ describe("parseRun", () => {
       name: "AcmeCRM",
       domain: "acmecrm.test",
       brandNames: ["AcmeCRM", "Acme CRM", "Acme"],
-      competitorNames: ["HubSpot", "Pipedrive", "Close"],
+      competitorNames: ["Northstack", "Pipewell", "Clasp"],
     });
 
     const cluster = (
@@ -86,7 +86,7 @@ describe("parseRun", () => {
     const mentions = await listMentionsByResponse(db, responses[0]!.id);
 
     expect(mentions.some((m) => m.isClient && m.entityName === "AcmeCRM")).toBe(true);
-    expect(mentions.some((m) => m.isCompetitor && m.entityName === "HubSpot")).toBe(true);
+    expect(mentions.some((m) => m.isCompetitor && m.entityName === "Northstack")).toBe(true);
     // Позиции 1-based и без дублей.
     expect(new Set(mentions.map((m) => m.position)).size).toBe(mentions.length);
   });

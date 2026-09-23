@@ -27,7 +27,7 @@ test("diagnose screen shows source mix, presence matrix and reasoned recommendat
   await page.getByLabel("Client name").fill("AcmeCRM");
   await page.getByLabel("Domain").fill("acmecrm.test");
   await page.getByLabel("Brand names").fill("AcmeCRM, Acme CRM, Acme");
-  await page.getByLabel("Competitors").fill("HubSpot, Pipedrive, Close");
+  await page.getByLabel("Competitors").fill("Northstack, Pipewell, Clasp");
   await page.getByRole("button", { name: "Create client" }).click();
   // Заведение клиента ведёт на второй шаг онбординга, а не в список.
   await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}\/onboarding$/);
@@ -74,7 +74,7 @@ test("diagnose screen shows source mix, presence matrix and reasoned recommendat
 
   // Матрица присутствия: есть и отметки клиента, и чипы конкурентов.
   await expect(page.getByTestId("client-present").first()).toBeVisible();
-  await expect(table).toContainText("HubSpot");
+  await expect(table).toContainText("Northstack");
 
   // Сводка разрыва совпадает по формату с данными диагностики.
   await expect(page.getByTestId("gap-summary")).toContainText(/Client in \d+ of \d+/);
@@ -114,7 +114,7 @@ test("a client missing from the answers gets reasoned recommendations", async ({
   await page.getByLabel("Client name").fill("Northwind CRM");
   await page.getByLabel("Domain").fill("northwind-crm.test");
   await page.getByLabel("Brand names").fill("Northwind CRM, Northwind");
-  await page.getByLabel("Competitors").fill("HubSpot, Pipedrive, Close");
+  await page.getByLabel("Competitors").fill("Northstack, Pipewell, Clasp");
   await page.getByRole("button", { name: "Create client" }).click();
   // Заведение клиента ведёт на второй шаг онбординга, а не в список.
   await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}\/onboarding$/);

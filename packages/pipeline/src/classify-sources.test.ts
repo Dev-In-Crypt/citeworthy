@@ -39,7 +39,7 @@ describe("classifyRunSources", () => {
       name: "AcmeCRM",
       domain: "acmecrm.test",
       brandNames: ["AcmeCRM"],
-      competitorNames: ["HubSpot"],
+      competitorNames: ["Northstack"],
     });
 
     const clusterId = (

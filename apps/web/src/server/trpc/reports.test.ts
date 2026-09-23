@@ -45,7 +45,7 @@ describe("reports.generate", () => {
       agencyId,
       name: "AcmeCRM",
       domain: "acmecrm.test",
-      competitorNames: ["HubSpot"],
+      competitorNames: ["Northstack"],
     });
     clientId = client.id;
 
@@ -64,7 +64,7 @@ describe("reports.generate", () => {
         periodStart: new Date(week),
         periodEnd: new Date(new Date(week).getTime() + 7 * 24 * 60 * 60 * 1000),
         clientVisibilityPct: pct.toFixed(1),
-        competitorVisibility: { HubSpot: 37 },
+        competitorVisibility: { Northstack: 37 },
         sampleCount: 30,
         sufficient: true,
       });
@@ -260,7 +260,7 @@ describe("reports.generate", () => {
       periodStart: new Date("2026-08-24T00:00:00Z"),
       periodEnd: new Date("2026-08-31T00:00:00Z"),
       clientVisibilityPct: "99.0",
-      competitorVisibility: { HubSpot: 37 },
+      competitorVisibility: { Northstack: 37 },
       sampleCount: 30,
       sufficient: true,
     });

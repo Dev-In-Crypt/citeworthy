@@ -62,7 +62,7 @@ describe("конверсия проспекта в клиента", () => {
       name: "AcmeCRM",
       domain: "acmecrm.test",
       brandNames: ["AcmeCRM", "Acme CRM", "Acme"],
-      competitorNames: ["HubSpot", "Pipedrive", "Close"],
+      competitorNames: ["Northstack", "Pipewell", "Clasp"],
       status: "prospect",
     });
     clientId = client.id;
@@ -129,6 +129,6 @@ describe("конверсия проспекта в клиента", () => {
       opportunitiesBefore,
     );
     // Конкуренты — тот же список, который вводили при заведении проспекта.
-    expect(converted?.competitorNames).toEqual(["HubSpot", "Pipedrive", "Close"]);
+    expect(converted?.competitorNames).toEqual(["Northstack", "Pipewell", "Clasp"]);
   });
 });

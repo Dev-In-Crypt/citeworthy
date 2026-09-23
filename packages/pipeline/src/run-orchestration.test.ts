@@ -18,7 +18,7 @@ const { db, close } = createDb();
 describe("planRunJobs", () => {
   const twoPrompts = [
     { id: "p1", text: "best CRM for startups" },
-    { id: "p2", text: "HubSpot alternatives" },
+    { id: "p2", text: "Northstack alternatives" },
   ];
 
   it("раскладывает прогон в промпт × платформа × сэмпл", () => {
@@ -55,7 +55,7 @@ describe("orchestrateRun (mock-режим)", () => {
       name: "AcmeCRM",
       domain: "acmecrm.test",
       brandNames: ["AcmeCRM", "Acme CRM"],
-      competitorNames: ["HubSpot", "Pipedrive"],
+      competitorNames: ["Northstack", "Pipewell"],
     });
     clientId = client.id;
 
@@ -68,7 +68,7 @@ describe("orchestrateRun (mock-режим)", () => {
 
     await db.insert(prompts).values([
       { clusterId: cluster.id, text: "best CRM for startups" },
-      { clusterId: cluster.id, text: "HubSpot alternatives" },
+      { clusterId: cluster.id, text: "Northstack alternatives" },
     ]);
 
     scheduleId = (

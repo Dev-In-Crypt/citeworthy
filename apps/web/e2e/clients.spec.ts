@@ -28,7 +28,7 @@ test("create a client with brand aliases and competitors, then edit it", async (
   await page.getByLabel("Domain").fill("acmecrm.com");
   await page.getByLabel("Industry").fill("B2B SaaS / CRM");
   await page.getByLabel("Brand names").fill("AcmeCRM, Acme CRM");
-  await page.getByLabel("Competitors").fill("HubSpot, Pipedrive, Close");
+  await page.getByLabel("Competitors").fill("Northstack, Pipewell, Clasp");
   await page.getByRole("button", { name: "Create client" }).click();
   // Заведение клиента ведёт на второй шаг онбординга, а не в список.
   await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}\/onboarding$/);
@@ -45,7 +45,7 @@ test("create a client with brand aliases and competitors, then edit it", async (
   // Уточняем область: «Settings» есть и в сайдбаре агентства.
   await page.getByRole("main").getByRole("link", { name: "Settings" }).click();
   await expect(page.getByLabel("Brand names")).toHaveValue("AcmeCRM, Acme CRM");
-  await expect(page.getByLabel("Competitors")).toHaveValue("HubSpot, Pipedrive, Close");
+  await expect(page.getByLabel("Competitors")).toHaveValue("Northstack, Pipewell, Clasp");
 
   await page.getByLabel("Client name").fill("AcmeCRM Renamed");
   await page.getByRole("button", { name: "Save changes" }).click();

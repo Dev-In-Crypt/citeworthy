@@ -58,7 +58,7 @@ describe("diagnosis на данных прогона", () => {
       name: "AcmeCRM",
       domain: "acmecrm.test",
       brandNames: ["AcmeCRM", "Acme CRM", "Acme"],
-      competitorNames: ["HubSpot", "Pipedrive", "Close"],
+      competitorNames: ["Northstack", "Pipewell", "Clasp"],
     });
     clientId = client.id;
 
@@ -129,7 +129,7 @@ describe("diagnosis на данных прогона", () => {
     const diagnosis = diagnose(toFacts(await listCitationFacts(db, clientId)));
 
     expect(diagnosis.gap.competitorPresentIn).toBeGreaterThan(0);
-    expect(diagnosis.influential.some((s) => s.competitorsPresent.includes("HubSpot"))).toBe(true);
+    expect(diagnosis.influential.some((s) => s.competitorsPresent.includes("Northstack"))).toBe(true);
   });
 
   it("вывод берётся из copy-констант, а не сочиняется", async () => {

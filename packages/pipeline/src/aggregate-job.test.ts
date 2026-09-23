@@ -30,7 +30,7 @@ describe("aggregateClient", () => {
       name: "AcmeCRM",
       domain: "acmecrm.test",
       brandNames: ["AcmeCRM", "Acme CRM", "Acme"],
-      competitorNames: ["HubSpot", "Pipedrive", "Close"],
+      competitorNames: ["Northstack", "Pipewell", "Clasp"],
     });
     clientId = client.id;
 
@@ -100,8 +100,8 @@ describe("aggregateClient", () => {
       (s) => s.clusterId === null && s.platform === null,
     );
 
-    expect(Object.keys(total?.competitorVisibility ?? {})).toContain("HubSpot");
-    expect(Number(total?.competitorVisibility["HubSpot"])).toBeGreaterThan(0);
+    expect(Object.keys(total?.competitorVisibility ?? {})).toContain("Northstack");
+    expect(Number(total?.competitorVisibility["Northstack"])).toBeGreaterThan(0);
   });
 
   it("повторный пересчёт не плодит строки и не меняет цифры", async () => {

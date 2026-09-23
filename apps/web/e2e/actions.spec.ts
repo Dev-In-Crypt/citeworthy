@@ -22,7 +22,7 @@ test("actions board moves cards and offers an experiment on completion", async (
   await page.getByLabel("Client name").fill("Northwind CRM");
   await page.getByLabel("Domain").fill("northwind-crm.test");
   await page.getByLabel("Brand names").fill("Northwind CRM, Northwind");
-  await page.getByLabel("Competitors").fill("HubSpot, Pipedrive, Close");
+  await page.getByLabel("Competitors").fill("Northstack, Pipewell, Clasp");
   await page.getByRole("button", { name: "Create client" }).click();
   // Заведение клиента ведёт на второй шаг онбординга, а не в список.
   await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}\/onboarding$/);
@@ -73,7 +73,7 @@ test("actions board moves cards and offers an experiment on completion", async (
   await drawer.getByTestId("owner-select").selectOption({ index: 1 });
   await expect(page.getByTestId("column-backlog")).not.toContainText("unassigned");
 
-  await drawer.getByRole("button", { name: "Close" }).click();
+  await drawer.getByRole("button", { name: "Clasp" }).click();
 
   // Перемещение в работу диалога не открывает.
   await page.getByRole("button", { name: "→ In progress" }).first().click();
@@ -105,7 +105,7 @@ test("actions board moves cards and offers an experiment on completion", async (
   await expect(outcome).toBeVisible();
   await expect(outcome).toContainText("No answers citing this source have been measured");
   await expect(outcome).toContainText("evidence, not attribution of cause");
-  await doneDrawer.getByRole("button", { name: "Close" }).click();
+  await doneDrawer.getByRole("button", { name: "Clasp" }).click();
 
   await page.goto(`/clients/${clientId}`);
   await expect(page.getByTestId("activity-feed")).toContainText("Action completed");

@@ -84,7 +84,7 @@ beforeEach(async () => {
     agencyId,
     name: "AcmeCRM",
     domain: "acmecrm.test",
-    competitorNames: ["HubSpot"],
+    competitorNames: ["Northstack"],
   });
 
   const report = await createReport(db, {

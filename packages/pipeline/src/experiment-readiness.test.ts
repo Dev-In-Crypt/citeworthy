@@ -40,7 +40,7 @@ describe("готовность эксперимента", () => {
       name: "AcmeCRM",
       domain: "acmecrm.test",
       brandNames: ["AcmeCRM"],
-      competitorNames: ["HubSpot", "Pipedrive"],
+      competitorNames: ["Northstack", "Pipewell"],
     });
     clientId = client.id;
 

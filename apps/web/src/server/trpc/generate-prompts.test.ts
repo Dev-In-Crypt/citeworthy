@@ -42,7 +42,7 @@ describe("prompts.generate / saveGenerated", () => {
       domain: "acmecrm.test",
       industry: "CRM software",
       brandNames: ["AcmeCRM", "Acme"],
-      competitorNames: ["HubSpot", "Pipedrive"],
+      competitorNames: ["Northstack", "Pipewell"],
       status: "prospect",
     });
     clientId = client.id;
@@ -64,8 +64,8 @@ describe("prompts.generate / saveGenerated", () => {
     const { prompts } = await caller(agencyId).prompts.generate({ clientId, count: 30 });
     const texts = prompts.map((prompt) => prompt.text);
 
-    expect(texts).toContain("AcmeCRM vs HubSpot");
-    expect(texts).toContain("alternatives to Pipedrive");
+    expect(texts).toContain("AcmeCRM vs Northstack");
+    expect(texts).toContain("alternatives to Pipewell");
     expect(texts.some((text) => text.includes("crm software"))).toBe(true);
   });
 

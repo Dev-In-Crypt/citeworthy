@@ -36,7 +36,7 @@ function caller(agencyId: string, role: SessionUser["role"] = "owner") {
 const RECOMMENDATION = makeRecommendation({
   actionType: "review_platform",
   title: "Get the client covered on g2.com",
-  reason: "g2.com is cited in 23% of answers here (12 citations). HubSpot appears; the client does not.",
+  reason: "g2.com is cited in 23% of answers here (12 citations). Northstack appears; the client does not.",
   estimatedImpact: "high",
   effort: "low",
   sourceDomain: "g2.com",

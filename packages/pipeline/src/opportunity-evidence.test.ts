@@ -31,7 +31,7 @@ describe("целостность доказательства", () => {
       name: "AcmeCRM",
       domain: "acmecrm.test",
       brandNames: ["AcmeCRM", "Acme CRM", "Acme"],
-      competitorNames: ["HubSpot", "Pipedrive", "Close"],
+      competitorNames: ["Northstack", "Pipewell", "Clasp"],
     });
     clientId = client.id;
 

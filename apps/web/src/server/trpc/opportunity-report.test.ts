@@ -41,7 +41,7 @@ describe("reports.generateOpportunity", () => {
       name: "AcmeCRM",
       domain: "acmecrm.test",
       brandNames: ["AcmeCRM", "Acme"],
-      competitorNames: ["HubSpot", "Pipedrive"],
+      competitorNames: ["Northstack", "Pipewell"],
       status: "prospect",
     });
     clientId = client.id;
