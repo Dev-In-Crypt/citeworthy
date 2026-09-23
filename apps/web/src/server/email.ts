@@ -19,11 +19,25 @@ export function setEmailSender(next: EmailSender | null): void {
   sender = next;
 }
 
-/** Базовый адрес приложения — из него строятся ссылки в письмах. */
+/**
+ * Базовый адрес приложения — из него строятся ссылки в письмах.
+ *
+ * Настройка проверяется здесь, а не у получателя: адрес без схемы даёт
+ * ссылку, которая в почтовом клиенте никуда не ведёт, и ошибка всплыла бы
+ * жалобой человека, не сумевшего принять приглашение.
+ */
 export function appUrl(): string {
-  return (
+  const configured = (
     process.env["NEXT_PUBLIC_APP_URL"] ??
     process.env["BETTER_AUTH_URL"] ??
     "http://localhost:3000"
-  ).replace(/\/$/, "");
+  ).trim();
+
+  if (!/^https?:\/\/\S/i.test(configured)) {
+    throw new Error(
+      `NEXT_PUBLIC_APP_URL must be an absolute http(s) URL, received "${configured}".`,
+    );
+  }
+
+  return configured.replace(/\/+$/, "");
 }
