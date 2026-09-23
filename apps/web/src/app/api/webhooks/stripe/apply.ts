@@ -1,23 +1,20 @@
-import {
-  type PaymentEventEnvelope,
-  type PaymentEventLedger,
-  type SubscriptionChange,
-} from "@repo/core";
-import { getSubscriptionByCustomer, type Database } from "@repo/db";
+import { type PaymentEventEnvelope, type PaymentEventLedger } from "@repo/core";
+import { type Database } from "@repo/db";
 import { applySubscriptionChange, type WebhookOutcome } from "@/server/subscription";
 
 /**
- * Применение события провайдера — ровно один раз и без потери того,
- * о чём событие молчит.
+ * Применение события провайдера — ровно один раз.
  *
- * Два свойства, которых нет в самой записи в базу:
+ * Провайдер доставляет событие «хотя бы один раз»: повторная доставка после
+ * нашего таймаута или 500 — штатная работа Stripe, и второй проход не должен
+ * ни поднять тариф дважды, ни отправить письмо дважды. Занять событие в
+ * журнале до записи — единственное, чем этот слой отличается от прямой
+ * записи.
  *
- * 1. Провайдер доставляет событие «хотя бы один раз». Повторная доставка
- *    после нашего таймаута или 500 — штатная работа Stripe, и второй
- *    проход не должен ни поднять тариф дважды, ни отправить письмо дважды.
- * 2. Счёт не знает ни тарифа, ни конца оплаченного периода. Записать по
- *    нему `null` значит стереть срок, по которому считается отсрочка при
- *    сбое платежа, — и выключить агентство раньше времени.
+ * Чем заполнять то, о чём событие молчит, и что делать с событием не по
+ * порядку, решает `applySubscriptionChange`: там уже читается записанное
+ * состояние, и второе такое же правило рядом однажды разойдётся с первым —
+ * ценой расхождения будет тариф агентства.
  */
 
 export type WebhookResult =
@@ -42,11 +39,11 @@ export async function applyPaymentEvent(
       return { status: "ignored", reason: envelope.event.reason };
     }
 
-    const change = await fillUnknownFields(db, envelope.event);
-    const outcome = await applySubscriptionChange(db, change);
+    const outcome = await applySubscriptionChange(db, envelope.event, envelope.occurredAt);
 
     if (!outcome.applied) {
-      // Событие не наше — повторять его незачем, журнал не трогаем.
+      // Событие не наше или устарело — повторять его незачем, журнал не
+      // трогаем: повтор той же доставки должен остаться повтором.
       return { status: "ignored", reason: outcome.reason };
     }
 
@@ -57,37 +54,4 @@ export async function applyPaymentEvent(
     await ledger.release(envelope.eventId);
     throw error;
   }
-}
-
-/**
- * Подставляет в событие то, о чём оно не говорит, из уже записанного.
- *
- * Плательщик есть в каждом событии, и по нему находится подписка: так
- * `invoice.payment_failed` меняет только статус, оставляя тариф и конец
- * периода на месте.
- */
-async function fillUnknownFields(
-  db: Database,
-  change: SubscriptionChange,
-): Promise<SubscriptionChange> {
-  const unknown = change.unknownFields ?? [];
-  if (unknown.length === 0) {
-    return change;
-  }
-
-  const known = await getSubscriptionByCustomer(db, change.customerId);
-  if (!known) {
-    return change;
-  }
-
-  return {
-    ...change,
-    plan: unknown.includes("plan") ? known.plan : change.plan,
-    currentPeriodEnd: unknown.includes("currentPeriodEnd")
-      ? known.currentPeriodEnd
-      : change.currentPeriodEnd,
-    cancelAtPeriodEnd: unknown.includes("cancelAtPeriodEnd")
-      ? known.cancelAtPeriodEnd
-      : change.cancelAtPeriodEnd,
-  };
 }

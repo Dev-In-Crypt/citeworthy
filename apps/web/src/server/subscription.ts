@@ -1,8 +1,10 @@
 import {
+  DEFAULT_PLAN,
   entitlementsFor,
   type Entitlements,
   type PlanId,
   type SubscriptionChange,
+  type SubscriptionField,
   type SubscriptionStatus,
 } from "@repo/core";
 import {
@@ -11,6 +13,7 @@ import {
   getSubscriptionByCustomer,
   upsertSubscription,
   type Database,
+  type Subscription,
 } from "@repo/db";
 
 /**
@@ -52,10 +55,19 @@ export type WebhookOutcome =
  * Событие без агентства не отбрасывается: агентство ищется по плательщику,
  * которого мы записали при первом же событии. Событие, которое не удалось
  * связать ни с кем, не применяется — оно не наше.
+ *
+ * Записанная строка читается ровно один раз и на два вопроса сразу:
+ * не устарело ли событие и чем заполнить то, о чём оно молчит. Оба правила
+ * живут здесь и только здесь — два умолчания для одного поля однажды
+ * разойдутся, а ценой расхождения будет тариф агентства.
+ *
+ * `occurredAt` — время события у провайдера. Без него (вызов не из вебхука)
+ * порядок не проверяется и отметка не ставится.
  */
 export async function applySubscriptionChange(
   db: Database,
   change: SubscriptionChange,
+  occurredAt: Date | null = null,
 ): Promise<WebhookOutcome> {
   const known = await getSubscriptionByCustomer(db, change.customerId);
   const agencyId = change.agencyId ?? known?.agencyId ?? null;
@@ -64,19 +76,46 @@ export async function applySubscriptionChange(
     return { applied: false, reason: "No agency is linked to this customer." };
   }
 
-  // План приходит не в каждом событии (в завершённом checkout цены нет),
-  // поэтому недостающее берётся из уже записанного состояния.
-  const plan = change.plan ?? known?.plan ?? "starter";
+  // Порядок доставки Stripe не гарантирует: задержавшееся событие о
+  // подписке приходит после более позднего и откатывает тариф назад.
+  // Журнал по идентификатору тут не помогает — идентификаторы разные.
+  //
+  // По времени сравниваются только события, которые приносят тариф
+  // целиком. Завершённый checkout и счета тарифа не знают, а их время
+  // отличается от времени события о подписке на доли секунды в любую
+  // сторону: отбросить по времени checkout значит потерять связь с
+  // агентством, а счёт — не заметить сбоя платежа. Пустая отметка значит
+  // «записано до того, как мы это отслеживали», и запись не блокирует.
+  const carriesPlan = change.plan !== null;
+
+  if (
+    carriesPlan &&
+    occurredAt &&
+    known?.lastEventAt &&
+    known.lastEventAt.getTime() > occurredAt.getTime()
+  ) {
+    return { applied: false, reason: "A newer event has already been applied." };
+  }
+
+  const fields = resolveFields(change, known);
 
   const saved = await upsertSubscription(db, {
     agencyId,
     customerId: change.customerId,
     subscriptionId: change.subscriptionId,
-    plan,
+    plan: fields.plan,
     status: change.status,
-    currentPeriodEnd: change.currentPeriodEnd,
-    cancelAtPeriodEnd: change.cancelAtPeriodEnd,
+    currentPeriodEnd: fields.currentPeriodEnd,
+    cancelAtPeriodEnd: fields.cancelAtPeriodEnd,
+    // Отметку ставят только события, по которым потом сравнивается порядок:
+    // иначе счёт или checkout подняли бы её и заблокировали событие о
+    // подписке, пришедшее на долю секунды «раньше».
+    lastEventAt: carriesPlan ? occurredAt : (known?.lastEventAt ?? null),
   });
+
+  if (carriesPlan && occurredAt) {
+    await stampLastEventAt(db, saved, occurredAt);
+  }
 
   // Поля агентства — производные от подписки, и они должны следовать за ней:
   // по ним считается лимит клиентов на горячем пути.
@@ -90,4 +129,63 @@ export async function applySubscriptionChange(
   await applyPlanToAgency(db, agencyId, entitlements.plan, entitlements.clientLimit);
 
   return { applied: true, agencyId, plan: saved.plan, status: saved.status };
+}
+
+/**
+ * Заполняет поля, о которых событие молчит, из уже записанного состояния.
+ *
+ * Единственное место, где это правило существует: счёт не знает ни тарифа,
+ * ни конца оплаченного периода, и записать по нему `null` значит стереть
+ * срок, по которому считается отсрочка при сбое платежа.
+ *
+ * Хвост `?? DEFAULT_PLAN` нужен ровно одному случаю — самому первому
+ * завершённому checkout: цены в сессии нет, а записанного состояния ещё нет
+ * тоже. Тариф приедет следующим событием о самой подписке.
+ */
+function resolveFields(
+  change: SubscriptionChange,
+  known: Subscription | undefined,
+): { plan: PlanId; currentPeriodEnd: Date | null; cancelAtPeriodEnd: boolean } {
+  const unknown = change.unknownFields ?? [];
+  const silent = (field: SubscriptionField): boolean => unknown.includes(field);
+
+  return {
+    plan: (silent("plan") ? null : change.plan) ?? known?.plan ?? DEFAULT_PLAN,
+    currentPeriodEnd: silent("currentPeriodEnd")
+      ? (known?.currentPeriodEnd ?? null)
+      : change.currentPeriodEnd,
+    cancelAtPeriodEnd: silent("cancelAtPeriodEnd")
+      ? (known?.cancelAtPeriodEnd ?? false)
+      : change.cancelAtPeriodEnd,
+  };
+}
+
+/**
+ * Проставляет время события, которым записано состояние подписки.
+ *
+ * Временная заплата: `upsertSubscription` перечисляет обновляемые поля
+ * поимённо и `last_event_at` в этом списке нет, поэтому при обновлении уже
+ * существующей строки отметка не доезжает — а именно обновление и есть
+ * основной путь. Заплата уйдёт, как только в `upsertSubscription`
+ * (`packages/db/src/queries.ts`) в `onConflictDoUpdate.set` появится
+ * `lastEventAt: values.lastEventAt ?? null`; поток платежей `packages/db`
+ * не правит. Запрос записан в `docs/open-questions/a-stripe.md`.
+ */
+async function stampLastEventAt(
+  db: Database,
+  saved: Subscription,
+  occurredAt: Date,
+): Promise<void> {
+  if (saved.lastEventAt?.getTime() === occurredAt.getTime()) {
+    return;
+  }
+
+  // Значения передаются параметрами с явным приведением типа — так же, как
+  // это делает `prunePaymentEvents` в `packages/db`: драйвер настроен
+  // drizzle-ом и сам `Date` в параметр не превращает.
+  await db.$client`
+    update subscriptions
+    set last_event_at = ${occurredAt.toISOString()}::timestamptz
+    where id = ${saved.id}::uuid
+  `;
 }
