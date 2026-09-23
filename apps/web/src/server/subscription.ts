@@ -1,7 +1,6 @@
 import {
   DEFAULT_PLAN,
   entitlementsFor,
-  type Entitlements,
   type PlanId,
   type SubscriptionChange,
   type SubscriptionField,
@@ -9,7 +8,6 @@ import {
 } from "@repo/core";
 import {
   applyPlanToAgency,
-  getSubscriptionByAgency,
   getSubscriptionByCustomer,
   upsertSubscription,
   type Database,
@@ -19,28 +17,12 @@ import {
 /**
  * Права агентства — единственная точка, через которую их читает приложение.
  *
- * Отдельный модуль, а не метод роутера: те же права нужны и в вебхуке, и в
- * проверке лимита при заведении клиента, и они обязаны считаться одинаково.
+ * Само вычисление живёт в `@repo/pipeline`: о правах спрашивает не только
+ * веб (вебхук, лимит клиентов, запуск измерения), но и воркер — расписание
+ * не должно опрашивать ассистентов за наш счёт у того, кто перестал
+ * платить. Два вычисления одного права разъехались бы молча.
  */
-export async function entitlementsForAgency(
-  db: Database,
-  agencyId: string,
-  now: Date = new Date(),
-): Promise<Entitlements> {
-  const subscription = await getSubscriptionByAgency(db, agencyId);
-
-  return entitlementsFor(
-    subscription
-      ? {
-          plan: subscription.plan,
-          status: subscription.status,
-          currentPeriodEnd: subscription.currentPeriodEnd,
-          cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
-        }
-      : null,
-    now,
-  );
-}
+export { entitlementsForAgency } from "@repo/pipeline";
 
 export type WebhookOutcome =
   | { applied: true; agencyId: string; plan: PlanId; status: SubscriptionStatus }

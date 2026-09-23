@@ -390,6 +390,61 @@ describe("stripe webhook", () => {
     expect(saved?.plan).toBe("growth");
   });
 
+  it("счёт не стирает отметку о порядке — иначе защита открывается сама", async () => {
+    /**
+     * Счёт тарифа не приносит и отметку не ставит. Но `upsertSubscription`
+     * переписывает это поле наравне с прочими, и передать по нему `null`
+     * значило бы стереть отметку: следующий застрявший повтор прошёл бы
+     * как ни в чём не бывало и откатил тариф.
+     *
+     * Здесь между двумя событиями о подписке вклинивается обычное удачное
+     * списание — ровно то, что приходит у любого платящего агентства раз
+     * в месяц.
+     */
+    await post(
+      subscriptionEvent({
+        id: "evt_before_invoice",
+        agencyId,
+        customerId,
+        price: "price_scale",
+        created: 1_790_500_000,
+      }),
+    );
+
+    await post({
+      id: "evt_routine_invoice",
+      object: "event",
+      created: 1_790_600_000,
+      type: "invoice.payment_succeeded",
+      data: {
+        object: {
+          id: "in_routine",
+          object: "invoice",
+          customer: customerId,
+          billing_reason: "subscription_cycle",
+          status: "paid",
+          parent: { subscription_details: { subscription: "sub_live_1" } },
+        },
+      },
+    });
+
+    const stale = await post(
+      subscriptionEvent({
+        id: "evt_stale_after_invoice",
+        agencyId,
+        customerId,
+        price: "price_starter",
+        created: 1_790_200_000,
+      }),
+    );
+
+    await expect(stale.json()).resolves.toMatchObject({ applied: false, status: "ignored" });
+
+    const saved = await getSubscriptionByAgency(db, agencyId);
+    expect(saved?.plan).toBe("scale");
+    expect(saved?.lastEventAt).not.toBeNull();
+  });
+
   it("событие, которое продукт не разбирает, отмечается доставленным", async () => {
     const response = await post({
       id: "evt_g",

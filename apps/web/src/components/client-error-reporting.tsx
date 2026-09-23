@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import type * as SentryBrowser from "@sentry/browser";
 import {
   createEventThrottle,
   DEV_RELEASE,
@@ -128,6 +129,62 @@ export interface ClientErrorReportingProps {
    */
   environment?: string;
   release?: string;
+}
+
+/**
+ * Поднимает SDK, если его ещё нет, и отдаёт его.
+ *
+ * `null` означает «отправлять некуда и не нужно»: нет DSN, либо это
+ * страница клиентского отчёта. Проверка пути стоит до динамического
+ * импорта — на `/r/*` чанк SDK не должен даже загружаться.
+ *
+ * Вынесено из эффекта, потому что об этом же просит `global-error.tsx`:
+ * он подменяет корневой layout целиком, компонент там не смонтирован, и
+ * без общего входа `captureException` оказался бы вызовом по пустому
+ * клиенту — молча и без единой ошибки.
+ */
+async function startBrowserReporting(
+  options: ClientErrorReportingProps = {},
+): Promise<typeof SentryBrowser | null> {
+  const { dsn, environment, release } = options;
+  const resolvedDsn = dsn ?? process.env.NEXT_PUBLIC_SENTRY_DSN;
+  if (!resolvedDsn || !reportingAllowedOnPath(window.location.pathname)) return null;
+
+  const Sentry = await import("@sentry/browser");
+  if (started) return Sentry;
+  started = true;
+
+  const filters = createBrowserEventFilters();
+  Sentry.init({
+    dsn: resolvedDsn,
+    environment: environment ?? process.env.NODE_ENV ?? "development",
+    release: release ?? DEV_RELEASE,
+    tracesSampleRate: 0,
+    // Ответы моделей и данные клиентов агентства в отчёт об ошибке не уходят.
+    sendDefaultPii: false,
+    maxBreadcrumbs: 20,
+    ignoreErrors: IGNORED,
+    denyUrls: IGNORED_SOURCES,
+    beforeSend: (event) =>
+      filters.beforeSend(event as unknown as Record<string, unknown>) as unknown as
+        typeof event | null,
+    beforeBreadcrumb: (breadcrumb) =>
+      filters.beforeBreadcrumb(breadcrumb as unknown as Record<string, unknown>) as unknown as
+        typeof breadcrumb | null,
+  });
+
+  return Sentry;
+}
+
+/**
+ * Отправить одну ошибку, подняв SDK, если он ещё не поднят.
+ *
+ * Для `global-error.tsx`: там нет ни смонтированного компонента, ни
+ * гарантии, что до падения успел отработать чей-то эффект.
+ */
+export async function reportClientError(error: unknown): Promise<void> {
+  const Sentry = await startBrowserReporting();
+  Sentry?.captureException(error);
 }
 
 export function ClientErrorReporting({

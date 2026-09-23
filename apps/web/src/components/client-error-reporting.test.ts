@@ -126,17 +126,55 @@ describe("репортер не поднимается на белолейбло
     expect(reportingAllowedOnPath("/sample-report")).toBe(true);
   });
 
-  it("запрет стоит в эффекте до загрузки SDK", async () => {
-    // Проверяется исходник: если чанк SDK успеет загрузиться, сторонний код
-    // уже на клиентской странице — отказ обязан стоять раньше импорта.
+  it("запрет стоит до загрузки SDK в обоих местах, откуда он поднимается", async () => {
+    /**
+     * Проверяется исходник: если чанк SDK успеет загрузиться, сторонний код
+     * уже на клиентской странице — отказ обязан стоять раньше импорта.
+     *
+     * Срез берётся от объявления каждой функции, а не от первого слова
+     * «useEffect» в файле: первое такое слово — строка импорта из React, и
+     * срез от неё захватывал бы объявление `reportingAllowedOnPath`, то
+     * есть проверка проходила бы и с вырезанным запретом.
+     */
     const source = await readFile(new URL("./client-error-reporting.tsx", import.meta.url), "utf8");
-    const effect = source.slice(source.indexOf("useEffect"));
 
-    const guard = effect.indexOf("reportingAllowedOnPath");
-    expect(guard).toBeGreaterThan(-1);
-    expect(guard).toBeLessThan(effect.indexOf('import("@sentry/browser")'));
-    // И в том же условии, где проверяется DSN, а не отдельной веткой ниже.
-    expect(effect).toMatch(/if \(!resolvedDsn \|\| started \|\| !reportingAllowedOnPath\(/);
+    const entries = {
+      // Компонент: поднимает SDK при монтировании на экранах агентства.
+      component: source.slice(source.indexOf("export function ClientErrorReporting")),
+      // Общий вход: им же пользуется global-error.tsx, где компонента нет.
+      starter: source.slice(
+        source.indexOf("async function startBrowserReporting"),
+        source.indexOf("export async function reportClientError"),
+      ),
+    };
+
+    for (const [name, body] of Object.entries(entries)) {
+      const guard = body.indexOf("reportingAllowedOnPath(window.location.pathname)");
+      // Именно загрузка, а не упоминание типа в сигнатуре функции.
+      const load = body.search(/(await|void) import\("@sentry\/browser"\)/);
+
+      expect(guard, `${name}: запрет на пути отсутствует`).toBeGreaterThan(-1);
+      expect(load, `${name}: загрузка SDK не найдена`).toBeGreaterThan(-1);
+      expect(guard, `${name}: запрет стоит после загрузки SDK`).toBeLessThan(load);
+      // И в том же условии, где проверяется DSN, а не отдельной веткой ниже.
+      expect(body, `${name}: запрет вынесен из условия с DSN`).toMatch(
+        /if \(!res(olvedDsn)?[^)]*!reportingAllowedOnPath\(/,
+      );
+    }
+  });
+
+  it("global-error отправляет ошибку общим входом, а не мимо него", async () => {
+    /**
+     * `global-error.tsx` подменяет корневой layout целиком: перенос
+     * репортера в `(app)/layout.tsx` его не закрывает, и прямой вызов
+     * `captureException` там был бы и обходом запрета на `/r/*`, и
+     * отправкой по неподнятому клиенту — то есть молчанием.
+     */
+    const source = await readFile(new URL("../app/global-error.tsx", import.meta.url), "utf8");
+
+    expect(source).toContain("void reportClientError(error)");
+    expect(source).not.toMatch(/(await|void) import\("@sentry\/browser"\)/);
+    expect(source).not.toMatch(/Sentry\.\w+\(/);
   });
 });
 
@@ -145,11 +183,12 @@ describe("инициализация браузерного SDK", () => {
     // Проверяется исходник: эффект без DSN должен выйти до динамического
     // импорта, иначе код SDK уедет в бандл каждой страницы.
     const source = await readFile(new URL("./client-error-reporting.tsx", import.meta.url), "utf8");
-    const effect = source.slice(source.indexOf("useEffect"));
+    // Срез от самого компонента: первое «useEffect» в файле — строка импорта.
+    const effect = source.slice(source.indexOf("export function ClientErrorReporting"));
 
     expect(effect).toContain("process.env.NEXT_PUBLIC_SENTRY_DSN");
     expect(effect.indexOf("if (!resolvedDsn")).toBeLessThan(
-      effect.indexOf('import("@sentry/browser")'),
+      effect.search(/(await|void) import\("@sentry\/browser"\)/),
     );
     // Серверный DSN публичным не становится ни при каких условиях.
     expect(source).not.toMatch(/process\.env\.SENTRY_DSN/);
