@@ -10,6 +10,7 @@ import {
   getScheduleForClient,
 } from "@repo/db";
 import type { Database } from "@repo/db";
+import type * as CapacityModule from "@repo/core/adapters/capacity";
 import type { SessionUser, TrpcContext } from "./context";
 
 /**
@@ -30,7 +31,7 @@ const refuseScheduleForPlan = vi.hoisted(() =>
 );
 
 vi.mock("@repo/core/adapters/capacity", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@repo/core/adapters/capacity")>();
+  const actual = await importOriginal<typeof CapacityModule>();
   // Подменяется ровно одна функция: список частот, оценка и ёмкость формы
   // остаются настоящими, иначе тест перестал бы говорить о живом экране.
   return { ...actual, refuseScheduleForPlan };
