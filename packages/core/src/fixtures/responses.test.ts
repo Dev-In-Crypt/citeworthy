@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { adapterResultSchema, PLATFORMS } from "../adapters/types";
-import { fixturesForPlatform, RESPONSE_FIXTURES } from "./responses";
+import { classifySource, HeuristicSourceClassifier } from "../sources/classifier";
+import { normalizeDomain } from "../sources/domains";
+import { allFixtures, fixturesForPlatform, RESPONSE_FIXTURES } from "./responses";
 
 /** Verify T11: fixtures валидируются против контракта C1 и покрывают edge-cases. */
 
@@ -58,5 +60,88 @@ describe("response fixtures", () => {
       expect(fixture.result.modelVersion).not.toBe("");
       expect(fixture.result.costUsd).toBeGreaterThan(0);
     }
+  });
+});
+
+/**
+ * Ни одного настоящего домена в демо-данных.
+ *
+ * Рядом с доменом в этих ответах стоит выдуманная доля упоминаний выдуманного
+ * бренда. На настоящем домене это превращается в утверждение о компании,
+ * которую мы никогда не измеряли, — и оно видно покупателю на публичной
+ * странице примера. Зоны `.example` и `.test` зарезервированы RFC 2606 и не
+ * регистрируются, поэтому домен из них не может однажды оказаться чьим-то.
+ */
+describe("домены в fixtures", () => {
+  /**
+   * Похожее на домен: несколько меток через точку, последняя — буквенная.
+   * Ищется во всём тексте ответов, а не только в url: «monday.com» посреди
+   * предложения — такой же настоящий домен, как и в ссылке.
+   */
+  const DOMAIN_LIKE = /\b[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9-]+)*\.[a-z]{2,}\b/gi;
+  const RESERVED = [".example", ".test"];
+
+  it("все домены — в зарезервированных зонах", () => {
+    const found = [...JSON.stringify(allFixtures()).matchAll(DOMAIN_LIKE)].map((m) => m[0]);
+
+    expect(found.length).toBeGreaterThan(0);
+    const real = found.filter(
+      (domain) => !RESERVED.some((zone) => domain.toLowerCase().endsWith(zone)),
+    );
+    expect([...new Set(real)]).toEqual([]);
+  });
+
+  it("не осталось площадок, названных именем настоящей компании", () => {
+    // Список ровно тех, что стояли здесь раньше: тест должен падать,
+    // если какая-то из них вернётся под другим написанием.
+    const realNames = [
+      "g2",
+      "capterra",
+      "trustradius",
+      "softwareadvice",
+      "reddit",
+      "hubspot",
+      "pipedrive",
+      "forbes",
+      "monday.com",
+    ];
+    const haystack = JSON.stringify(allFixtures()).toLowerCase();
+
+    for (const name of realNames) {
+      expect(haystack.includes(`${name}.`)).toBe(false);
+    }
+  });
+
+  /**
+   * Замена доменов не должна была сдвинуть данные: типы источников считает
+   * тот же классификатор, что и в бою, и распределение по типам обязано
+   * остаться прежним — иначе демо-экраны показывают уже другую картину.
+   */
+  it("распределение источников по типам не изменилось", async () => {
+    const classifier = new HeuristicSourceClassifier();
+    const counts = new Map<string, number>();
+
+    for (const fixture of allFixtures()) {
+      // Клиент выбирается так же, как в seed: у spend-набора свой.
+      const clientDomain = fixture.id.includes("spend") ? "ledgerbrook.test" : "acmecrm.test";
+
+      for (const citation of fixture.result.citations) {
+        const { type } = await classifySource(normalizeDomain(citation.url), classifier, {
+          clientDomain,
+          ...(citation.title ? { title: citation.title } : {}),
+        });
+        const key = type ?? "unclassified";
+        counts.set(key, (counts.get(key) ?? 0) + 1);
+      }
+    }
+
+    expect(Object.fromEntries([...counts].sort())).toEqual({
+      documentation: 4,
+      editorial: 7,
+      owned: 17,
+      review: 42,
+      ugc: 8,
+      unclassified: 49,
+    });
   });
 });

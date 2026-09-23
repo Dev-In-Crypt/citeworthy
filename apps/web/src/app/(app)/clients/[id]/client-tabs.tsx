@@ -15,6 +15,14 @@ import { cn } from "@/lib/utils";
  *
  * Адреса при этом не переименованы. Двадцать из двадцати трёх сквозных
  * тестов ходят по ним напрямую, и агентство — тоже, по памяти.
+ *
+ * Одно понятие — одно имя. Экран `/measure` назывался тремя словами сразу
+ * («Analytics» во вкладке, «Visibility» в подвкладке, «Measure» в заголовке),
+ * `/diagnose` — двумя. Три имени одного экрана человек читает как три разных
+ * места и ищет между ними разницу, которой нет. Оставлены слова самого
+ * продукта — Measure и Diagnose: ими названы адреса, ими же говорят план и
+ * документация, и заголовки экранов уже стоят на них. Вкладка, подвкладка и
+ * заголовок теперь совпадают дословно; это проверяется тестом (naming.test.ts).
  */
 
 /**
@@ -27,7 +35,7 @@ const TABS = [
   { segment: "opportunities", label: "Opportunities" },
   { segment: "actions", label: "Work" },
   { segment: "reports", label: "Report" },
-  { segment: "measure", label: "Analytics" },
+  { segment: "measure", label: "Measure" },
   { segment: "settings", label: "Settings" },
 ] as const;
 
@@ -38,8 +46,10 @@ const SUBTABS = {
     { segment: "experiments", label: "Experiments" },
   ],
   measure: [
-    { segment: "measure", label: "Visibility" },
-    { segment: "diagnose", label: "Sources" },
+    // Раздел назван по своему первому экрану, как «Work» назван по работе:
+    // повтор слова честнее, чем синоним, за которым человек ищет другой экран.
+    { segment: "measure", label: "Measure" },
+    { segment: "diagnose", label: "Diagnose" },
   ],
 } as const;
 
