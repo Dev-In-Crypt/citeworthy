@@ -1,10 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { api } from "@/trpc/react";
 import { buttonClass } from "@/components/ui/button";
 import { controlClass } from "@/components/ui/field";
+import { FileInput } from "@/components/ui/file-input";
 import { cn } from "@/lib/utils";
 
 export function SettingsForm({
@@ -17,7 +18,6 @@ export function SettingsForm({
   initialLogoUrl: string | null;
 }) {
   const router = useRouter();
-  const fileInput = useRef<HTMLInputElement>(null);
 
   const [name, setName] = useState(initialName);
   const [brandColor, setBrandColor] = useState(initialColor);
@@ -34,8 +34,7 @@ export function SettingsForm({
     onError: (e) => setError(e.message),
   });
 
-  async function handleLogoChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
+  async function handleLogoChange(file: File | null) {
     if (!file) return;
 
     setError(null);
@@ -101,13 +100,11 @@ export function SettingsForm({
           ) : (
             <p className="text-sm text-muted-foreground">No logo uploaded yet.</p>
           )}
-          <input
-            ref={fileInput}
-            type="file"
-            aria-label="Logo file"
+          <FileInput
+            label="Logo file"
             accept="image/png,image/jpeg,image/webp,image/svg+xml"
-            onChange={handleLogoChange}
-            className="text-sm"
+            onSelect={(file) => void handleLogoChange(file)}
+            testId="logo-file"
           />
         </div>
 

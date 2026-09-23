@@ -30,18 +30,21 @@ export const GAP_FIXTURES: ResponseFixture[] = [
         "4. **Data export** — check you can leave without an engineer.",
         "5. **Seat pricing** — most teams underestimate growth.",
         "",
-        "Reviewers on G2 and Capterra weight onboarding time heavily; it is the most",
+        "Reviewers on Reviewgrid and Softwarepicks weight onboarding time heavily; it is the most",
         "common reason a rollout stalls.",
       ].join("\n"),
       citations: [
-        { url: "https://www.g2.com/categories/crm/buyers-guide", title: "CRM Buyer's Guide | G2" },
         {
-          url: "https://www.capterra.com/customer-relationship-management-software/",
-          title: "CRM Software Reviews | Capterra",
+          url: "https://www.reviewgrid.example/categories/crm/buyers-guide",
+          title: "CRM Buyer's Guide | Reviewgrid Reviews",
         },
         {
-          url: "https://www.trustradius.com/crm",
-          title: "CRM Software Reviews and Ratings | TrustRadius",
+          url: "https://www.softwarepicks.example/customer-relationship-management-software/",
+          title: "CRM Software Reviews | Softwarepicks",
+        },
+        {
+          url: "https://www.vendorverdict.example/crm",
+          title: "CRM Software Reviews and Ratings | Vendor Verdict",
         },
       ],
       modelVersion: "gpt-4o-2026-05-13",
@@ -63,12 +66,15 @@ export const GAP_FIXTURES: ResponseFixture[] = [
         "comparison written for teams under fifty people.",
       ].join("\n"),
       citations: [
-        { url: "https://www.g2.com/categories/crm/buyers-guide", title: "CRM Buyer's Guide | G2" },
         {
-          url: "https://www.softwareadvice.com/crm/",
-          title: "Best CRM Software 2026 | Software Advice",
+          url: "https://www.reviewgrid.example/categories/crm/buyers-guide",
+          title: "CRM Buyer's Guide | Reviewgrid Reviews",
         },
-        { url: "https://www.reddit.com/r/sales/comments/crm-picks", title: "How did you pick?" },
+        {
+          url: "https://www.shortlister.example/crm/",
+          title: "Best CRM Software 2026 | Shortlister Reviews",
+        },
+        { url: "https://forum.saaspeers.example/sales/crm-picks", title: "How did you pick?" },
       ],
       modelVersion: "sonar-pro-2026-04",
       costUsd: 0.0098,
@@ -88,10 +94,10 @@ export const GAP_FIXTURES: ResponseFixture[] = [
       ].join("\n"),
       citations: [
         {
-          url: "https://www.capterra.com/customer-relationship-management-software/",
-          title: "CRM Software Reviews | Capterra",
+          url: "https://www.softwarepicks.example/customer-relationship-management-software/",
+          title: "CRM Software Reviews | Softwarepicks",
         },
-        { url: "https://www.forbes.com/advisor/business/software/best-crm/", title: "Best CRM" },
+        { url: "https://news.marketledger.example/business/best-crm/", title: "Best CRM" },
       ],
       modelVersion: "gemini-2.5-pro-2026-03",
       costUsd: 0.0087,
@@ -116,11 +122,14 @@ export const GAP_FIXTURES: ResponseFixture[] = [
       ].join("\n"),
       citations: [
         {
-          url: "https://blog.hubspot.com/sales/crm-vs-spreadsheet",
+          url: "https://blog.crmdigest.example/crm-vs-spreadsheet",
           title: "CRM vs Spreadsheet",
         },
-        { url: "https://www.g2.com/categories/crm", title: "Best CRM Software 2026 | G2" },
-        { url: "https://www.reddit.com/r/smallbusiness/comments/crm-or-sheet", title: "Worth it?" },
+        {
+          url: "https://www.reviewgrid.example/categories/crm",
+          title: "CRM Software Reviews 2026 | Reviewgrid",
+        },
+        { url: "https://forum.saaspeers.example/smallbusiness/crm-or-sheet", title: "Worth it?" },
       ],
       modelVersion: "gpt-4o-2026-05-13",
       costUsd: 0.0117,
@@ -139,8 +148,11 @@ export const GAP_FIXTURES: ResponseFixture[] = [
         "HubSpot where marketing shares the data.",
       ].join("\n"),
       citations: [
-        { url: "https://www.capterra.com/crm-vs-spreadsheet/", title: "CRM vs Spreadsheet" },
-        { url: "https://www.reddit.com/r/sales/comments/sheet-to-crm", title: "When to switch" },
+        {
+          url: "https://www.softwarepicks.example/crm-vs-spreadsheet/",
+          title: "CRM vs Spreadsheet | Softwarepicks Reviews",
+        },
+        { url: "https://forum.saaspeers.example/sales/sheet-to-crm", title: "When to switch" },
       ],
       modelVersion: "sonar-pro-2026-04",
       costUsd: 0.0091,
@@ -159,10 +171,13 @@ export const GAP_FIXTURES: ResponseFixture[] = [
         "Close are the names that come up most for teams making that move.",
       ].join("\n"),
       citations: [
-        { url: "https://www.g2.com/categories/crm", title: "Best CRM Software 2026 | G2" },
         {
-          url: "https://www.trustradius.com/crm",
-          title: "CRM Software Reviews and Ratings | TrustRadius",
+          url: "https://www.reviewgrid.example/categories/crm",
+          title: "CRM Software Reviews 2026 | Reviewgrid",
+        },
+        {
+          url: "https://www.vendorverdict.example/crm",
+          title: "CRM Software Reviews and Ratings | Vendor Verdict",
         },
       ],
       modelVersion: "gemini-2.5-pro-2026-03",
@@ -186,10 +201,10 @@ export const GAP_FIXTURES: ResponseFixture[] = [
       ].join("\n"),
       citations: [
         {
-          url: "https://www.pipedrive.com/en/blog/sales-pipeline-management",
+          url: "https://www.pipewell.example/blog/sales-pipeline-management",
           title: "Sales Pipeline Management",
         },
-        { url: "https://blog.hubspot.com/sales/sales-pipeline", title: "Sales Pipeline Guide" },
+        { url: "https://blog.crmdigest.example/sales-pipeline", title: "Sales Pipeline Guide" },
       ],
       modelVersion: "gpt-4o-2026-05-13",
       costUsd: 0.0105,
@@ -208,10 +223,13 @@ export const GAP_FIXTURES: ResponseFixture[] = [
       ].join("\n"),
       citations: [
         {
-          url: "https://support.pipedrive.com/en/article/pipelines",
-          title: "Pipelines | Pipedrive Support",
+          url: "https://support.pipewell.example/article/pipelines",
+          title: "Pipelines | Pipewell Support",
         },
-        { url: "https://www.g2.com/categories/crm", title: "Best CRM Software 2026 | G2" },
+        {
+          url: "https://www.reviewgrid.example/categories/crm",
+          title: "CRM Software Reviews 2026 | Reviewgrid",
+        },
       ],
       modelVersion: "sonar-pro-2026-04",
       costUsd: 0.0083,
@@ -231,10 +249,13 @@ export const GAP_FIXTURES: ResponseFixture[] = [
       ].join("\n"),
       citations: [
         {
-          url: "https://www.pipedrive.com/en/blog/sales-pipeline-management",
+          url: "https://www.pipewell.example/blog/sales-pipeline-management",
           title: "Sales Pipeline Management",
         },
-        { url: "https://www.capterra.com/crm-pipeline/", title: "Pipeline Features Compared" },
+        {
+          url: "https://www.softwarepicks.example/crm-pipeline/",
+          title: "Pipeline Features Compared | Softwarepicks Reviews",
+        },
       ],
       modelVersion: "gemini-2.5-pro-2026-03",
       costUsd: 0.0074,

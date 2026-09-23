@@ -23,6 +23,21 @@ describe("демонстрационный отчёт", () => {
   it("логотипа нет — грузить его в сборке неоткуда", () => {
     expect(SAMPLE_AGENCY.logoUrl).toBeNull();
   });
+
+  /**
+   * Эту страницу видит покупатель. Строка вида «g2.com процитирован в 18%
+   * ответов» рядом с выдуманным брендом — выдуманная цифра, приписанная
+   * настоящей компании. Зона `.example` не регистрируется (RFC 2606), поэтому
+   * домен из неё не может однажды оказаться чьим-то.
+   */
+  it("ни одного настоящего домена — все в зоне .example", () => {
+    const domainLike = /\b[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9-]+)*\.[a-z]{2,}\b/gi;
+    const text = JSON.stringify([SAMPLE_AUDIT_REPORT, SAMPLE_DELIVERY_REPORT, SAMPLE_AGENCY]);
+    const found = [...text.matchAll(domainLike)].map((match) => match[0]);
+
+    expect(found.length).toBeGreaterThan(0);
+    expect([...new Set(found.filter((domain) => !domain.endsWith(".example")))]).toEqual([]);
+  });
 });
 
 describe("отчёт аудита", () => {

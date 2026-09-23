@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { ASSISTANTS, MEASUREMENT_COPY } from "@repo/core";
 import { api } from "@/trpc/react";
+import { FileInput } from "@/components/ui/file-input";
 
 /**
  * Переходы от ассистентов.
@@ -24,9 +25,14 @@ export function TrafficCard({
   visibilityDeltaPp?: number | null;
 }) {
   const utils = api.useUtils();
-  const input = useRef<HTMLInputElement>(null);
   const [result, setResult] = useState<{ imported: number; skipped: string[] } | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
+  /**
+   * Поле пересоздаётся после каждого импорта. Пока в нём лежит тот же файл,
+   * повторный выбор того же файла событие не вызывает — а именно так и
+   * импортируют: выгрузили заново, поправили, отдали ещё раз.
+   */
+  const [pickerKey, setPickerKey] = useState(0);
 
   const summary = api.analytics.summary.useQuery({ clientId });
 
@@ -39,14 +45,13 @@ export function TrafficCard({
     onError: (error) => setErrors([error.message]),
   });
 
-  async function handleFile(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
+  async function handleFile(file: File | null) {
     if (!file) return;
 
     setErrors([]);
     setResult(null);
     importTraffic.mutate({ clientId, csv: await file.text() });
-    if (input.current) input.current.value = "";
+    setPickerKey((key) => key + 1);
   }
 
   const data = summary.data;
@@ -106,19 +111,13 @@ export function TrafficCard({
       {/* Предел метрики стоит рядом с цифрой, а не в сноске под экраном. */}
       <p className="text-xs text-muted-foreground">{MEASUREMENT_COPY.trafficUndercount}</p>
 
-      <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium" htmlFor="traffic-csv">
-          Import a referral export
-        </label>
-        <input
-          id="traffic-csv"
-          ref={input}
-          type="file"
-          accept=".csv,text/csv"
-          onChange={handleFile}
-          className="text-xs"
-        />
-      </div>
+      <FileInput
+        key={pickerKey}
+        label="Import a referral export"
+        accept=".csv,text/csv"
+        onSelect={(file) => void handleFile(file)}
+        testId="traffic-csv"
+      />
 
       {result && (
         <p data-testid="traffic-import" className="text-xs text-muted-foreground">

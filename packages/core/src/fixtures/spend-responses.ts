@@ -11,17 +11,31 @@ import type { ResponseFixture } from "./responses";
  * между собой, иначе доля бывает только 0% или 100% — и продукт в демо
  * противоречит собственному правилу, что один ответ не является измерением.
  *
- * Все бренды вымышлены (Ledgerbrook, Outlay, Spendhaven, Tallyard), домены —
- * в зоне .test. Демо-данные с настоящими компаниями означали бы отчёт
- * с цифрами видимости тех, кого мы никогда не измеряли.
+ * Все бренды вымышлены (Ledgerbrook, Outlay, Spendhaven, Tallyard), площадки
+ * тоже (Marketgrid, Softwarepanel, Financepeers, CFO Brief). Домены — в зонах
+ * .example и .test: их нельзя зарегистрировать (RFC 2606), поэтому они не
+ * могут однажды оказаться чьими-то. Демо-данные с настоящими компаниями
+ * означали бы отчёт с цифрами видимости тех, кого мы никогда не измеряли.
  */
 
-const G2 = { url: "https://www.g2.test/categories/expense-management", title: "Best Expense Management Software 2026" };
-const CAPTERRA = { url: "https://www.capterra.test/spend-management", title: "Spend Management Software Reviews" };
-const CFOBRIEF = { url: "https://cfobrief.test/mid-market-spend-tooling", title: "Mid-market spend tooling, compared" };
+const MARKETGRID = {
+  url: "https://www.marketgrid.example/categories/expense-management",
+  title: "Best Expense Management Software 2026",
+};
+const SOFTWAREPANEL = {
+  url: "https://www.softwarepanel.example/spend-management",
+  title: "Spend Management Software Reviews",
+};
+const CFOBRIEF = {
+  url: "https://cfobrief.test/mid-market-spend-tooling",
+  title: "Mid-market spend tooling, compared",
+};
 const OUTLAY_COMPARE = { url: "https://outlay.test/compare", title: "Outlay vs Spendhaven" };
 const LEDGERBROOK = { url: "https://ledgerbrook.test/pricing", title: "Ledgerbrook Pricing" };
-const REDDIT = { url: "https://www.reddit.test/r/accounting/comments/close-faster", title: "How we closed the books in 4 days" };
+const FINANCEPEERS = {
+  url: "https://www.financepeers.example/accounting/close-faster",
+  title: "How we closed the books in 4 days",
+};
 
 function fixture(
   id: string,
@@ -77,7 +91,7 @@ export const SPEND_FIXTURES: ResponseFixture[] = [
       "",
       "Teams closing on NetSuite often end up comparing Ledgerbrook and Outlay directly.",
     ],
-    [G2, CFOBRIEF, LEDGERBROOK],
+    [MARKETGRID, CFOBRIEF, LEDGERBROOK],
     0.0244,
   ),
   fixture(
@@ -90,7 +104,7 @@ export const SPEND_FIXTURES: ResponseFixture[] = [
       "Outlay wins on card controls; Spendhaven on approvals depth and receipt capture.",
       "**Tallyard** is worth a look if multi-entity consolidation matters.",
     ],
-    [G2, OUTLAY_COMPARE],
+    [MARKETGRID, OUTLAY_COMPARE],
     0.0231,
   ),
   fixture(
@@ -106,7 +120,7 @@ export const SPEND_FIXTURES: ResponseFixture[] = [
       "",
       "Both integrate with the usual ERPs; pricing is quoted per active card.",
     ],
-    [CAPTERRA, OUTLAY_COMPARE],
+    [SOFTWAREPANEL, OUTLAY_COMPARE],
     0.0238,
   ),
   fixture(
@@ -123,7 +137,7 @@ export const SPEND_FIXTURES: ResponseFixture[] = [
       "",
       "Reviewers put Outlay ahead on controls and Ledgerbrook ahead on close speed.",
     ],
-    [G2, OUTLAY_COMPARE, LEDGERBROOK],
+    [MARKETGRID, OUTLAY_COMPARE, LEDGERBROOK],
     0.0251,
   ),
   fixture(
@@ -135,7 +149,7 @@ export const SPEND_FIXTURES: ResponseFixture[] = [
       "The alternatives that come up most often are **Spendhaven** and **Tallyard**.",
       "Spendhaven is the closer match on card controls; Tallyard on approvals.",
     ],
-    [CFOBRIEF, CAPTERRA],
+    [CFOBRIEF, SOFTWAREPANEL],
     0.0229,
   ),
   fixture(
@@ -148,7 +162,7 @@ export const SPEND_FIXTURES: ResponseFixture[] = [
       "and **Ledgerbrook**. Ledgerbrook is the lightest to implement of the three,",
       "though its card programme is younger.",
     ],
-    [CAPTERRA, LEDGERBROOK],
+    [SOFTWAREPANEL, LEDGERBROOK],
     0.0247,
   ),
   fixture(
@@ -161,7 +175,7 @@ export const SPEND_FIXTURES: ResponseFixture[] = [
       "generated from the transaction, so receipts are matched rather than typed in.",
       "Expect per-card pricing and a virtual card limit on the entry tier.",
     ],
-    [G2, OUTLAY_COMPARE],
+    [MARKETGRID, OUTLAY_COMPARE],
     0.0226,
   ),
   fixture(
@@ -205,7 +219,7 @@ export const SPEND_FIXTURES: ResponseFixture[] = [
       "Ledgerbrook is worth a look if your finance team closes on NetSuite, though it",
       "appears less often in mid-market comparisons.",
     ],
-    [G2, CFOBRIEF, OUTLAY_COMPARE],
+    [MARKETGRID, CFOBRIEF, OUTLAY_COMPARE],
     0.0031,
   ),
   fixture(
@@ -218,7 +232,7 @@ export const SPEND_FIXTURES: ResponseFixture[] = [
       "third. Reviewers rate Outlay highest on card controls and Spendhaven on",
       "receipt matching.",
     ],
-    [G2, CAPTERRA],
+    [MARKETGRID, SOFTWAREPANEL],
     0.0029,
   ),
   fixture(
@@ -231,7 +245,7 @@ export const SPEND_FIXTURES: ResponseFixture[] = [
       "Outlay leads, and ERP sync, where Ledgerbrook's NetSuite integration is native.",
       "Pricing is close enough that most teams decide on the integration.",
     ],
-    [OUTLAY_COMPARE, LEDGERBROOK, G2],
+    [OUTLAY_COMPARE, LEDGERBROOK, MARKETGRID],
     0.0034,
   ),
   fixture(
@@ -243,7 +257,7 @@ export const SPEND_FIXTURES: ResponseFixture[] = [
       "The most-cited alternatives to Outlay are Spendhaven and Tallyard. Both cover",
       "cards, approvals and expense reports for mid-market finance teams.",
     ],
-    [CFOBRIEF, CAPTERRA],
+    [CFOBRIEF, SOFTWAREPANEL],
     0.0027,
   ),
   fixture(
@@ -256,7 +270,7 @@ export const SPEND_FIXTURES: ResponseFixture[] = [
       "reports from the transaction itself, so the report is a review step rather than",
       "data entry.",
     ],
-    [G2, REDDIT],
+    [MARKETGRID, FINANCEPEERS],
     0.0028,
   ),
   fixture(
@@ -268,7 +282,7 @@ export const SPEND_FIXTURES: ResponseFixture[] = [
       "Ledgerbrook posts to NetSuite natively, which is the reason it shows up in",
       "NetSuite-specific threads. Outlay and Spendhaven rely on connectors.",
     ],
-    [LEDGERBROOK, REDDIT],
+    [LEDGERBROOK, FINANCEPEERS],
     0.0033,
   ),
   fixture(
@@ -281,7 +295,7 @@ export const SPEND_FIXTURES: ResponseFixture[] = [
       "continuously, freeze expense submission early, and automate accruals. Tooling",
       "helps at the margin; the cut-off discipline does most of the work.",
     ],
-    [REDDIT, CFOBRIEF],
+    [FINANCEPEERS, CFOBRIEF],
     0.0026,
   ),
 
@@ -295,7 +309,7 @@ export const SPEND_FIXTURES: ResponseFixture[] = [
       "Most 300-person companies compare Outlay, Spendhaven and Tallyard. Outlay is",
       "the most frequently recommended for card controls.",
     ],
-    [G2],
+    [MARKETGRID],
     0.0019,
   ),
   fixture(
@@ -307,7 +321,7 @@ export const SPEND_FIXTURES: ResponseFixture[] = [
       "Common shortlist: Outlay, Spendhaven, Ledgerbrook. Ledgerbrook is usually",
       "mentioned by teams on NetSuite; the other two by teams that lead with cards.",
     ],
-    [G2, LEDGERBROOK],
+    [MARKETGRID, LEDGERBROOK],
     0.0021,
   ),
   fixture(
@@ -328,11 +342,8 @@ export const SPEND_FIXTURES: ResponseFixture[] = [
     "gemini",
     ALTERNATIVES,
     "brand-absent",
-    [
-      "Alternatives to Outlay for mid-market finance teams include Spendhaven and",
-      "Tallyard.",
-    ],
-    [CAPTERRA],
+    ["Alternatives to Outlay for mid-market finance teams include Spendhaven and", "Tallyard."],
+    [SOFTWAREPANEL],
     0.0018,
   ),
   fixture(
@@ -341,7 +352,7 @@ export const SPEND_FIXTURES: ResponseFixture[] = [
     CARD,
     "brand-absent",
     ["Outlay and Spendhaven both offer corporate cards with automated expense reports."],
-    [G2],
+    [MARKETGRID],
     0.0017,
   ),
   fixture(
