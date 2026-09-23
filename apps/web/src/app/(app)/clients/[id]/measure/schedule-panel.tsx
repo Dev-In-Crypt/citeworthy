@@ -100,28 +100,33 @@ export function SchedulePanel({ clientId }: { clientId: string }) {
    * подменить выбор молча — значит соврать о том, что настроено. Выбрать её
    * заново нельзя, а при сохранении сервер объяснит отказ.
    */
-  const cadenceOptions = options
-    ? options.cadences.some((option) => option.id === cadence)
-      ? options.cadences.map((option) => ({ ...option, allowed: true }))
-      : [...options.cadences.map((option) => ({ ...option, allowed: true })), {
-          id: cadence,
-          label: cadence,
-          allowed: false,
-        }]
-    : [];
+  const allowedCadences = (options?.cadences ?? []).map((option) => ({
+    ...option,
+    allowed: true,
+  }));
+  /**
+   * Выбранное сейчас всегда есть в списке: пустой select подменил бы выбор
+   * агентства первым попавшимся вариантом. Запрещённым оно помечается только
+   * когда ёмкость уже пришла и тариф действительно его не разрешает.
+   */
+  const cadenceOptions = allowedCadences.some((option) => option.id === cadence)
+    ? allowedCadences
+    : [...allowedCadences, { id: cadence, label: cadence, allowed: options === undefined }];
 
   /**
    * То же и с ассистентами: включённый, но больше не разрешённый тарифом
    * остаётся видимым, чтобы его можно было снять. Заново поставить нельзя.
    */
-  const assistantOptions = options
-    ? [
-        ...options.assistants.map((option) => ({ ...option, allowed: true })),
-        ...platforms
-          .filter((id) => !options.assistants.some((option) => option.id === id))
-          .map((id) => ({ id, label: id, allowed: false })),
-      ]
-    : [];
+  const allowedAssistants = (options?.assistants ?? []).map((option) => ({
+    ...option,
+    allowed: true,
+  }));
+  const assistantOptions = [
+    ...allowedAssistants,
+    ...platforms
+      .filter((id) => !allowedAssistants.some((option) => option.id === id))
+      .map((id) => ({ id, label: id, allowed: options === undefined })),
+  ];
 
   const estimate =
     options && platforms.length > 0 && options.promptCount > 0
