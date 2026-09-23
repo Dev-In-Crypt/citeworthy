@@ -1,4 +1,4 @@
-import { MemoryEmailSender, consoleEmailLog } from "./memory";
+import { MemoryEmailSender, consoleEmailFailureLog, consoleEmailLog } from "./memory";
 import { ResendEmailSender } from "./resend";
 import type { EmailSender } from "./types";
 
@@ -35,5 +35,11 @@ export function createEmailSender(env: NodeJS.ProcessEnv = process.env): EmailSe
   }
 
   const from = env["EMAIL_FROM"]?.trim();
-  return new ResendEmailSender({ apiKey, ...(from ? { from } : {}) });
+  return new ResendEmailSender({
+    apiKey,
+    ...(from ? { from } : {}),
+    // Не ушедшее письмо попадает в лог целиком: иначе отказ транспорта
+    // означал бы, что приглашение исчезло вместе со ссылкой.
+    onFailure: consoleEmailFailureLog,
+  });
 }
