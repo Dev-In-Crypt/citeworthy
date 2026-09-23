@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import * as templates from "./templates";
 import {
   EMAIL_COPY,
   inviteEmail,
@@ -46,14 +47,34 @@ const REPORT: ReportReadyEmailInput = {
   reportUrl: "https://reports.northwind.test/r/abc",
 };
 
-/** Все письма продукта: список ведётся здесь, чтобы общие проверки шли по каждому. */
-const ALL_MESSAGES: ReadonlyArray<readonly [string, EmailMessage]> = [
-  ["invite", inviteEmail(INVITE)],
-  ["password reset", passwordResetEmail(RESET)],
-  ["report ready", reportReadyEmail(REPORT)],
-];
+/**
+ * Все письма продукта. Список сверяется с модулем шаблонов отдельным тестом:
+ * руками его вести нельзя — четвёртое письмо просто не попало бы в общие
+ * проверки, и никто бы этого не заметил.
+ */
+const SAMPLES: Record<string, EmailMessage> = {
+  inviteEmail: inviteEmail(INVITE),
+  passwordResetEmail: passwordResetEmail(RESET),
+  reportReadyEmail: reportReadyEmail(REPORT),
+};
+
+const ALL_MESSAGES: ReadonlyArray<readonly [string, EmailMessage]> = Object.entries(SAMPLES);
+
+/** Шаблоны, какие есть в модуле: по ним и сверяется список. */
+function exportedTemplateNames(): string[] {
+  return Object.entries(templates)
+    .filter(([name, value]) => typeof value === "function" && name.endsWith("Email"))
+    .map(([name]) => name)
+    .sort();
+}
 
 describe("email templates", () => {
+  it("каждый шаблон модуля проходит общие проверки", () => {
+    // Падает ровно тогда, когда письмо добавили, а образца для него нет:
+    // без этого новое письмо молча прошло бы мимо всех проверок ниже.
+    expect(exportedTemplateNames()).toEqual(Object.keys(SAMPLES).sort());
+  });
+
   it("приглашение несёт ссылку, агентство и роль", () => {
     const message = inviteEmail(INVITE);
 
@@ -236,8 +257,34 @@ describe("MemoryEmailSender", () => {
     const record = JSON.parse(lines[0] ?? "{}") as Record<string, unknown>;
     expect(record["level"]).toBe("error");
     expect(record["event"]).toBe("email.failed");
+    expect(record["to"]).toBe("colleague@agency.test");
+    expect(record["subject"]).toContain("Northwind Studio");
     expect(JSON.stringify(record["error"])).toContain("transport is down");
-    expect(String(record["body"])).toContain("https://app.test/invite/abc123");
+    expect(record["body"]).toBeUndefined();
+  });
+
+  it.each(ALL_MESSAGES)("%s: в записи об отказе нет ни ссылки, ни токена", (_name, message) => {
+    /**
+     * Строка об отказе живёт в логе хостинга и может уехать во внешний
+     * сборщик ошибок. Ссылка на смену пароля и ссылка `/r/<токен>`, дающая
+     * доступ к отчёту клиента без входа, туда попасть не должны: повторная
+     * отправка стоит одного клика, а утёкший токен не отзовёшь.
+     */
+    const lines: string[] = [];
+    const logger = createLogger({ sink: (line) => lines.push(line) });
+
+    createEmailFailureLog(logger)(message, new Error("transport is down"));
+    const record = lines[0] ?? "";
+
+    expect(record).not.toContain("://");
+    for (const link of message.text.match(/https?:\/\/\S+/g) ?? []) {
+      expect(record).not.toContain(link);
+      // И сам токен из ссылки — тоже: он опаснее ссылки целиком.
+      for (const part of link.split(/[/?=]/).filter((piece) => piece.length >= 3)) {
+        if (/^https?:$/.test(part) || part.includes(".")) continue;
+        expect(record).not.toContain(part);
+      }
+    }
   });
 
   it("в запись попадают имя отправителя и адрес для ответа", () => {

@@ -45,18 +45,27 @@ export class MemoryEmailSender implements EmailSender {
 }
 
 /**
- * Поля письма для структурной записи.
- *
- * Тело кладётся целиком и намеренно: без транспорта лог — единственное место,
- * где остаётся ссылка на приглашение и на смену пароля. Другого канала для
- * неё нет, и терять её нельзя.
+ * Конверт письма: всё, по чему его можно опознать, и ничего из содержимого.
  */
-export function emailLogFields(message: EmailMessage): LogFields {
+export function emailEnvelopeFields(message: EmailMessage): LogFields {
   return {
     to: message.to,
     subject: message.subject,
     fromName: message.fromName,
     replyTo: message.replyTo,
+  };
+}
+
+/**
+ * Поля письма для режима без транспорта.
+ *
+ * Тело кладётся целиком — но только здесь: без транспорта лог единственное
+ * место, где остаётся ссылка на приглашение и на смену пароля. Другого канала
+ * для неё нет, и терять её нельзя.
+ */
+export function emailLogFields(message: EmailMessage): LogFields {
+  return {
+    ...emailEnvelopeFields(message),
     // Разметка в лог не идёт: читать её некому, а строку она раздувает.
     htmlBytes: message.html ? message.html.length : undefined,
     body: message.text,
@@ -73,22 +82,27 @@ export function createEmailLog(logger: Logger): (message: EmailMessage) => void 
 /**
  * Письмо, которое транспорт так и не принял.
  *
- * Уровень error и то же тело: отказ доставки не должен означать потерю
- * содержимого — по этой строке человека можно довести до нужной страницы
- * руками.
+ * Тела здесь нет намеренно. В живом режиме письмо содержит ссылку на смену
+ * пароля и ссылку `/r/<токен>`, открывающую отчёт клиента без входа; эти
+ * строки не должны лежать в логе, который собирает хостинг и куда смотрит
+ * внешний сборщик ошибок. Отказ доставки лечится повторной отправкой в один
+ * клик, а утёкший токен — нет. Для разбора хватает адресата, темы и причины:
+ * число попыток уже стоит в тексте ошибки.
  */
 export function createEmailFailureLog(
   logger: Logger,
 ): (message: EmailMessage, error: Error) => void {
   return (message, error) => {
-    logger.error("email.failed", { ...emailLogFields(message), error });
+    logger.error("email.failed", { ...emailEnvelopeFields(message), error });
   };
 }
 
-function stdoutLogger(): Logger {
+/** Ошибки — в stderr, остальное — в stdout: так же, как у логов web. */
+function consoleLogger(): Logger {
   return createLogger({
-    sink: (line) => {
-      process.stdout.write(`${line}\n`);
+    sink: (line, level) => {
+      if (level === "warn" || level === "error") process.stderr.write(`${line}\n`);
+      else process.stdout.write(`${line}\n`);
     },
     base: { service: "email" },
   });
@@ -98,7 +112,7 @@ function stdoutLogger(): Logger {
  * Пишет письмо целиком одной структурной строкой: разбирать свободный текст
  * грепом через полгода — отдельная работа (тот же довод, что у логов воркера).
  */
-export const consoleEmailLog: (message: EmailMessage) => void = createEmailLog(stdoutLogger());
+export const consoleEmailLog: (message: EmailMessage) => void = createEmailLog(consoleLogger());
 
 export const consoleEmailFailureLog: (message: EmailMessage, error: Error) => void =
-  createEmailFailureLog(stdoutLogger());
+  createEmailFailureLog(consoleLogger());
