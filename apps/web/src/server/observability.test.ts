@@ -77,6 +77,91 @@ describe("error reporting wiring", () => {
     });
   });
 
+  it("в каждой записи есть окружение, версия и отпечаток", async () => {
+    // Канал остался логом, поэтому у записи должны быть те же опоры, что
+    // у события Sentry: по ним её ищут и группируют.
+    const { errorReporter } = await import("./observability");
+    const { lines, restore } = captureStderr();
+
+    errorReporter.captureError(new Error("run 1 timed out"), { scope: "test" });
+    errorReporter.captureError(new Error("run 2 timed out"), { scope: "test" });
+    restore();
+
+    const records = lines.map((line) => JSON.parse(line) as Record<string, unknown>);
+    expect(records[0]).toMatchObject({ service: "web", environment: "test", release: "dev" });
+    expect(records[0]!["fingerprint"]).toMatch(/^[0-9a-f]{8}$/);
+    expect(records[0]!["fingerprint"]).toBe(records[1]!["fingerprint"]);
+  });
+
+  it("секреты и почта в лог не попадают", async () => {
+    // Строка лога уезжает в сборщик хостинга — то есть наружу.
+    const { errorReporter } = await import("./observability");
+    const { lines, restore } = captureStderr();
+
+    errorReporter.captureError(new Error("invite to owner@agency.example failed"), {
+      scope: "test",
+      authorization: "Bearer abcdefghijklmnop",
+      client: { contact: { email: "owner@agency.example" } },
+    });
+    restore();
+
+    expect(lines[0]).not.toContain("owner@agency.example");
+    expect(lines[0]).not.toContain("abcdefghijklmnop");
+    expect(JSON.parse(lines[0]!)).toMatchObject({
+      authorization: "[redacted]",
+      message: "invite to [email] failed",
+    });
+  });
+
+  it("из заголовков берётся идентификатор запроса и ничего больше", async () => {
+    const { onRequestError } = await import("../instrumentation");
+    const { lines, restore } = captureStderr();
+
+    await onRequestError?.(
+      new Error("render blew up"),
+      {
+        path: "/clients",
+        method: "GET",
+        headers: {
+          "x-request-id": "req-42",
+          cookie: "better-auth.session_token=abc",
+          authorization: "Bearer abcdefghijklmnop",
+        },
+      },
+      {
+        routerKind: "App Router",
+        routePath: "/clients",
+        routeType: "render",
+        revalidateReason: undefined,
+      },
+    );
+    restore();
+
+    expect(JSON.parse(lines[0]!)).toMatchObject({ scope: "web.request", requestId: "req-42" });
+    // Заголовки целиком не уходят: там кука сессии и Authorization.
+    expect(lines[0]).not.toContain("better-auth.session_token");
+    expect(lines[0]).not.toContain("abcdefghijklmnop");
+  });
+
+  it("без известного заголовка идентификатор не выдумывается", async () => {
+    const { onRequestError } = await import("../instrumentation");
+    const { lines, restore } = captureStderr();
+
+    await onRequestError?.(
+      new Error("render blew up"),
+      { path: "/clients", method: "GET", headers: { cookie: "x=1" } },
+      {
+        routerKind: "App Router",
+        routePath: "/clients",
+        routeType: "render",
+        revalidateReason: undefined,
+      },
+    );
+    restore();
+
+    expect(JSON.parse(lines[0]!)).not.toHaveProperty("requestId");
+  });
+
   it("серверная часть не тянет SDK Sentry", async () => {
     // Node-SDK Sentry ронял dev-сервер целиком: сборщик Next пытается
     // забандлить инструментацию загрузки модулей и падает на резолве `path`.
