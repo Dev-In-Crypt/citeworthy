@@ -109,13 +109,11 @@ export async function applySubscriptionChange(
     cancelAtPeriodEnd: fields.cancelAtPeriodEnd,
     // Отметку ставят только события, по которым потом сравнивается порядок:
     // иначе счёт или checkout подняли бы её и заблокировали событие о
-    // подписке, пришедшее на долю секунды «раньше».
+    // подписке, пришедшее на долю секунды «раньше». Остальные переписывают
+    // её тем же значением — `upsertSubscription` обновляет это поле наравне
+    // с прочими, и не передать его значило бы стереть.
     lastEventAt: carriesPlan ? occurredAt : (known?.lastEventAt ?? null),
   });
-
-  if (carriesPlan && occurredAt) {
-    await stampLastEventAt(db, saved, occurredAt);
-  }
 
   // Поля агентства — производные от подписки, и они должны следовать за ней:
   // по ним считается лимит клиентов на горячем пути.
@@ -158,34 +156,4 @@ function resolveFields(
       ? (known?.cancelAtPeriodEnd ?? false)
       : change.cancelAtPeriodEnd,
   };
-}
-
-/**
- * Проставляет время события, которым записано состояние подписки.
- *
- * Временная заплата: `upsertSubscription` перечисляет обновляемые поля
- * поимённо и `last_event_at` в этом списке нет, поэтому при обновлении уже
- * существующей строки отметка не доезжает — а именно обновление и есть
- * основной путь. Заплата уйдёт, как только в `upsertSubscription`
- * (`packages/db/src/queries.ts`) в `onConflictDoUpdate.set` появится
- * `lastEventAt: values.lastEventAt ?? null`; поток платежей `packages/db`
- * не правит. Запрос записан в `docs/open-questions/a-stripe.md`.
- */
-async function stampLastEventAt(
-  db: Database,
-  saved: Subscription,
-  occurredAt: Date,
-): Promise<void> {
-  if (saved.lastEventAt?.getTime() === occurredAt.getTime()) {
-    return;
-  }
-
-  // Значения передаются параметрами с явным приведением типа — так же, как
-  // это делает `prunePaymentEvents` в `packages/db`: драйвер настроен
-  // drizzle-ом и сам `Date` в параметр не превращает.
-  await db.$client`
-    update subscriptions
-    set last_event_at = ${occurredAt.toISOString()}::timestamptz
-    where id = ${saved.id}::uuid
-  `;
 }
