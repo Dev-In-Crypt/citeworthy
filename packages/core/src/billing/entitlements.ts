@@ -81,10 +81,14 @@ export function entitlementsFor(
       };
 
     case "past_due": {
+      // Пустой конец оплаченного периода — это отсутствие отсрочки, а не
+      // бесконечная отсрочка: отсчитывать её не от чего. Трактовать пустоту
+      // в пользу доступа значит выдать бессрочную бесплатную работу тому, у
+      // кого платёж не прошёл, а оплаченного периода в базе нет.
       const deadline = subscription.currentPeriodEnd
         ? new Date(subscription.currentPeriodEnd.getTime() + PAST_DUE_GRACE_DAYS * 86_400_000)
         : null;
-      const withinGrace = deadline === null || now.getTime() <= deadline.getTime();
+      const withinGrace = deadline !== null && now.getTime() <= deadline.getTime();
 
       return {
         plan: subscription.plan,
@@ -92,7 +96,9 @@ export function entitlementsFor(
         active: withinGrace,
         reason: withinGrace
           ? "A payment did not go through. Update the card to keep the account running."
-          : "The account is suspended after an unpaid period.",
+          : deadline === null
+            ? "A payment did not go through and no paid period is on record. Update the card to restore the account."
+            : "The account is suspended after an unpaid period.",
       };
     }
 

@@ -1,10 +1,14 @@
 import type { PlanId, SubscriptionStatus } from "./entitlements";
 import type {
+  CancelInput,
+  ChangePlanInput,
   CheckoutInput,
   CheckoutSession,
   PaymentEvent,
+  PaymentEventEnvelope,
   PaymentProvider,
   PortalInput,
+  SubscriptionField,
 } from "./payments";
 
 /**
@@ -113,7 +117,53 @@ export class StripePaymentProvider implements PaymentProvider {
     return { url: session.url };
   }
 
-  async parseEvent(payload: string, signature: string): Promise<PaymentEvent> {
+  /**
+   * Переводит подписку на другой тариф.
+   *
+   * Сначала читается сама подписка: чтобы заменить цену, а не добавить
+   * вторую строку к счёту, в запрос нужен идентификатор существующей
+   * позиции. `always_invoice` — потому что апгрейд, за который счёт придёт
+   * через три недели, агентству ничего не открывает сегодня.
+   */
+  async changePlan(input: ChangePlanInput): Promise<void> {
+    const price = this.config.prices[input.plan];
+    if (!price) {
+      throw new Error(`No Stripe price configured for the ${input.plan} plan.`);
+    }
+
+    const subscription = await this.get<StripeSubscription>(
+      `/subscriptions/${encodeURIComponent(input.subscriptionId)}`,
+    );
+    const item = subscription.items?.data?.[0];
+    if (!item?.id) {
+      throw new Error(`Stripe subscription ${input.subscriptionId} has no item to move.`);
+    }
+
+    if (item.price?.id === price) {
+      // Тариф уже такой: повторный запрос создал бы пропорциональный
+      // пересчёт на пустом месте.
+      return;
+    }
+
+    await this.post(`/subscriptions/${encodeURIComponent(input.subscriptionId)}`, {
+      "items[0][id]": item.id,
+      "items[0][price]": price,
+      "items[0][quantity]": "1",
+      proration_behavior: "always_invoice",
+      // Неудачное списание не должно молча оставить агентство на старом
+      // тарифе: подписка уходит в past_due, и это видно по вебхуку.
+      payment_behavior: "allow_incomplete",
+    });
+  }
+
+  /** Отмена в конце оплаченного периода и возврат из неё — один и тот же запрос. */
+  async setCancelAtPeriodEnd(input: CancelInput): Promise<void> {
+    await this.post(`/subscriptions/${encodeURIComponent(input.subscriptionId)}`, {
+      cancel_at_period_end: input.cancelAtPeriodEnd ? "true" : "false",
+    });
+  }
+
+  async parseEvent(payload: string, signature: string): Promise<PaymentEventEnvelope> {
     await verifyStripeSignature({
       payload,
       signature,
@@ -122,7 +172,17 @@ export class StripePaymentProvider implements PaymentProvider {
     });
 
     const event = JSON.parse(payload) as StripeEvent;
-    return this.translate(event);
+    if (!event.id || !event.type) {
+      throw new WebhookSignatureError("The webhook body is not a Stripe event.");
+    }
+
+    return {
+      eventId: event.id,
+      type: event.type,
+      // `created` у Stripe в секундах; без него берётся момент разбора.
+      occurredAt: event.created ? new Date(event.created * 1000) : this.now(),
+      event: this.translate(event),
+    };
   }
 
   private translate(event: StripeEvent): PaymentEvent {
@@ -139,6 +199,7 @@ export class StripePaymentProvider implements PaymentProvider {
           status: "active",
           currentPeriodEnd: null,
           cancelAtPeriodEnd: false,
+          unknownFields: UNKNOWN_EXCEPT_STATUS,
         };
       }
 
@@ -162,6 +223,45 @@ export class StripePaymentProvider implements PaymentProvider {
               : (STATUS_MAP[object.status] ?? "incomplete"),
           currentPeriodEnd: periodEnd ? new Date(periodEnd * 1000) : null,
           cancelAtPeriodEnd: Boolean(object.cancel_at_period_end),
+          // Цена неизвестного нам продукта не должна перевести агентство на
+          // starter: пусть остаётся записанный тариф.
+          unknownFields: [
+            ...(priceId && this.planByPrice.has(priceId) ? [] : (["plan"] as SubscriptionField[])),
+            ...(periodEnd ? [] : (["currentPeriodEnd"] as SubscriptionField[])),
+          ],
+        };
+      }
+
+      /**
+       * Счета.
+       *
+       * Stripe и сам пришлёт `customer.subscription.updated` со статусом
+       * `past_due`, но между неудачным списанием и этим событием проходит
+       * время, а отсрочка должна начинаться от самого сбоя. Про тариф и
+       * конец периода счёт ничего не знает — и не трогает их.
+       */
+      case "invoice.payment_failed":
+      case "invoice.payment_succeeded": {
+        const object = event.data.object as StripeInvoice;
+        const subscriptionId = invoiceSubscriptionId(object);
+        if (!subscriptionId) {
+          return {
+            kind: "ignored",
+            type: event.type,
+            reason: "The invoice does not belong to a subscription.",
+          };
+        }
+
+        return {
+          kind: "subscription",
+          agencyId: null,
+          customerId: asId(object.customer),
+          subscriptionId,
+          plan: null,
+          status: event.type === "invoice.payment_failed" ? "past_due" : "active",
+          currentPeriodEnd: null,
+          cancelAtPeriodEnd: false,
+          unknownFields: UNKNOWN_EXCEPT_STATUS,
         };
       }
 
@@ -169,9 +269,23 @@ export class StripePaymentProvider implements PaymentProvider {
         return {
           kind: "ignored",
           type: event.type,
-          reason: "The product only reacts to checkout and subscription events.",
+          reason: "The product only reacts to checkout, subscription and invoice events.",
         };
     }
+  }
+
+  private async get<T>(path: string): Promise<T> {
+    const response = await this.fetchImpl(`${this.endpoint}${path}`, {
+      method: "GET",
+      headers: { authorization: `Bearer ${this.config.secretKey}` },
+    });
+
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`Stripe responded ${response.status}: ${body.slice(0, 500)}`);
+    }
+
+    return (await response.json()) as T;
   }
 
   private async post<T>(path: string, form: Record<string, string>): Promise<T> {
@@ -193,9 +307,18 @@ export class StripePaymentProvider implements PaymentProvider {
   }
 }
 
+/** Событие говорит только о статусе: остальное берётся из записанного. */
+const UNKNOWN_EXCEPT_STATUS: readonly SubscriptionField[] = [
+  "plan",
+  "currentPeriodEnd",
+  "cancelAtPeriodEnd",
+];
+
 export interface StripeEvent {
   id: string;
   type: string;
+  /** Момент создания события у Stripe, в секундах. */
+  created?: number;
   data: { object: unknown };
 }
 
@@ -213,7 +336,35 @@ interface StripeSubscription {
   cancel_at_period_end?: boolean;
   current_period_end?: number;
   metadata?: { agency_id?: string };
-  items?: { data?: { price?: { id: string }; current_period_end?: number }[] };
+  items?: { data?: StripeSubscriptionItem[] };
+}
+
+interface StripeSubscriptionItem {
+  id: string;
+  price?: { id: string };
+  current_period_end?: number;
+}
+
+/**
+ * Счёт.
+ *
+ * Подписка у счёта лежит в двух местах: до версии API 2025-04-30 — полем
+ * `subscription`, после — в `parent.subscription_details`. Читаются оба:
+ * версия API задаётся в кабинете Stripe, а не в этом коде.
+ */
+interface StripeInvoice {
+  id?: string;
+  customer: string | { id: string };
+  subscription?: string | { id: string } | null;
+  parent?: {
+    subscription_details?: { subscription?: string | { id: string } | null } | null;
+  } | null;
+}
+
+function invoiceSubscriptionId(invoice: StripeInvoice): string | null {
+  const nested = invoice.parent?.subscription_details?.subscription;
+  const value = invoice.subscription ?? nested ?? null;
+  return value ? asId(value) : null;
 }
 
 function asId(value: string | { id: string }): string {

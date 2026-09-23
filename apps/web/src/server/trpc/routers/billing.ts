@@ -6,6 +6,7 @@ import {
   PLAN_LIMITS,
   sumCostUsd,
   usageStatus,
+  type PaymentProvider,
   type PlanId,
 } from "@repo/core";
 import {
@@ -15,11 +16,34 @@ import {
   getSubscriptionByAgency,
   getUsageCounter,
   listCostsByClientAndPlatform,
+  type Database,
+  type Subscription,
 } from "@repo/db";
 import { protectedProcedure, roleProcedure, router } from "../trpc";
 import { appUrl } from "../../email";
 import { getPaymentProvider } from "../../payments";
 import { entitlementsForAgency } from "../../subscription";
+
+const planInput = z.object({ plan: z.enum(["starter", "growth", "scale"]) });
+
+/**
+ * Подписка, в которой ещё есть что двигать.
+ *
+ * `canceled` и `incomplete` — это уже не подписка: менять в ней тариф
+ * нечего, такому агентству нужен новый checkout.
+ */
+const LIVE_STATUSES = new Set(["trialing", "active", "past_due"]);
+
+function requirePayments(): PaymentProvider {
+  const payments = getPaymentProvider();
+  if (!payments.configured) {
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: "Payments are not connected yet.",
+    });
+  }
+  return payments;
+}
 
 export const billingRouter = router({
   /**
@@ -43,23 +67,33 @@ export const billingRouter = router({
       currentPeriodEnd: subscription?.currentPeriodEnd ?? null,
       cancelAtPeriodEnd: subscription?.cancelAtPeriodEnd ?? false,
       hasCustomer: Boolean(subscription?.customerId),
+      /**
+       * Есть ли подписка, которую можно двигать.
+       *
+       * Экран выбирает по этому флагу между «оплатить» и «перейти»: второй
+       * checkout у платящего агентства завёл бы вторую подписку и второй
+       * счёт за тот же продукт.
+       */
+      hasLiveSubscription: isLive(subscription),
       plans: (Object.keys(PLAN_LIMITS) as PlanId[]).map((id) => ({ id, ...PLAN_LIMITS[id] })),
     };
   }),
 
   /** Ссылка на оплату. Деньги принимает провайдер, продукт их не видит. */
   checkout: roleProcedure("owner")
-    .input(z.object({ plan: z.enum(["starter", "growth", "scale"]) }))
+    .input(planInput)
     .mutation(async ({ ctx, input }) => {
-      const payments = getPaymentProvider();
-      if (!payments.configured) {
+      const payments = requirePayments();
+
+      const subscription = await getSubscriptionByAgency(ctx.db, ctx.user.agencyId);
+      if (isLive(subscription)) {
+        // Иначе агентство платило бы дважды за один продукт.
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
-          message: "Payments are not connected yet.",
+          message: "This agency already has a subscription. Change the plan instead.",
         });
       }
 
-      const subscription = await getSubscriptionByAgency(ctx.db, ctx.user.agencyId);
       const base = `${appUrl()}/settings/billing`;
 
       const session = await payments.createCheckout({
@@ -73,6 +107,65 @@ export const billingRouter = router({
 
       return { url: session.url };
     }),
+
+  /**
+   * Переход между тарифами вверх и вниз.
+   *
+   * Правит цену в существующей подписке, а не заводит вторую: второй
+   * checkout у платящего агентства — это второй счёт за тот же продукт.
+   *
+   * В базу здесь не пишется ничего. Источник истины о деньгах — провайдер,
+   * и новый тариф приедет вебхуком: запись «по факту нажатия» разошлась бы
+   * с реальностью ровно в тот момент, когда списание не прошло.
+   */
+  changePlan: roleProcedure("owner")
+    .input(planInput)
+    .mutation(async ({ ctx, input }) => {
+      const payments = requirePayments();
+      const subscription = await requireLiveSubscription(ctx.db, ctx.user.agencyId);
+
+      if (subscription.plan === input.plan) {
+        return { plan: input.plan, changed: false };
+      }
+
+      await payments.changePlan({
+        subscriptionId: subscription.subscriptionId,
+        plan: input.plan,
+      });
+
+      return { plan: input.plan, changed: true };
+    }),
+
+  /**
+   * Отмена в конце оплаченного периода.
+   *
+   * Не мгновенная: агентство заплатило за месяц и должно его доработать —
+   * у него в этом месяце отчёты, которые обещаны его клиентам.
+   */
+  cancel: roleProcedure("owner").mutation(async ({ ctx }) => {
+    const payments = requirePayments();
+    const subscription = await requireLiveSubscription(ctx.db, ctx.user.agencyId);
+
+    await payments.setCancelAtPeriodEnd({
+      subscriptionId: subscription.subscriptionId,
+      cancelAtPeriodEnd: true,
+    });
+
+    return { cancelAtPeriodEnd: true };
+  }),
+
+  /** Передумали до конца периода — подписка возвращается в строй без нового checkout. */
+  resume: roleProcedure("owner").mutation(async ({ ctx }) => {
+    const payments = requirePayments();
+    const subscription = await requireLiveSubscription(ctx.db, ctx.user.agencyId);
+
+    await payments.setCancelAtPeriodEnd({
+      subscriptionId: subscription.subscriptionId,
+      cancelAtPeriodEnd: false,
+    });
+
+    return { cancelAtPeriodEnd: false };
+  }),
 
   /** Карта, счета и отмена — на стороне провайдера: продукт не хранит платёжные данные. */
   portal: roleProcedure("owner").mutation(async ({ ctx }) => {
@@ -168,3 +261,30 @@ export const billingRouter = router({
       };
     }),
 });
+
+function isLive(subscription: Subscription | undefined): boolean {
+  return Boolean(subscription?.subscriptionId) && LIVE_STATUSES.has(subscription?.status ?? "");
+}
+
+/**
+ * Подписка, которой можно управлять, — или понятный отказ.
+ *
+ * Читается из нашей базы, а не из провайдера: слепок там свежий, его
+ * держит вебхук, а лишний поход в сеть на каждый клик — это ещё один
+ * способ уронить экран, когда провайдер моргнул.
+ */
+async function requireLiveSubscription(
+  db: Database,
+  agencyId: string,
+): Promise<Subscription & { subscriptionId: string }> {
+  const subscription = await getSubscriptionByAgency(db, agencyId);
+
+  if (!subscription?.subscriptionId || !LIVE_STATUSES.has(subscription.status)) {
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: "There is no live subscription to change. Pick a plan to start one.",
+    });
+  }
+
+  return subscription as Subscription & { subscriptionId: string };
+}

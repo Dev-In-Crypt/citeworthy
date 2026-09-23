@@ -76,6 +76,17 @@ describe("entitlementsFor", () => {
     expect(result.active).toBe(false);
   });
 
+  it("непрошедший платёж без оплаченного периода не даёт бессрочной отсрочки", () => {
+    // Строка без срока заводится завершённым checkout: тариф и период
+    // приезжают следующим событием. Если оно потерялось, а списание не
+    // прошло, отсрочке не от чего считаться — и это не повод работать
+    // бесплатно и бессрочно.
+    const result = entitlementsFor(snapshot({ status: "past_due", currentPeriodEnd: null }), NOW);
+
+    expect(result.active).toBe(false);
+    expect(result.reason).toMatch(/no paid period/i);
+  });
+
   it("отменённая подписка возвращает к starter и закрывает работу", () => {
     const result = entitlementsFor(snapshot({ status: "canceled" }), NOW);
 

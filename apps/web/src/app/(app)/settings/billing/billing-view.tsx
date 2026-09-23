@@ -4,6 +4,7 @@ import { useState } from "react";
 import { api } from "@/trpc/react";
 import { cn } from "@/lib/utils";
 import { buttonClass } from "@/components/ui/button";
+import { NotePanel } from "@/components/ui/note-panel";
 import { SkeletonCards } from "@/components/ui/skeleton";
 
 const PLAN_NAMES: Record<string, string> = {
@@ -12,23 +13,58 @@ const PLAN_NAMES: Record<string, string> = {
   scale: "Scale",
 };
 
+const PLAN_ORDER = ["starter", "growth", "scale"];
+
+/**
+ * Пока провайдер не подтвердил перемену, экран её не рисует.
+ *
+ * Тариф в базе меняет вебхук, и он приходит через секунды. Показывать
+ * новый тариф сразу по нажатию — значит однажды показать его агентству,
+ * у которого не прошло списание.
+ */
+const PENDING_NOTE =
+  "The change is with our payment provider. This page updates as soon as it confirms.";
+
 export function BillingView() {
   const subscription = api.billing.subscription.useQuery();
   const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState<string | null>(null);
+
+  function begin() {
+    setError(null);
+    setPending(null);
+  }
+
+  function onError(mutationError: { message: string }) {
+    setPending(null);
+    setError(mutationError.message);
+  }
+
+  const afterProviderChange = {
+    onSuccess: () => {
+      setPending(PENDING_NOTE);
+      void subscription.refetch();
+    },
+    onError,
+  };
 
   const checkout = api.billing.checkout.useMutation({
     onSuccess: (data) => {
       window.location.href = data.url;
     },
-    onError: (mutationError) => setError(mutationError.message),
+    onError,
   });
 
   const portal = api.billing.portal.useMutation({
     onSuccess: (data) => {
       window.location.href = data.url;
     },
-    onError: (mutationError) => setError(mutationError.message),
+    onError,
   });
+
+  const changePlan = api.billing.changePlan.useMutation(afterProviderChange);
+  const cancel = api.billing.cancel.useMutation(afterProviderChange);
+  const resume = api.billing.resume.useMutation(afterProviderChange);
 
   const data = subscription.data;
   if (!data) {
@@ -36,6 +72,9 @@ export function BillingView() {
   }
 
   const { entitlements } = data;
+  const busy =
+    checkout.isPending || changePlan.isPending || cancel.isPending || resume.isPending;
+  const currentRank = PLAN_ORDER.indexOf(entitlements.plan);
 
   return (
     <div className="flex flex-col gap-6">
@@ -62,12 +101,28 @@ export function BillingView() {
         )}
       </div>
 
+      {data.status === "past_due" && (
+        // Сбой списания — это ещё не отказ от продукта: у карты кончился
+        // срок, банк отклонил разовый платёж. Отчёты клиентов агентства
+        // всё это время продолжают открываться.
+        <NotePanel testId="past-due-note" title="A payment did not go through">
+          Update the card and the account keeps running. Your clients&rsquo; report links stay open
+          while this is sorted out.
+        </NotePanel>
+      )}
+
       {!data.paymentsConfigured && (
         // Ни фальшивого checkout, ни кнопки, которая упадёт: пока провайдер
         // не подключён, продукт говорит это прямо.
         <p data-testid="payments-off" className="text-sm text-muted-foreground">
           Payments are not connected yet, so plans cannot be changed from here. The starter limits
           apply and everything else in the product works.
+        </p>
+      )}
+
+      {pending && (
+        <p data-testid="change-pending" className="text-sm text-muted-foreground">
+          {pending}
         </p>
       )}
 
@@ -80,6 +135,15 @@ export function BillingView() {
       <div className="grid gap-3 sm:grid-cols-3">
         {data.plans.map((plan) => {
           const current = plan.id === entitlements.plan;
+          const rank = PLAN_ORDER.indexOf(plan.id);
+          // Одна и та же кнопка ведёт себя по-разному только по надписи:
+          // вверх это «Upgrade», вниз — «Switch down», и человек видит, на
+          // что он нажимает.
+          const label = data.hasLiveSubscription
+            ? rank > currentRank
+              ? `Upgrade to ${PLAN_NAMES[plan.id] ?? plan.id}`
+              : `Switch to ${PLAN_NAMES[plan.id] ?? plan.id}`
+            : `Choose ${PLAN_NAMES[plan.id] ?? plan.id}`;
 
           return (
             <div
@@ -104,13 +168,23 @@ export function BillingView() {
                   type="button"
                   data-testid={`choose-${plan.id}`}
                   onClick={() => {
-                    setError(null);
-                    checkout.mutate({ plan: plan.id });
+                    begin();
+                    // Платящее агентство двигает существующую подписку:
+                    // второй checkout означал бы второй счёт за тот же продукт.
+                    if (data.hasLiveSubscription) {
+                      changePlan.mutate({ plan: plan.id });
+                    } else {
+                      checkout.mutate({ plan: plan.id });
+                    }
                   }}
-                  disabled={checkout.isPending}
-                  className={buttonClass("primary", "lg", "mt-2 w-full")}
+                  disabled={busy}
+                  className={buttonClass(
+                    rank > currentRank ? "primary" : "outline",
+                    "lg",
+                    "mt-2 w-full",
+                  )}
                 >
-                  Choose {PLAN_NAMES[plan.id] ?? plan.id}
+                  {label}
                 </button>
               )}
 
@@ -122,13 +196,57 @@ export function BillingView() {
         })}
       </div>
 
+      {data.paymentsConfigured && data.hasLiveSubscription && (
+        <div className="flex flex-col gap-3 rounded-lg border p-5">
+          {data.cancelAtPeriodEnd ? (
+            <>
+              <p className="text-sm text-muted-foreground">
+                This subscription ends when the current period closes. Nothing is lost until then.
+              </p>
+              <button
+                type="button"
+                data-testid="resume-subscription"
+                onClick={() => {
+                  begin();
+                  resume.mutate();
+                }}
+                disabled={busy}
+                className={buttonClass("primary", "lg", "self-start")}
+              >
+                Keep the subscription
+              </button>
+            </>
+          ) : (
+            <>
+              {/* Отмена не мгновенная: месяц оплачен, и отчёты в нём обещаны клиентам. */}
+              <p className="text-sm text-muted-foreground">
+                Cancelling stops the renewal. The plan keeps working until the end of the period
+                you have already paid for, and you can undo it any time before then.
+              </p>
+              <button
+                type="button"
+                data-testid="cancel-subscription"
+                onClick={() => {
+                  begin();
+                  cancel.mutate();
+                }}
+                disabled={busy}
+                className={buttonClass("danger", "lg", "self-start")}
+              >
+                Cancel at period end
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
       {data.paymentsConfigured && data.hasCustomer && (
         <div className="flex flex-col gap-2">
           <button
             type="button"
             data-testid="open-portal"
             onClick={() => {
-              setError(null);
+              begin();
               portal.mutate();
             }}
             disabled={portal.isPending}
@@ -138,7 +256,7 @@ export function BillingView() {
           </button>
           {/* Карта и счета живут у провайдера: продукт платёжных данных не хранит. */}
           <p className="text-sm text-muted-foreground">
-            Card, invoices and cancellation are handled by our payment provider.
+            Card and invoices are handled by our payment provider.
           </p>
         </div>
       )}
