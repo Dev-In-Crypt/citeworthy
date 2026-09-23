@@ -30,8 +30,20 @@ FROM deps AS build
 COPY . .
 # Сборке Next нужны публичные переменные: они попадают в бандл. Секреты сюда
 # не передаются — они читаются в рантайме.
+#
+# Перечислены все NEXT_PUBLIC_*, которые есть в продукте. Next подставляет их
+# значения прямо в код на сборке — и в клиентский бандл, и в серверный. Не
+# переданная сюда переменная окажется пустой даже если задать её в окружении
+# контейнера, и выглядеть это будет как «настройка не работает». Смена любой
+# из них требует пересборки образа — об этом сказано в docs/deploy.md.
 ARG NEXT_PUBLIC_APP_URL
 ARG NEXT_PUBLIC_SENTRY_DSN
+# Домен, на котором агентство отдаёт отчёты своим клиентам (white-label).
+ARG NEXT_PUBLIC_REPORT_HOST
+# Контакт продаж на лендинге. Пусто — кнопки нет, звонок не обещается.
+ARG NEXT_PUBLIC_SALES_EMAIL
+ARG NEXT_PUBLIC_SALES_URL
+ARG NEXT_PUBLIC_SALES_LABEL
 # Standalone-вывод включается только здесь: на Windows он ломает локальную
 # сборку, потому что раскладывается симлинками.
 ENV DOCKER_BUILD=1 NEXT_TELEMETRY_DISABLED=1
@@ -59,7 +71,12 @@ RUN apk add --no-cache chromium nss freetype harfbuzz ttf-freefont
 ENV CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser     INTERNAL_APP_URL=http://127.0.0.1:3000
 
 # Непривилегированный пользователь: процессу приложения root не нужен.
-RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
+#
+# uid и gid совпадают с воркером намеренно: контейнеры делят том с сырыми
+# ответами, и разные владельцы означали бы, что один из них не может прочитать
+# то, что записал другой.
+RUN addgroup --system --gid 1001 nodejs \
+    && adduser --system --uid 1001 --ingroup nodejs nextjs
 
 # В public лежит только шрифт: он обязан ехать в образ, иначе продукт в бою
 # нарисуется системным и будет выглядеть иначе, чем всё, что мы проверяли.
@@ -76,7 +93,15 @@ RUN mkdir -p /data/storage && chown -R nextjs:nodejs /data/storage
 USER nextjs
 EXPOSE 3000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+# /api/health отвечает 503, пока недоступна база: живость меряется по тому,
+# может ли инстанс отдать отчёт, а не по тому, поднялся ли процесс.
+# start-period с запасом: на маленькой машине первый запуск после сборки
+# занимает заметно больше десяти секунд, а ранний красный статус пугает
+# человека, который в этот момент смотрит на `compose ps`.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
+# node запускается напрямую: standalone-сервер Next сам обрабатывает SIGTERM
+# и закрывает соединения. Chromium для печати PDF оставляет за собой дочерние
+# процессы, поэтому контейнер поднимается с init-процессом (см. compose).
 CMD ["node", "apps/web/server.js"]

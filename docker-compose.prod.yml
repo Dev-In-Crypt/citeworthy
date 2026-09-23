@@ -12,56 +12,111 @@ name: citeworthy-prod
 # Запуск:
 #   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
 #
+# Порядок первого запуска, откат, резервные копии и проверка после деплоя —
+# в docs/deploy.md.
+#
 # Миграции накатывает отдельная одноразовая служба: приложение не должно
 # менять схему при старте, иначе два инстанса сделают это одновременно.
+
+# Логи ограничены размером. Без этого json-файл контейнера растёт, пока не
+# кончится диск, — и падает сначала база, а не тот, кто шумел.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
 
 services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
+    logging: *logging
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-aisdos}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-aisdos}
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    # Общая память под сортировки и параллельные планы: умолчание в 64 МБ
+    # роняет запросы по ответам, как только их становится много.
+    shm_size: 256mb
+    # Образ Postgres останавливается по SIGINT (fast shutdown) и успевает
+    # закрыть файлы. Времени даётся с запасом: убитая на середине база — это
+    # восстановление из резервной копии вместо перезапуска.
+    stop_grace_period: 60s
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aisdos} -d ${POSTGRES_DB:-aisdos}"]
       interval: 5s
       timeout: 5s
       retries: 20
+    deploy:
+      resources:
+        limits:
+          memory: ${POSTGRES_MEMORY_LIMIT:-1g}
 
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    logging: *logging
+    # appendonly: в Redis лежит очередь прогонов. Со снимками раз в несколько
+    # минут перезапуск машины терял бы уже поставленные задачи — прогон
+    # оставался бы pending навсегда, и заметили бы это по молчанию цифр.
+    #
+    # noeviction — умолчание, но записано явно: политика с вытеснением тихо
+    # выбрасывала бы задачи под нагрузкой. Это тот случай, когда отказ на
+    # запись лучше незаметной потери.
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
     volumes:
       - redis-data:/data
+    stop_grace_period: 30s
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 5s
       retries: 20
+    deploy:
+      resources:
+        limits:
+          memory: ${REDIS_MEMORY_LIMIT:-512m}
 
   migrate:
     build:
       context: .
       dockerfile: apps/worker/Dockerfile
+    # Образ воркера начинается в своей папке — миграции живут в корне репозитория.
+    working_dir: /repo
     command: ["pnpm", "db:migrate"]
+    logging: *logging
     environment:
       DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
     depends_on:
       postgres:
         condition: service_healthy
     restart: "no"
+    security_opt:
+      - no-new-privileges:true
 
   web:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
       args:
+        # Всё, что уезжает в бандл на сборке. Смена любого из этих значений
+        # требует пересборки образа: в рантайме они уже не читаются.
         NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:?set NEXT_PUBLIC_APP_URL}
         NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+        NEXT_PUBLIC_REPORT_HOST: ${NEXT_PUBLIC_REPORT_HOST:-}
+        NEXT_PUBLIC_SALES_EMAIL: ${NEXT_PUBLIC_SALES_EMAIL:-}
+        NEXT_PUBLIC_SALES_URL: ${NEXT_PUBLIC_SALES_URL:-}
+        NEXT_PUBLIC_SALES_LABEL: ${NEXT_PUBLIC_SALES_LABEL:-}
     restart: unless-stopped
+    logging: *logging
+    # Печать PDF запускает Chromium, а тот оставляет за собой дочерние
+    # процессы. Без init они становятся зомби на PID 1 и копятся до предела
+    # процессов в контейнере — то есть до дня, когда PDF перестаёт печататься.
+    init: true
+    security_opt:
+      - no-new-privileges:true
     ports:
       - "${WEB_PORT:-3000}:3000"
     volumes:
@@ -69,6 +124,8 @@ services:
       # общего тома ответы прогонов по расписанию не открываются из интерфейса,
       # а перезапуск контейнера стирает всё, что положено на диск.
       - storage-data:/data/storage
+    # Запрос может печатать PDF: даём ему дойти до конца, а не рвём соединение.
+    stop_grace_period: 30s
     environment:
       STORAGE_DIR: /data/storage
       DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
@@ -76,6 +133,16 @@ services:
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:?set BETTER_AUTH_URL}
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+      # Домен отчётов передаётся и сюда, хотя работает значение из build args:
+      # Next подставил его в код на сборке. Переменная здесь — чтобы тот, кто
+      # поменяет её в .env.production и увидит старые ссылки, нашёл ответ в
+      # одном файле с вопросом: нужна пересборка образа.
+      NEXT_PUBLIC_REPORT_HOST: ${NEXT_PUBLIC_REPORT_HOST:-}
+      # Адрес, по которому веб-процесс сам открывает страницу отчёта для
+      # печати. Публичный адрес отсюда может быть недоступен: снаружи другой
+      # порт, а за прокси — лишний круг через интернет. Домен агентства здесь
+      # не годится тем более — его DNS ведёт наружу.
+      INTERNAL_APP_URL: ${INTERNAL_APP_URL:-http://127.0.0.1:3000}
       # Режим адаптеров задаётся явно: умолчание — фикстуры, и молча
       # измерять на них в проде значит показывать выдуманные цифры.
       ADAPTERS_MODE: ${ADAPTERS_MODE:-mock}
@@ -106,6 +173,8 @@ services:
       STRIPE_PRICE_GROWTH: ${STRIPE_PRICE_GROWTH:-}
       STRIPE_PRICE_SCALE: ${STRIPE_PRICE_SCALE:-}
       SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-production}
+      SENTRY_RELEASE: ${SENTRY_RELEASE:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -121,16 +190,30 @@ services:
         - "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
       interval: 15s
       timeout: 5s
-      start_period: 20s
+      start_period: 40s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          # С запасом на Chromium: печать PDF поднимает браузер внутри этого
+          # же контейнера, и жёсткий лимит убил бы не браузер, а сервер.
+          memory: ${WEB_MEMORY_LIMIT:-2g}
 
   worker:
     build:
       context: .
       dockerfile: apps/worker/Dockerfile
     restart: unless-stopped
+    logging: *logging
+    init: true
+    security_opt:
+      - no-new-privileges:true
     volumes:
       - storage-data:/data/storage
+    # Остановка ждёт текущие задачи: обработчик SIGTERM в apps/worker/src/index.ts
+    # закрывает очереди и доигрывает начатое. Ответ модели, брошенный на
+    # середине, — это потраченные деньги и дырка в измерении.
+    stop_grace_period: 120s
     environment:
       STORAGE_DIR: /data/storage
       DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
@@ -154,16 +237,44 @@ services:
       XAI_API_KEY: ${XAI_API_KEY:-}
       GROK_MODEL: ${GROK_MODEL:-}
       GROK_ENDPOINT: ${GROK_ENDPOINT:-}
+      # Почта у воркера та же, что у веба. Сегодня он писем не шлёт, но
+      # умолчание внутри кода — `log`, и первое же письмо из фонового задания
+      # ушло бы в лог вместо адресата, никак об этом не сообщив.
+      EMAIL_MODE: ${EMAIL_MODE:-log}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      # Ссылки в письмах строятся от публичного адреса продукта, а на отчёт —
+      # от домена агентства. У воркера нет сборки, поэтому обе читаются в рантайме.
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+      NEXT_PUBLIC_REPORT_HOST: ${NEXT_PUBLIC_REPORT_HOST:-}
       SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-production}
+      SENTRY_RELEASE: ${SENTRY_RELEASE:-}
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+    healthcheck:
+      # HTTP-порта нет, поэтому проверяется работа, а не порт: Redis отвечает
+      # и на очередях есть подписчик. Скрипт собирается в образе воркера.
+      test: ["CMD", "node", "healthcheck.mjs"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: ${WORKER_MEMORY_LIMIT:-1g}
 
 volumes:
   postgres-data:
   redis-data:
   # Сырые ответы, логотипы агентств и напечатанные PDF. Сырые ответы хранятся
   # всегда: по ним переобрабатывают измерения, когда меняется парсер.
+  # Резервная копия этого тома так же обязательна, как копия базы: без него
+  # измерения нельзя переразобрать, а отчёты теряют доказательную часть.
   storage-data:
