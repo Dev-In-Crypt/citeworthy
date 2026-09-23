@@ -1,6 +1,6 @@
 "use client";
 
-import { DEFAULT_PLATFORMS, ESTIMATED_COST_PER_ANSWER_USD } from "@repo/core";
+import { DEFAULT_PLATFORMS } from "@repo/core";
 import { cn } from "@/lib/utils";
 
 /**
@@ -54,7 +54,6 @@ export function SamplingCost({
   const assistants = DEFAULT_PLATFORMS.length;
   const perRun = prompts * assistants * samplesPerPrompt;
   const perMonth = perRun * runsPerMonth;
-  const costPerMonth = perMonth * ESTIMATED_COST_PER_ANSWER_USD;
 
   if (prompts === 0) {
     return (
@@ -67,8 +66,9 @@ export function SamplingCost({
   return (
     <span data-testid="sampling-cost" className="metric text-sm text-muted-foreground">
       {prompts} prompts × {assistants} assistants × {samplesPerPrompt} samples ={" "}
-      <span className="font-medium text-foreground">{perRun} answers</span> per run · about $
-      {costPerMonth.toFixed(2)} a month at the default cadence
+      <span className="font-medium text-foreground">{perRun} answers</span> per run ·{" "}
+      <span className="font-medium text-foreground">{perMonth}</span> checks a month at the default
+      cadence
     </span>
   );
 }

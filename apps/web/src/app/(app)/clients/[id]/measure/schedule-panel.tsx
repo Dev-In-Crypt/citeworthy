@@ -249,14 +249,12 @@ export function SchedulePanel({ clientId }: { clientId: string }) {
                   ? " Lower the cadence, the samples, or the number of assistants to fit."
                   : ""}
               </p>
-              <p className="text-xs text-muted-foreground">
-                Estimated measurement cost ≈{" "}
-                <span className="metric">${estimate.estimatedCostUsd.toFixed(2)}</span> a month. It
-                counts every answer at ${options.estimatedCostPerAnswerUsd.toFixed(4)} — a single
-                live measurement, taken on ChatGPT. Other assistants cost more or less per answer,
-                so read this as a rough figure. What each answer actually costs is recorded per
-                answer.
-              </p>
+              {/*
+                Себестоимость ответа агентству не показывается: это наша цифра,
+                а не его. Агентство платит за тариф и решает по проверкам —
+                сколько их даёт план и сколько съедает выбранная настройка. Это
+                и стоит выше.
+              */}
             </>
           ) : (
             <p className="text-muted-foreground">
