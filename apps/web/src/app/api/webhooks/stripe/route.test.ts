@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   hmacSha256Hex,
   InMemoryPaymentEventLedger,
@@ -13,14 +13,35 @@ import {
   getAgencyById,
   getSubscriptionByAgency,
 } from "@repo/db";
-import {
-  setPaymentEventLedger,
-  setPaymentProvider,
-  getPaymentEventLedger,
-} from "@/server/payments";
+import { setPaymentEventLedger, setPaymentProvider } from "@/server/payments";
 import { appRouter } from "@/server/trpc/root";
 import type { SessionUser, TrpcContext } from "@/server/trpc/context";
+import type * as SubscriptionModule from "@/server/subscription";
 import { POST } from "./route";
+
+/**
+ * Сбой записи подменяется на уровне модуля: в тесте нужен именно упавший
+ * `applySubscriptionChange`, потому что только он проверяет, что событие
+ * после сбоя отпущено и повтор его применит. Обычно подмена выключена и
+ * вызов уходит в настоящую реализацию.
+ */
+const writeFailure = vi.hoisted(() => ({ once: false }));
+
+vi.mock("@/server/subscription", async (importOriginal) => {
+  const actual = await importOriginal<typeof SubscriptionModule>();
+  return {
+    ...actual,
+    applySubscriptionChange: async (
+      ...args: Parameters<typeof actual.applySubscriptionChange>
+    ): ReturnType<typeof actual.applySubscriptionChange> => {
+      if (writeFailure.once) {
+        writeFailure.once = false;
+        throw new Error("the database is unavailable");
+      }
+      return actual.applySubscriptionChange(...args);
+    },
+  };
+});
 
 function caller(agencyId: string) {
   const user: SessionUser = {
@@ -84,12 +105,14 @@ function subscriptionEvent(patch: {
   type?: string;
   periodEnd?: number;
   cancelAtPeriodEnd?: boolean;
+  /** Время события у провайдера (секунды). Им определяется порядок. */
+  created?: number;
 }) {
   return {
     id: patch.id,
     object: "event",
     api_version: "2025-04-30.basil",
-    created: 1_790_000_000,
+    created: patch.created ?? 1_790_000_000,
     type: patch.type ?? "customer.subscription.updated",
     data: {
       object: {
@@ -188,7 +211,9 @@ describe("stripe webhook", () => {
     expect(after?.updatedAt.toISOString()).toBe(saved?.updatedAt.toISOString());
   });
 
-  it("повтор после отмены не воскрешает старый тариф", async () => {
+  it("повтор того же события после отмены отбивается журналом по его id", async () => {
+    // Про порядок событий этот тест не говорит ничего — он про повтор с тем
+    // же идентификатором. Порядок проверяет следующий тест.
     const paid = subscriptionEvent({ id: "evt_a", agencyId, customerId, price: "price_scale" });
     const cancelled = subscriptionEvent({
       id: "evt_b",
@@ -201,11 +226,93 @@ describe("stripe webhook", () => {
     await post(paid);
     await post(cancelled);
     // Провайдер повторяет первое событие, потому что наш ответ на него потерялся.
-    await post(paid);
+    const repeat = await post(paid);
+    await expect(repeat.json()).resolves.toMatchObject({ status: "duplicate" });
 
     const agency = await getAgencyById(db, agencyId);
     expect(agency?.plan).toBe("starter");
     expect((await getSubscriptionByAgency(db, agencyId))?.status).toBe("canceled");
+  });
+
+  it("задержавшееся событие с другим id не откатывает тариф назад", async () => {
+    // Stripe порядок доставки не гарантирует, а идентификаторы у этих
+    // событий разные — журнал по id тут не помогает.
+    await post(
+      subscriptionEvent({
+        id: "evt_first",
+        agencyId,
+        customerId,
+        price: "price_growth",
+        created: 1_790_000_000,
+      }),
+    );
+
+    // Агентство перешло на scale.
+    await post(
+      subscriptionEvent({
+        id: "evt_newer",
+        agencyId,
+        customerId,
+        price: "price_scale",
+        created: 1_790_500_000,
+      }),
+    );
+
+    // А следом приезжает застрявший повтор более раннего события.
+    const stale = await post(
+      subscriptionEvent({
+        id: "evt_older",
+        agencyId,
+        customerId,
+        price: "price_starter",
+        created: 1_790_200_000,
+      }),
+    );
+
+    expect(stale.status).toBe(200);
+    await expect(stale.json()).resolves.toMatchObject({ applied: false, status: "ignored" });
+
+    // Лимит клиентов на scale должен остаться: 26-й клиент агентства не
+    // должен упереться в starter из-за порядка доставки.
+    const saved = await getSubscriptionByAgency(db, agencyId);
+    expect(saved?.plan).toBe("scale");
+    expect((await getAgencyById(db, agencyId))?.clientLimit).toBe(PLAN_LIMITS.scale.clientLimit);
+  });
+
+  it("событие о подписке не отбрасывается по времени: только оно приносит тариф", async () => {
+    // Завершённый checkout и создание подписки происходят в одну секунду, и
+    // порядок доставки между ними произвольный. Проверка порядка не должна
+    // отбросить событие о подписке только потому, что checkout доехал
+    // первым: тогда тариф не приедет никогда.
+    await post({
+      id: "evt_checkout",
+      object: "event",
+      created: 1_790_900_000,
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          id: "cs_live_1",
+          object: "checkout.session",
+          customer: customerId,
+          subscription: "sub_live_1",
+          client_reference_id: agencyId,
+        },
+      },
+    });
+
+    const created = await post(
+      subscriptionEvent({
+        id: "evt_created",
+        agencyId,
+        customerId,
+        price: "price_scale",
+        type: "customer.subscription.created",
+        created: 1_790_899_999,
+      }),
+    );
+
+    await expect(created.json()).resolves.toMatchObject({ applied: true });
+    expect((await getSubscriptionByAgency(db, agencyId))?.plan).toBe("scale");
   });
 
   it("сбой списания оставляет тариф и срок оплаченного периода на месте", async () => {
@@ -297,16 +404,21 @@ describe("stripe webhook", () => {
   });
 
   it("сбой записи отпускает событие, и повтор его применяет", async () => {
-    const ledger = getPaymentEventLedger();
     const event = subscriptionEvent({ id: "evt_h", agencyId, customerId, price: "price_scale" });
 
-    // Журнал занял событие, но применить его не удалось — так выглядит
-    // упавшая запись в базу. Провайдер повторит доставку.
-    await ledger.claim("evt_h", new Date());
-    await ledger.release("evt_h");
+    // Первая доставка падает на записи в базу: событие уже занято журналом,
+    // и без явного отпускания оно потеряно навсегда.
+    writeFailure.once = true;
+    const failed = await post(event);
 
-    const response = await post(event);
-    await expect(response.json()).resolves.toMatchObject({ applied: true });
+    expect(failed.status).toBe(500);
+    expect(await getSubscriptionByAgency(db, agencyId)).toBeUndefined();
+
+    // Провайдер повторяет доставку того же события после нашего 500.
+    const retry = await post(event);
+
+    expect(retry.status).toBe(200);
+    await expect(retry.json()).resolves.toMatchObject({ applied: true });
     expect((await getSubscriptionByAgency(db, agencyId))?.plan).toBe("scale");
   });
 
