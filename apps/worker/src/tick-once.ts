@@ -21,8 +21,12 @@ async function main(): Promise<void> {
   const flow = new FlowProducer({ connection });
 
   try {
-    const started = await tickSchedules(db, new Date(), mode);
-    console.log(`[tick] due schedules: ${started.length}`);
+    const { started, skipped } = await tickSchedules(db, new Date(), mode);
+    console.log(`[tick] due schedules: ${started.length + skipped.length}`);
+
+    for (const schedule of skipped) {
+      console.warn(`[tick] schedule ${schedule.scheduleId} skipped: ${schedule.reason}`);
+    }
 
     for (const result of started) {
       try {

@@ -6,6 +6,7 @@ import {
   deleteAgency,
   listRunsByClient,
   setScheduleNextRun,
+  upsertSubscription,
 } from "@repo/db";
 import { runSchedules } from "@repo/db/schema/measurement";
 import { nextRunAfter, tickSchedules } from "./scheduler";
@@ -62,7 +63,7 @@ describe("tickSchedules", () => {
   });
 
   it("не трогает расписание без next_run_at — иначе первый тик запустил бы всех сразу", async () => {
-    const started = await tickSchedules(db, new Date());
+    const { started } = await tickSchedules(db, new Date());
     expect(started.filter((r) => r.scheduleId === scheduleId)).toHaveLength(0);
     expect(await listRunsByClient(db, clientId)).toHaveLength(0);
   });
@@ -70,7 +71,7 @@ describe("tickSchedules", () => {
   it("не трогает расписание, чей срок ещё не наступил", async () => {
     await setScheduleNextRun(db, scheduleId, new Date(Date.now() + 60 * 60 * 1000));
 
-    const started = await tickSchedules(db, new Date());
+    const { started } = await tickSchedules(db, new Date());
     expect(started.filter((r) => r.scheduleId === scheduleId)).toHaveLength(0);
     expect(await listRunsByClient(db, clientId)).toHaveLength(0);
   });
@@ -78,7 +79,7 @@ describe("tickSchedules", () => {
   it("подхватывает созревшее расписание и создаёт прогон", async () => {
     await setScheduleNextRun(db, scheduleId, new Date(Date.now() - 1000));
 
-    const started = await tickSchedules(db, new Date());
+    const { started } = await tickSchedules(db, new Date());
     const mine = started.filter((r) => r.scheduleId === scheduleId);
 
     expect(mine).toHaveLength(1);
@@ -104,8 +105,72 @@ describe("tickSchedules", () => {
     await setScheduleNextRun(db, scheduleId, new Date(Date.now() - 1000));
     await db.update(runSchedules).set({ active: false });
 
-    const started = await tickSchedules(db, new Date());
+    const { started } = await tickSchedules(db, new Date());
     expect(started.filter((r) => r.scheduleId === scheduleId)).toHaveLength(0);
+  });
+
+  it("расписание агентства без действующей подписки не запускается", async () => {
+    await setScheduleNextRun(db, scheduleId, new Date(Date.now() - 1000));
+    await upsertSubscription(db, {
+      agencyId,
+      customerId: `cus_cancelled_${agencyId}`,
+      plan: "starter",
+      status: "canceled",
+      currentPeriodEnd: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+    });
+
+    const { started, skipped } = await tickSchedules(db, new Date());
+
+    // Иначе отменившееся агентство продолжало бы опрашивать ассистентов за
+    // наш счёт раз в две недели — месяцами и без единого клика.
+    expect(started.filter((r) => r.scheduleId === scheduleId)).toHaveLength(0);
+    expect(await listRunsByClient(db, clientId)).toHaveLength(0);
+
+    // Пропуск виден и назван: молчание читалось бы как «замеров не было».
+    const mine = skipped.find((s) => s.scheduleId === scheduleId);
+    expect(mine?.reason).toBeTruthy();
+  });
+
+  it("расписание не сдвигается на отказе — оплата вернётся, заводить заново не придётся", async () => {
+    const due = new Date(Date.now() - 1000);
+    await setScheduleNextRun(db, scheduleId, due);
+    await upsertSubscription(db, {
+      agencyId,
+      customerId: `cus_lapsed_${agencyId}`,
+      plan: "starter",
+      status: "canceled",
+      currentPeriodEnd: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+    });
+
+    await tickSchedules(db, new Date());
+
+    // Подписка восстановлена — следующий же тик берёт то же расписание.
+    await upsertSubscription(db, {
+      agencyId,
+      customerId: `cus_lapsed_${agencyId}`,
+      plan: "starter",
+      status: "active",
+      currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    });
+
+    const { started } = await tickSchedules(db, new Date());
+    expect(started.filter((r) => r.scheduleId === scheduleId)).toHaveLength(1);
+  });
+
+  it("действующая подписка измерение не останавливает", async () => {
+    await setScheduleNextRun(db, scheduleId, new Date(Date.now() - 1000));
+    await upsertSubscription(db, {
+      agencyId,
+      customerId: `cus_active_${agencyId}`,
+      plan: "growth",
+      status: "active",
+      currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    });
+
+    const { started, skipped } = await tickSchedules(db, new Date());
+
+    expect(started.filter((r) => r.scheduleId === scheduleId)).toHaveLength(1);
+    expect(skipped.filter((s) => s.scheduleId === scheduleId)).toHaveLength(0);
   });
 });
 

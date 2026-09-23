@@ -1,5 +1,6 @@
-import { createRun, listDueSchedules, setScheduleNextRun } from "@repo/db";
+import { createRun, getClientById, listDueSchedules, setScheduleNextRun } from "@repo/db";
 import type { Database } from "@repo/db";
+import { entitlementsForAgency } from "@repo/pipeline";
 
 export type Cadence = "daily" | "weekly" | "biweekly";
 
@@ -16,20 +17,77 @@ export interface TickResult {
   clientId: string;
 }
 
+/** Расписание, созревшее у агентства без действующей подписки. */
+export interface SkippedSchedule {
+  scheduleId: string;
+  clientId: string;
+  reason: string;
+}
+
+export interface TickOutcome {
+  started: TickResult[];
+  skipped: SkippedSchedule[];
+}
+
 /**
  * Один тик планировщика: находит созревшие расписания, создаёт по прогону
  * и сдвигает next_run_at. Сдвиг выполняется сразу после создания прогона,
  * иначе следующий тик подхватил бы то же расписание повторно.
+ *
+ * Перед созданием прогона проверяется подписка агентства — той же функцией,
+ * которой это проверяет веб при ручном запуске. Без этой проверки закрытой
+ * оказывалась только кнопка: агентство с отменённой подпиской не могло
+ * нажать «измерить», но его расписание продолжало опрашивать ассистентов
+ * за наш счёт раз в две недели, месяцами и без единого клика. Ручной прогон
+ * — это один человек и один раз; расписание — это расход, который никто не
+ * останавливает.
+ *
+ * Расписание при отказе не выключается и не сдвигается: оплата
+ * возобновляется, и выключенное расписание пришлось бы заводить заново
+ * вручную, по всем клиентам сразу. Созревшее расписание просто ждёт.
  */
 export async function tickSchedules(
   db: Database,
   now: Date = new Date(),
   adaptersMode: "mock" | "live" = "mock",
-): Promise<TickResult[]> {
+): Promise<TickOutcome> {
   const due = await listDueSchedules(db, now);
-  const results: TickResult[] = [];
+  const started: TickResult[] = [];
+  const skipped: SkippedSchedule[] = [];
+
+  // Права на агентство читаются один раз за тик: у одного агентства обычно
+  // созревает сразу несколько клиентов, и спрашивать базу на каждого — это
+  // те же данные тем же запросом.
+  const byAgency = new Map<string, { active: boolean; reason: string }>();
 
   for (const schedule of due) {
+    const client = await getClientById(db, schedule.clientId);
+    if (!client) {
+      // Клиент удалён, а расписание осталось: измерять нечего.
+      skipped.push({
+        scheduleId: schedule.id,
+        clientId: schedule.clientId,
+        reason: "The client no longer exists.",
+      });
+      continue;
+    }
+
+    let entitlements = byAgency.get(client.agencyId);
+    if (!entitlements) {
+      const resolved = await entitlementsForAgency(db, client.agencyId, now);
+      entitlements = { active: resolved.active, reason: resolved.reason };
+      byAgency.set(client.agencyId, entitlements);
+    }
+
+    if (!entitlements.active) {
+      skipped.push({
+        scheduleId: schedule.id,
+        clientId: schedule.clientId,
+        reason: entitlements.reason,
+      });
+      continue;
+    }
+
     const run = await createRun(db, {
       scheduleId: schedule.id,
       clientId: schedule.clientId,
@@ -42,8 +100,8 @@ export async function tickSchedules(
 
     await setScheduleNextRun(db, schedule.id, nextRunAfter(schedule.cadence, now));
 
-    results.push({ scheduleId: schedule.id, runId: run.id, clientId: schedule.clientId });
+    started.push({ scheduleId: schedule.id, runId: run.id, clientId: schedule.clientId });
   }
 
-  return results;
+  return { started, skipped };
 }

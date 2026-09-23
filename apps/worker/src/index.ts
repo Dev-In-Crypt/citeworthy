@@ -46,7 +46,16 @@ async function main(): Promise<void> {
   const tickWorker = new Worker(
     TICK_QUEUE,
     async () => {
-      const started = await tickSchedules(db, new Date(), mode);
+      const { started, skipped } = await tickSchedules(db, new Date(), mode);
+
+      for (const schedule of skipped) {
+        // Молча пропущенный замер выглядит как «ничего не изменилось»
+        // спустя две недели. Причина пишется целиком — по ней видно, что
+        // делать: это отказ по подписке, а не сбой.
+        console.warn(
+          `[tick] schedule ${schedule.scheduleId} skipped for client ${schedule.clientId}: ${schedule.reason}`,
+        );
+      }
 
       let queued = 0;
       let failed = 0;

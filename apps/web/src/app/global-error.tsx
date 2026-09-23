@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { buttonClass } from "@/components/ui/button";
+import { reportingAllowedOnPath } from "@/components/client-error-reporting";
 
 /**
  * Последний рубеж: ошибка, до которой не добрался ни один локальный boundary.
@@ -17,7 +18,15 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
+    /**
+     * Та же проверка, что и в обычном репортере: этот экран подменяет собой
+     * корневой layout целиком, поэтому перенос репортера в `(app)` его не
+     * закрывает. Сбой отрисовки на странице клиентского отчёта иначе
+     * подтянул бы сторонний скрипт ровно туда, где его быть не должно
+     * (инвариант 3), и отправил бы вместе с ним токен доступа в адресе.
+     */
     if (!process.env.NEXT_PUBLIC_SENTRY_DSN) return;
+    if (!reportingAllowedOnPath(window.location.pathname)) return;
     void import("@sentry/browser").then((Sentry) => Sentry.captureException(error));
   }, [error]);
 
