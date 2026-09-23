@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { reportPayloadSchema } from "@repo/core";
 import { createDb, getAgencyById, getClientById, getReportById, getShareByToken } from "@repo/db";
 import { ReportView } from "@/components/report-view";
+import { reportUrl } from "../report-url";
 import { ApproveForm } from "./approve-form";
 
 /**
@@ -10,18 +11,47 @@ import { ApproveForm } from "./approve-form";
  * потому что требовать регистрацию от клиента агентства значит убить канал.
  */
 
-export const metadata: Metadata = {
+/**
+ * Метаданные собираются на запрос, а не объявляются константой: canonical
+ * зависит от токена и от домена агентства.
+ *
+ * Каждое поле задано явно, даже там, где корневой layout сегодня ничего не
+ * перебивает. Наследование — это способ, которым имя продукта попадает на
+ * страницу клиента незаметно: достаточно, чтобы кто-то добавил в корень
+ * openGraph с siteName, и он окажется в исходнике отчёта, не сломав ни
+ * одного теста про видимый текст.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ token: string }>;
+}): Promise<Metadata> {
+  const { token } = await params;
+  // Свой домен агентства, если он настроен; иначе адрес продукта.
+  const canonical = reportUrl(token);
+
   // Заголовок вкладки тоже без брендинга продукта (инвариант 3).
-  title: "AI Search report",
-  /**
-   * Описание задаётся явно, чтобы не унаследовать маркетинговую строку из
-   * корневого layout: она попадает в исходник страницы, которую агентство
-   * отправляет своему клиенту, и это ровно тот брендинг, которого тут быть
-   * не должно.
-   */
-  description: "Client report on visibility in AI answers.",
-  robots: { index: false, follow: false },
-};
+  const title = "AI Search report";
+  const description = "Client report on visibility in AI answers.";
+
+  return {
+    title,
+    description,
+    /**
+     * Ссылка отдана конкретному человеку — в поиске её быть не должно.
+     * Попутно это снимает вопрос, чей домен «главный» для этой страницы.
+     */
+    robots: { index: false, follow: false },
+    alternates: { canonical },
+    /**
+     * Превью в мессенджере — первое, что видит клиент агентства, ещё не
+     * открыв ссылку. Здесь нет ни siteName, ни картинки: и то и другое
+     * пришло бы от продукта.
+     */
+    openGraph: { title, description, url: canonical, type: "website" },
+    twitter: { card: "summary", title, description },
+  };
+}
 
 export default async function PublicReportPage({
   params,

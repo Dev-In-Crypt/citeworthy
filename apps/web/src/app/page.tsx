@@ -6,7 +6,14 @@ import { MARKETING_COPY, SAMPLE_DELIVERY_REPORT } from "@repo/core";
 import { auth } from "@/lib/auth";
 import { Faq, MethodLink, SecHead, SrcChip } from "@/components/marketing/bits";
 import { MarketingShell } from "@/components/marketing/chrome";
-import { AUDIENCE, MARKET_NOTE, OBJECTIONS, PRICING_NOTES } from "@/components/marketing/content";
+import {
+  AUDIENCE,
+  checkoutCopy,
+  MARKET_NOTE,
+  OBJECTIONS,
+  PRICING_NOTES,
+} from "@/components/marketing/content";
+import { getPaymentProvider } from "@/server/payments";
 import { PER_CLIENT_MAX, PER_CLIENT_MIN, PLANS, CLIENT, int, usd } from "@/components/marketing/data";
 import { EvidenceCard } from "@/components/marketing/evidence-card";
 import { ReportPreview } from "@/components/marketing/report-preview";
@@ -322,7 +329,7 @@ export default async function HomePage() {
             ))}
           </ul>
           <div className="row-between">
-            <span className="label">{PRICING_NOTES.checkout}</span>
+            <span className="label">{checkoutCopy(getPaymentProvider().configured).note}</span>
             <Link className="link" href="/pricing">
               Full pricing and what an AI check is →
             </Link>

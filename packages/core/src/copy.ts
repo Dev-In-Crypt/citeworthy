@@ -275,7 +275,7 @@ export const MARKETING_COPY = {
    */
   whiteLabel: {
     page: "The client sees your logo and colour. The report page does not name us, link to us or mention a plan.",
-    link: "The link opens without an account. It lives on our domain; custom domains are not available yet.",
+    link: "The link opens without an account. It can be served from a domain you own — ask us and we set it up — and on that domain nothing but the report exists.",
     email:
       "Sent from the product, the email goes out under your agency's name from our sending address.",
     pdf: "You can download the same page as a PDF to forward. The client's link has an approve step, not a download button.",

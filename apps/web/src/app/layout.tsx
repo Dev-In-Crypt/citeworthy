@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { TrpcProvider } from "@/trpc/react";
-import { ClientErrorReporting } from "@/components/client-error-reporting";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -42,7 +41,15 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
       <body className="antialiased">
-        <ClientErrorReporting />
+        {/*
+          Сбора ошибок здесь нет намеренно. Под этим корнем лежит и
+          `/r/[token]` — страница, которую агентство отправляет своему
+          клиенту; сторонний скрипт и наш ключ проекта на ней нарушили бы
+          инвариант 3, а в событие попал бы сам токен доступа. Репортер
+          смонтирован в `(app)/layout.tsx`, то есть только там, где сидит
+          агентство. Сам компонент на `/r/` тоже не запускается — два замка
+          на одну дверь здесь оправданы: цена ошибки — чужой отчёт.
+        */}
         <TrpcProvider>{children}</TrpcProvider>
       </body>
     </html>

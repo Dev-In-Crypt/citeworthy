@@ -144,8 +144,8 @@ describe("изоляция режимов адаптеров", () => {
     const facts = await listCitationFacts(db, clientId, null);
     const domains = facts.map((fact) => fact.domain);
 
-    // g2.com и прочее приходят только из фикстур.
-    expect(domains).not.toContain("g2.com");
+    // reviewgrid.example и прочее приходят только из фикстур.
+    expect(domains).not.toContain("reviewgrid.example");
     expect(domains).toContain("agenciapisto.test");
   });
 });

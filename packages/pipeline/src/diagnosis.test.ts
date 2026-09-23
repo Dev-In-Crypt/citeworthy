@@ -112,10 +112,10 @@ describe("diagnosis на данных прогона", () => {
   it("находит влиятельные источники с типами", async () => {
     const diagnosis = diagnose(toFacts(await listCitationFacts(db, clientId)));
 
-    const g2 = diagnosis.influential.find((s) => s.domain === "g2.com");
-    expect(g2).toBeDefined();
-    expect(g2?.sourceType).toBe("review");
-    expect(g2?.citations).toBeGreaterThan(0);
+    const reviews = diagnosis.influential.find((s) => s.domain === "reviewgrid.example");
+    expect(reviews).toBeDefined();
+    expect(reviews?.sourceType).toBe("review");
+    expect(reviews?.citations).toBeGreaterThan(0);
   });
 
   it("собственный домен клиента опознан как owned", async () => {

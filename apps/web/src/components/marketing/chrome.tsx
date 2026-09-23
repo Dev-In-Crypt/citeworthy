@@ -110,6 +110,18 @@ export function MarketingFooter() {
               <li><Link href="/sample-report/audit">Sample audit report</Link></li>
             </ul>
           </div>
+          {/*
+            Три страницы, до которых иначе не дойти: в шапке им места нет, а
+            без ссылки страница существует только для того, кто знает адрес.
+          */}
+          <div className="foot-col">
+            <h2>For agencies</h2>
+            <ul>
+              <li><Link href="/partners">Selling it to clients</Link></li>
+              <li><Link href="/proposal-template">Proposal template</Link></li>
+              <li><Link href="/research">What the research says</Link></li>
+            </ul>
+          </div>
         </div>
         <div className="foot-small">
           <span>{MARKETING_COPY.siteBasis}</span>

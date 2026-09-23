@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createDb, getAgencyById } from "@repo/db";
 import { auth } from "@/lib/auth";
 import { AppShell } from "@/components/app-shell";
+import { ClientErrorReporting } from "@/components/client-error-reporting";
 
 /** Общий каркас всех защищённых экранов: сессия проверяется здесь, а не в каждой странице. */
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -25,6 +26,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <AppShell agencyName={agencyName} userEmail={session.user.email}>
+      {/* Сбор ошибок — только на экранах агентства: см. комментарий в корневом layout. */}
+      <ClientErrorReporting />
       {children}
     </AppShell>
   );

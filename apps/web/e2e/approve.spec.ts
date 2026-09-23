@@ -52,7 +52,7 @@ async function setUpReport(page: Page): Promise<{ clientId: string; token: strin
 
   await page.getByRole("button", { name: "Get client link" }).click();
 
-  const token = (await page.getByTestId("share-link").innerText()).replace("/r/", "").trim();
+  const token = (await page.getByTestId("share-link").innerText()).split("/r/").at(-1)!.trim();
   return { clientId, token };
 }
 

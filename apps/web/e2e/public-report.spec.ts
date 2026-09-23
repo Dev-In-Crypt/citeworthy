@@ -69,7 +69,7 @@ async function setUpAgencyWithReport(page: Page): Promise<{ clientId: string; to
   await page.getByRole("button", { name: "Get client link" }).click();
   const link = page.getByTestId("share-link");
   await expect(link).toBeVisible();
-  const token = (await link.innerText()).replace("/r/", "").trim();
+  const token = (await link.innerText()).split("/r/").at(-1)!.trim();
 
   return { clientId, token };
 }

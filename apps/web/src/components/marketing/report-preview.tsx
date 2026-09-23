@@ -21,18 +21,12 @@ function formatPp(value: number): string {
 }
 
 /**
- * Домены в причинах примера аудита — на `.example`, как во всей витрине:
- * приписывать выдуманные доли реальным площадкам на публичной странице незачем.
+ * Домены в примере — вымышленные, на `.example`, и такими приходят из данных
+ * (`packages/core/src/fixtures`). Подмена при отрисовке здесь стояла, пока
+ * настоящие площадки лежали в самих данных: она лечила картинку, а в отчёте,
+ * в PDF и на экранах продукта домены оставались настоящими. Теперь чинить
+ * нечего — приписывать выдуманные доли реальным площадкам негде.
  */
-const EXAMPLE_DOMAINS: [RegExp, string][] = [
-  [/g2\.com/g, "reviewhub.example"],
-  [/reddit\.com/g, "forum.example"],
-  [/capterra\.com/g, "listings.example"],
-];
-
-function exampleDomains(text: string): string {
-  return EXAMPLE_DOMAINS.reduce((acc, [pattern, replacement]) => acc.replace(pattern, replacement), text);
-}
 
 function DeliveryBody({ payload }: { payload: ReportPayload }) {
   const work = payload.workCompleted;
@@ -140,8 +134,8 @@ function AuditBody({ payload }: { payload: ReportPayload }) {
           {shown.map((action) => (
             <li key={action.title}>
               <div>
-                {exampleDomains(action.title)}
-                <span>{exampleDomains(action.reason)}</span>
+                {action.title}
+                <span>{action.reason}</span>
                 <span className="r-meta-line">
                   Estimated impact: {action.estimatedImpact} · Effort: {action.effort}
                 </span>

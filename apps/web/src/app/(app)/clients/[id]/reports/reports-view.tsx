@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PROPOSAL_DEFAULTS } from "@repo/core";
 import { api } from "@/trpc/react";
+import { reportUrl } from "@/app/r/report-url";
 import { EmptyState } from "@/components/page-header";
 import { buttonClass } from "@/components/ui/button";
 import { controlClass, inputClass } from "@/components/ui/field";
@@ -17,6 +18,15 @@ export function ReportsView({ clientId }: { clientId: string }) {
   const [shareLinks, setShareLinks] = useState<Record<string, string>>({});
   const [sending, setSending] = useState<string | null>(null);
   const [sentTo, setSentTo] = useState<Record<string, string>>({});
+
+  /**
+   * Ссылку отсюда копируют и отдают клиенту, поэтому она должна быть
+   * целой, а не путём. Origin берётся после монтирования: на сервере его
+   * в клиентском коде нет, а расхождение разметки ломало бы гидратацию.
+   * Свой домен отчётов (если он настроен) `reportUrl` подставит и без него.
+   */
+  const [origin, setOrigin] = useState("");
+  useEffect(() => setOrigin(window.location.origin), []);
 
   const generate = api.reports.generate.useMutation({
     onSuccess: async () => {
@@ -123,15 +133,15 @@ export function ReportsView({ clientId }: { clientId: string }) {
 
                 {token && (
                   <p data-testid="share-link" className="break-all text-sm text-muted-foreground">
-                    {/* Ссылка показывается целиком: агентство отправит её сам,
+                    {/* Ссылка показывается целиком: агентство отправит её само,
                         автоматической рассылки в продукте нет. */}
                     <a
-                      href={`/r/${token}`}
+                      href={reportUrl(token, { origin })}
                       target="_blank"
                       rel="noreferrer noopener"
                       className="text-primary underline-offset-4 hover:underline"
                     >
-                      /r/{token}
+                      {reportUrl(token, { origin })}
                     </a>
                   </p>
                 )}

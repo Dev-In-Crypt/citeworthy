@@ -55,10 +55,54 @@ export const PRICING_NOTES = {
     "The plan sets how many client accounts the workspace can hold at once. Adding one beyond that means moving to the next plan, and the product asks you to rather than failing quietly.",
   seats: "The number of people on your team is not counted, and there is no charge per seat.",
   extraAssistants: `Claude and Grok have no separate price. Switching them on for a client means five assistants instead of three, so that client uses about 5/3 as many AI checks (roughly ${int(TYPICAL_CHECKS_FIVE_ASSISTANTS)} a month if measured weekly).`,
-  checkout: "There is no self-serve checkout yet. Plans are set up with us directly.",
+  /**
+   * Как сегодня покупают.
+   *
+   * Витрина не должна расходиться с продуктом: в нём кнопка оплаты стоит
+   * ровно тогда, когда подключён платёжный провайдер, и обещать обратное
+   * (в любую сторону) — это первое, что агентство проверит после входа.
+   * Поэтому текст выбирается тем же признаком, что и сама кнопка.
+   */
+  checkoutSelfServe:
+    "You pick a plan in the product and pay by card. If your agency would rather be invoiced, say so and we set that up directly.",
+  checkoutDirect: "There is no self-serve checkout yet. Plans are set up with us directly.",
+  checkoutHeadingSelfServe: "Pick a plan and pay by card",
+  checkoutHeadingDirect: "No self-serve checkout yet",
+  checkoutLeadSelfServe:
+    "Start with the free audit on one of your clients, then pick a plan in the product and pay by card. Cards are handled by the payment provider; we never see the number.",
+  checkoutLeadDirect:
+    "Start with the free audit on one of your clients. Plans and billing are then set up with us directly; there is no “Buy now” button to pretend with.",
   seoSuite:
     "Keep your SEO suite. Semrush or Ahrefs stay where your keyword and backlink work lives; Citeworthy is the client-facing AI-visibility layer next to them and does not try to replace them.",
 };
+
+/**
+ * Что витрина говорит про покупку.
+ *
+ * `paymentsOn` — тот же признак, по которому продукт рисует кнопку оплаты
+ * (`getPaymentProvider().configured`). Страницы серверные, поэтому берут его
+ * прямо у провайдера; иначе сайт и продукт разъезжаются молча.
+ */
+export function checkoutCopy(paymentsOn: boolean): {
+  heading: string;
+  lead: string;
+  note: string;
+  faqAnswer: string;
+} {
+  return paymentsOn
+    ? {
+        heading: PRICING_NOTES.checkoutHeadingSelfServe,
+        lead: PRICING_NOTES.checkoutLeadSelfServe,
+        note: PRICING_NOTES.checkoutSelfServe,
+        faqAnswer: `Yes. ${PRICING_NOTES.checkoutSelfServe}`,
+      }
+    : {
+        heading: PRICING_NOTES.checkoutHeadingDirect,
+        lead: PRICING_NOTES.checkoutLeadDirect,
+        note: PRICING_NOTES.checkoutDirect,
+        faqAnswer: `Not yet. ${PRICING_NOTES.checkoutDirect}`,
+      };
+}
 
 /**
  * Внешняя цифра о рынке — только с источником и ссылкой рядом. Своих

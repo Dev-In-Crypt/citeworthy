@@ -8,9 +8,10 @@ import {
   deleteAgency,
   ensureSource,
   getSourceByDomain,
+  listResponsesByRun,
   listUnclassifiedSources,
 } from "@repo/db";
-import { promptClusters, prompts, runSchedules } from "@repo/db/schema/measurement";
+import { citations, promptClusters, prompts, runSchedules } from "@repo/db/schema/measurement";
 import { sources } from "@repo/db/schema/sources";
 import { orchestrateRun } from "./run-orchestration";
 import { classifyRunSources } from "./classify-sources";
@@ -59,6 +60,25 @@ describe("classifyRunSources", () => {
 
     runId = (await createRun(db, { clientId: client.id, scheduleId, trigger: "manual" })).id;
     await orchestrateRun(db, runId, "mock");
+
+    /**
+     * Одна цитата на настоящий домен из словаря — руками, поверх фикстур.
+     *
+     * В демо-данных настоящих компаний нет намеренно: выдуманные цифры о
+     * реальной компании — это ложь о ней. Но словарь `domains.ts` — это как
+     * раз знание о настоящем мире, и путь «классифицировано правилом» без
+     * такого домена не проходит вовсе: в фикстурах остались только зоны
+     * `.example` и `.test`, которых в словаре нет и быть не должно.
+     * Проверка «модель не может переспорить словарь» стоит одной цитаты.
+     */
+    const [response] = await listResponsesByRun(db, runId);
+    await db.insert(citations).values({
+      responseId: response!.id,
+      url: "https://www.g2.com/categories/crm",
+      domain: "g2.com",
+      title: "Best CRM Software",
+      position: 99,
+    });
   });
 
   afterEach(async () => {
@@ -73,12 +93,13 @@ describe("classifyRunSources", () => {
     const outcome = await classifyRunSources(db, runId);
 
     expect(outcome.domains).toBeGreaterThan(0);
-    expect(await getSourceByDomain(db, "g2.com")).toBeDefined();
+    expect(await getSourceByDomain(db, "reviewgrid.example")).toBeDefined();
   });
 
   it("известные домены классифицируются правилом", async () => {
     await classifyRunSources(db, runId);
 
+    // Домен из словаря — та самая цитата, добавленная руками выше.
     const g2 = await getSourceByDomain(db, "g2.com");
     expect(g2?.sourceType).toBe("review");
     // Видно, чем классифицирован — правилом или моделью.
@@ -100,10 +121,10 @@ describe("classifyRunSources", () => {
   it("домен вне словаря классифицируется моделью", async () => {
     const outcome = await classifyRunSources(db, runId);
 
-    // blog.hubspot.com словарём не покрыт, но подсказка «blog» в домене
+    // blog.crmdigest.example словарём не покрыт, но подсказка «blog» в домене
     // позволяет классификатору отнести его к editorial.
     expect(outcome.classifiedByModel).toBeGreaterThan(0);
-    const blog = await getSourceByDomain(db, "blog.hubspot.com");
+    const blog = await getSourceByDomain(db, "blog.crmdigest.example");
     expect(blog?.sourceType).toBe("editorial");
     expect(blog?.classifiedBy).toBe("model");
   });
@@ -128,7 +149,7 @@ describe("classifyRunSources", () => {
     const unclassified = await listUnclassifiedSources(db);
 
     expect(outcome.unclassified).toBeGreaterThan(0);
-    expect(unclassified.some((s) => s.domain === "blog.hubspot.com")).toBe(true);
+    expect(unclassified.some((s) => s.domain === "blog.crmdigest.example")).toBe(true);
   });
 
   it("повторная классификация не плодит источники", async () => {

@@ -63,7 +63,7 @@ test("opportunity report and its PDF are produced for a prospect", async ({ page
   await expect(page.getByTestId("reports-list").locator("li")).toHaveCount(1);
 
   await page.getByRole("button", { name: "Get client link" }).click();
-  const token = (await page.getByTestId("share-link").innerText()).replace("/r/", "").trim();
+  const token = (await page.getByTestId("share-link").innerText()).split("/r/").at(-1)!.trim();
 
   // Клиентская страница: предложение видно, внутренняя экономика — нет.
   const anonymous = await browser.newContext();
