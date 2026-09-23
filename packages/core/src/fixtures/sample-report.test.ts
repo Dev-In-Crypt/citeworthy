@@ -72,7 +72,9 @@ describe("квартальный отчёт", () => {
 
   it("вклад показан диапазоном и с уровнем уверенности, а не точкой", () => {
     expect(SAMPLE_DELIVERY_REPORT.highestImpactAction?.estimatedContribution).toBe("+2–6 pp");
-    expect(SAMPLE_DELIVERY_REPORT.highestImpactAction?.confidence).toBe("medium");
+    // Сравнивать было не с чем — значит и уверенность низкая, иначе отчёт
+    // спорил бы сам с собой.
+    expect(SAMPLE_DELIVERY_REPORT.highestImpactAction?.confidence).toBe("low");
   });
 
   it("сделанная работа сгруппирована по типам", () => {

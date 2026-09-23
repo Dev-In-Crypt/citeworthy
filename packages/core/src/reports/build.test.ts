@@ -106,6 +106,21 @@ describe("buildReportPayload", () => {
     });
   });
 
+  it("без группы сравнения уверенность падает до низкой", () => {
+    // Иначе отчёт спорит сам с собой: в оговорках «сравнивать было не с чем»,
+    // а под вкладом — «уверенность: средняя», и клиент читает вторую.
+    const payload = buildReportPayload(
+      inputs({ caveats: [REPORT_COPY.noComparisonGroup] }),
+    );
+
+    expect(payload.highestImpactAction?.confidence).toBe("low");
+    expect(payload.caveats).toContain(REPORT_COPY.noComparisonGroup);
+  });
+
+  it("с группой сравнения уверенность остаётся той, что посчитали", () => {
+    expect(buildReportPayload(inputs()).highestImpactAction?.confidence).toBe("medium");
+  });
+
   it("пояснение о природе измерения есть всегда", () => {
     // Клиент должен понимать, что именно измерено, даже если агентство
     // забыло об этом сказать.

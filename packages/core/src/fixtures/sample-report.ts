@@ -168,7 +168,10 @@ export const SAMPLE_DELIVERY_REPORT: ReportPayload = buildReportPayload({
   highestImpact: {
     title: "Refreshed the comparison page",
     incrementalPp: 4,
-    confidence: "medium",
+    // Оговорка ниже говорит, что нетронутых тем для сравнения не было, и
+    // сборщик сам опустит уверенность до низкой. Здесь она записана такой же,
+    // чтобы пример читался ровно так, как он соберётся.
+    confidence: "low",
   },
   nextSprint: [
     "Get covered on the two remaining review platforms",

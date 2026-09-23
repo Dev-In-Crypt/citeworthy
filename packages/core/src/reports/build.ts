@@ -1,4 +1,4 @@
-import { measurementBasisFor } from "../copy";
+import { measurementBasisFor, REPORT_COPY } from "../copy";
 import { competitorGapPp } from "../metrics/visibility";
 import type { VisibilitySnapshot } from "../metrics/visibility";
 import { reportPayloadSchema } from "./schema";
@@ -152,7 +152,19 @@ export function buildReportPayload(inputs: ReportInputs): ReportPayload {
     payload.highestImpactAction = {
       title: inputs.highestImpact.title,
       estimatedContribution: contribution,
-      confidence: inputs.highestImpact.confidence,
+      /**
+       * Без группы сравнения уверенность не бывает выше низкой.
+       *
+       * Иначе в отчёте рядом стоят две несовместимые фразы: «сравнивать было
+       * не с чем» в оговорках и «уверенность: средняя» под вкладом действия.
+       * Клиент читает вторую и считает вклад измеренным. Занижение здесь
+       * намеренное: когда часть экспериментов шла без контрольных тем,
+       * сказать «мы не уверены» честнее, чем разбирать, какой именно из них
+       * попал в «самое влиятельное».
+       */
+      confidence: inputs.caveats.includes(REPORT_COPY.noComparisonGroup)
+        ? "low"
+        : inputs.highestImpact.confidence,
     };
   }
 
