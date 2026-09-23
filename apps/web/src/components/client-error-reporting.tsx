@@ -44,6 +44,32 @@ const IGNORED = [
 
 const IGNORED_SOURCES = [/^chrome-extension:\/\//, /^moz-extension:\/\//, /^safari-extension:\/\//];
 
+/**
+ * Страницы, на которых репортер не поднимается ни при каком DSN.
+ *
+ * `/r/<токен>` — белолейбловый отчёт, который агентство отправляет своему
+ * клиенту. По инварианту 3 там не должно быть ни следа нашего продукта, а
+ * публичный DSN — это id нашего проекта в Sentry, и он уезжает в бандл
+ * страницы. По инварианту 1 это единственный анонимный вход, и `ReportView`
+ * намеренно сделан без интерактива: чем меньше на странице исполняемого кода,
+ * тем меньше поводов ей не доверять. Сторонний скрипт поставщика — ровно то,
+ * чего здесь быть не должно.
+ *
+ * Кроме того, в событии отсюда стоял бы `/r/<токен>` — ссылка, дающая доступ
+ * к отчёту клиента агентства и к кнопке approve.
+ *
+ * Проверка живёт в самом компоненте, а не в том, куда его смонтировали:
+ * монтаж завтра переедет, а запрет должен остаться где был.
+ */
+const NO_REPORTING_ROUTES = new Set(["r"]);
+
+/** `/r/abc` → false. Отдельная функция ради теста: браузер для него не нужен. */
+export function reportingAllowedOnPath(pathname: string): boolean {
+  const path = pathname.startsWith("/") ? pathname : `/${pathname}`;
+  const first = path.split("/")[1] ?? "";
+  return !NO_REPORTING_ROUTES.has(first.toLowerCase());
+}
+
 export interface BrowserEventFilters {
   /** null — событие не отправляется. */
   beforeSend(event: Record<string, unknown>): Record<string, unknown> | null;
@@ -111,7 +137,9 @@ export function ClientErrorReporting({
 }: ClientErrorReportingProps = {}) {
   useEffect(() => {
     const resolvedDsn = dsn ?? process.env.NEXT_PUBLIC_SENTRY_DSN;
-    if (!resolvedDsn || started) return;
+    // Проверка пути стоит здесь же, до динамического импорта: на отчёте
+    // клиента агентства чанк SDK не должен даже загружаться.
+    if (!resolvedDsn || started || !reportingAllowedOnPath(window.location.pathname)) return;
     started = true;
 
     const filters = createBrowserEventFilters();

@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
-import { createBrowserEventFilters } from "./client-error-reporting";
+import { createBrowserEventFilters, reportingAllowedOnPath } from "./client-error-reporting";
 
 /**
  * Что вкладка отправляет в Sentry.
@@ -90,12 +90,13 @@ describe("createBrowserEventFilters", () => {
     expect(
       filters.beforeBreadcrumb({
         category: "navigation",
-        data: { to: "/r/share?token=abc", from: "/clients" },
+        data: { to: "/r/9f2b7c1d4e6a8b3f?token=abc", from: "/clients" },
       }),
     ).toEqual({
-      // Токен отчёта — это доступ к отчёту: в навигации от него остаётся имя.
+      // Токен отчёта — это доступ к отчёту, и лежит он в пути. От перехода
+      // остаётся маршрут: видно, что сломалось на отчёте, и не видно, на чьём.
       category: "navigation",
-      data: { to: "/r/share?token=[redacted]", from: "/clients" },
+      data: { to: "/r/[redacted]?token=[redacted]", from: "/clients" },
     });
 
     expect(
@@ -104,6 +105,38 @@ describe("createBrowserEventFilters", () => {
         data: { url: "https://app.example/api?token=abc" },
       }),
     ).toEqual({ category: "fetch", data: { url: "https://app.example/api?token=[redacted]" } });
+  });
+});
+
+describe("репортер не поднимается на белолейбловом отчёте", () => {
+  it("на /r/<токен> инициализация запрещена", () => {
+    // Страница, которую агентство отправляет своему клиенту: инвариант 3 —
+    // ни следа нашего продукта, инвариант 1 — единственный анонимный вход.
+    expect(reportingAllowedOnPath("/r/9f2b7c1d4e6a8b3f")).toBe(false);
+    expect(reportingAllowedOnPath("/r/9f2b7c1d4e6a8b3f/")).toBe(false);
+    expect(reportingAllowedOnPath("/r")).toBe(false);
+    expect(reportingAllowedOnPath("/R/9f2b7c1d4e6a8b3f")).toBe(false);
+  });
+
+  it("в приложении агентства инициализация разрешена", () => {
+    expect(reportingAllowedOnPath("/")).toBe(true);
+    expect(reportingAllowedOnPath("/clients/42")).toBe(true);
+    expect(reportingAllowedOnPath("/research")).toBe(true);
+    // Свой демонстрационный отчёт — наша страница, а не клиентская.
+    expect(reportingAllowedOnPath("/sample-report")).toBe(true);
+  });
+
+  it("запрет стоит в эффекте до загрузки SDK", async () => {
+    // Проверяется исходник: если чанк SDK успеет загрузиться, сторонний код
+    // уже на клиентской странице — отказ обязан стоять раньше импорта.
+    const source = await readFile(new URL("./client-error-reporting.tsx", import.meta.url), "utf8");
+    const effect = source.slice(source.indexOf("useEffect"));
+
+    const guard = effect.indexOf("reportingAllowedOnPath");
+    expect(guard).toBeGreaterThan(-1);
+    expect(guard).toBeLessThan(effect.indexOf('import("@sentry/browser")'));
+    // И в том же условии, где проверяется DSN, а не отдельной веткой ниже.
+    expect(effect).toMatch(/if \(!resolvedDsn \|\| started \|\| !reportingAllowedOnPath\(/);
   });
 });
 
