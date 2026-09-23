@@ -14,10 +14,11 @@ import type { VisibilitySnapshot } from "../metrics/visibility";
  * означает, что невалидные данные роняют импорт пакета, а не показываются
  * посетителю.
  *
- * Все имена вымышлены. Конкуренты — тоже: приписать реальной компании
- * выдуманную долю упоминаний на публичной странице значит сочинить утверждение
- * о третьем лице. Домен клиента в зоне `.example` — её нельзя зарегистрировать
- * (RFC 2606), поэтому он не может однажды оказаться чьим-то.
+ * Все имена вымышлены. Конкуренты — тоже, и процитированные площадки тоже:
+ * приписать реальной компании выдуманную долю упоминаний на публичной
+ * странице значит сочинить утверждение о третьем лице. Все домены — в зоне
+ * `.example`, её нельзя зарегистрировать (RFC 2606), поэтому ни один из них
+ * не может однажды оказаться чьим-то.
  */
 
 export const SAMPLE_AGENCY = {
@@ -55,16 +56,16 @@ function snapshot(
  */
 const RANKED_ACTIONS = [
   {
-    title: "Get the client covered on g2.com",
+    title: "Get the client covered on reviewhub.example",
     reason:
-      "g2.com is cited in 18% of answers for this category (14 citations). Quillstack and Loambox appear in those answers; Fernpost does not.",
+      "reviewhub.example is cited in 18% of answers for this category (14 citations). Quillstack and Loambox appear in those answers; Fernpost does not.",
     estimatedImpact: "high" as const,
     effort: "medium" as const,
   },
   {
-    title: "Get the client covered on reddit.com",
+    title: "Get the client covered on forum.example",
     reason:
-      "reddit.com is cited in 12% of answers here (9 citations), and threads comparing the category name competitors without mentioning Fernpost.",
+      "forum.example is cited in 12% of answers here (9 citations), and threads comparing the category name competitors without mentioning Fernpost.",
     estimatedImpact: "medium" as const,
     effort: "medium" as const,
   },
@@ -83,9 +84,9 @@ const RANKED_ACTIONS = [
     effort: "low" as const,
   },
   {
-    title: "Get the client covered on capterra.com",
+    title: "Get the client covered on listings.example",
     reason:
-      "capterra.com is cited in 7% of answers here (5 citations), with two competitors listed and the client absent.",
+      "listings.example is cited in 7% of answers here (5 citations), with two competitors listed and the client absent.",
     estimatedImpact: "medium" as const,
     effort: "low" as const,
   },

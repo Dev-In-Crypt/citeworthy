@@ -11,6 +11,12 @@ import { GAP_FIXTURES } from "./gap-responses";
  *   1. бренд упомянут явно и есть citations;
  *   2. бренд упомянут только под alias ("Acme CRM" / "Acme");
  *   3. бренда нет вовсе (для одного из вариантов — ещё и без citations).
+ *
+ * Все процитированные площадки вымышлены (Reviewgrid, Softwarepicks,
+ * Vendorverdict, Shortlister, Saaspeers, CRM Digest, Market Ledger, Pipewell),
+ * домены — в зонах .example и .test: их нельзя зарегистрировать (RFC 2606).
+ * Настоящий домен рядом с выдуманной долей упоминаний — это приписанное
+ * третьему лицу утверждение, которого мы не измеряли.
  */
 
 export interface ResponseFixture {
@@ -42,9 +48,12 @@ export const RESPONSE_FIXTURES: ResponseFixture[] = [
         "two most commonly recommended starting points.",
       ].join("\n"),
       citations: [
-        { url: "https://www.g2.com/categories/crm", title: "Best CRM Software 2026 | G2" },
         {
-          url: "https://blog.hubspot.com/sales/best-crm-for-startups",
+          url: "https://www.reviewgrid.example/categories/crm",
+          title: "CRM Software Reviews 2026 | Reviewgrid",
+        },
+        {
+          url: "https://blog.crmdigest.example/best-crm-for-startups",
           title: "The Best CRM for Startups",
         },
         { url: "https://acmecrm.test/pricing", title: "AcmeCRM Pricing" },
@@ -69,10 +78,10 @@ export const RESPONSE_FIXTURES: ResponseFixture[] = [
       ].join("\n"),
       citations: [
         {
-          url: "https://www.capterra.com/crm-software/",
-          title: "CRM Software Reviews | Capterra",
+          url: "https://www.softwarepicks.example/crm-software/",
+          title: "CRM Software Reviews | Softwarepicks",
         },
-        { url: "https://www.reddit.com/r/sales/comments/hubspot_alternatives" },
+        { url: "https://forum.saaspeers.example/sales/hubspot-alternatives" },
       ],
       modelVersion: "gpt-4o-2026-05-13",
       costUsd: 0.0098,
@@ -92,8 +101,11 @@ export const RESPONSE_FIXTURES: ResponseFixture[] = [
         "small team needs.",
       ].join("\n"),
       citations: [
-        { url: "https://www.pipedrive.com/en/features", title: "Pipedrive Features" },
-        { url: "https://www.g2.com/categories/crm", title: "Best CRM Software 2026 | G2" },
+        { url: "https://www.pipewell.example/features", title: "Pipewell Features" },
+        {
+          url: "https://www.reviewgrid.example/categories/crm",
+          title: "CRM Software Reviews 2026 | Reviewgrid",
+        },
       ],
       modelVersion: "gpt-4o-2026-05-13",
       costUsd: 0.0089,
@@ -117,14 +129,17 @@ export const RESPONSE_FIXTURES: ResponseFixture[] = [
         "specialised around outbound sales workflows.",
       ].join("\n"),
       citations: [
-        { url: "https://www.g2.com/categories/crm", title: "Best CRM Software 2026 | G2" },
         {
-          url: "https://www.trustradius.com/crm",
+          url: "https://www.reviewgrid.example/categories/crm",
+          title: "CRM Software Reviews 2026 | Reviewgrid",
+        },
+        {
+          url: "https://www.vendorverdict.example/crm",
           title: "CRM Software Reviews and Ratings",
         },
         { url: "https://acmecrm.test/blog/crm-for-startups", title: "AcmeCRM for startups" },
         {
-          url: "https://www.reddit.com/r/startups/comments/which_crm",
+          url: "https://forum.saaspeers.example/startups/which-crm",
           title: "Which CRM are you using?",
         },
       ],
@@ -146,7 +161,7 @@ export const RESPONSE_FIXTURES: ResponseFixture[] = [
         "shows up in developer-focused comparisons.",
       ].join("\n"),
       citations: [
-        { url: "https://developers.hubspot.com/docs/api/overview", title: "HubSpot API" },
+        { url: "https://developers.pipewell.example/api/overview", title: "Pipewell API" },
         { url: "https://acmecrm.test/docs/api", title: "AcmeCRM API reference" },
       ],
       modelVersion: "sonar-pro-2026-04",
@@ -190,10 +205,13 @@ export const RESPONSE_FIXTURES: ResponseFixture[] = [
         "The right pick depends on whether your motion is inbound marketing or outbound sales.",
       ].join("\n"),
       citations: [
-        { url: "https://www.g2.com/categories/crm", title: "Best CRM Software | G2" },
         {
-          url: "https://www.forbes.com/advisor/business/software/best-crm-for-startups/",
-          title: "Best CRM For Startups Of 2026 – Forbes Advisor",
+          url: "https://www.reviewgrid.example/categories/crm",
+          title: "CRM Software Reviews | Reviewgrid",
+        },
+        {
+          url: "https://news.marketledger.example/business/best-crm-for-startups/",
+          title: "Best CRM For Startups Of 2026 – Market Ledger",
         },
       ],
       modelVersion: "gemini-2.5-pro",
@@ -213,7 +231,10 @@ export const RESPONSE_FIXTURES: ResponseFixture[] = [
         "workflow.",
       ].join("\n"),
       citations: [
-        { url: "https://www.capterra.com/crm-software/", title: "CRM Software | Capterra" },
+        {
+          url: "https://www.softwarepicks.example/crm-software/",
+          title: "CRM Software Reviews | Softwarepicks",
+        },
       ],
       modelVersion: "gemini-2.5-pro",
       costUsd: 0.0038,
@@ -227,12 +248,15 @@ export const RESPONSE_FIXTURES: ResponseFixture[] = [
     covers: "brand-absent",
     result: {
       text: [
-        "Agencies most often use Asana, Monday.com, ClickUp or Notion for project management.",
+        "Agencies most often use Asana, Monday, ClickUp or Notion for project management.",
         "The choice usually comes down to whether you need time tracking and client-facing",
         "views out of the box.",
       ].join("\n"),
       citations: [
-        { url: "https://www.g2.com/categories/project-management", title: "Project Management | G2" },
+        {
+          url: "https://www.reviewgrid.example/categories/project-management",
+          title: "Project Management Reviews | Reviewgrid",
+        },
       ],
       modelVersion: "gemini-2.5-pro",
       costUsd: 0.0035,
