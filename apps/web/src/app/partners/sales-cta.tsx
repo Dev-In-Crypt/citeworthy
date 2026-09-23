@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ComponentProps } from "react";
 import type { SalesContact } from "@/config/site";
 import { SALES_CONTACT } from "@/config/site";
 
@@ -14,13 +15,13 @@ import { SALES_CONTACT } from "@/config/site";
  * проверить тестом без рендера React.
  */
 
+/** Внутренний путь в том виде, в каком его принимает typedRoutes. */
+type InternalHref = ComponentProps<typeof Link>["href"];
+
 export interface CtaTarget {
   /** sales — ведёт к человеку; audit — запасной путь, никакого обещания. */
   kind: "sales" | "audit";
   label: string;
-  href: string;
-  /** Внешняя ссылка (mailto:/календарь) рендерится обычным <a>, не <Link>. */
-  external: boolean;
 }
 
 export const AUDIT_FALLBACK = {
@@ -36,18 +37,13 @@ export const AUDIT_FALLBACK = {
  */
 export function salesCtaTarget(
   contact: SalesContact | null,
-  fallback: { label: string; href: string } = AUDIT_FALLBACK,
+  fallbackLabel: string = AUDIT_FALLBACK.label,
 ): CtaTarget {
   if (contact) {
-    return {
-      kind: "sales",
-      label: contact.label,
-      href: contact.href,
-      external: !contact.href.startsWith("/"),
-    };
+    return { kind: "sales", label: contact.label };
   }
 
-  return { kind: "audit", label: fallback.label, href: fallback.href, external: false };
+  return { kind: "audit", label: fallbackLabel };
 }
 
 /** Есть ли кому звонить. Блоки «поговорите с нами» целиком прячутся по этому флагу. */
@@ -61,22 +57,25 @@ export function SalesCta({
 }: {
   className?: string;
   fallbackLabel?: string;
-  fallbackHref?: string;
+  fallbackHref?: InternalHref;
   arrow?: boolean;
 }) {
-  const target = salesCtaTarget(SALES_CONTACT, { label: fallbackLabel, href: fallbackHref });
+  const target = salesCtaTarget(SALES_CONTACT, fallbackLabel);
   const text = arrow ? `${target.label} →` : target.label;
 
-  if (target.external) {
+  // Контакт — это всегда mailto: или чужой календарь, то есть обычный <a>.
+  // Внутренние пути ходят только через запасной путь, и только они знают
+  // про typedRoutes.
+  if (target.kind === "sales" && SALES_CONTACT) {
     return (
-      <a className={className} href={target.href} data-testid="sales-contact">
+      <a className={className} href={SALES_CONTACT.href} data-testid="sales-contact">
         {text}
       </a>
     );
   }
 
   return (
-    <Link className={className} href={target.href} data-testid="sales-fallback">
+    <Link className={className} href={fallbackHref} data-testid="sales-fallback">
       {text}
     </Link>
   );

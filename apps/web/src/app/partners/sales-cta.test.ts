@@ -8,41 +8,27 @@ import { AUDIT_FALLBACK, salesCtaTarget } from "./sales-cta";
  * звонок, которого некому принять, стоит дороже, чем отсутствующая кнопка.
  */
 describe("кнопка разговора с человеком", () => {
-  it("без контакта ведёт на бесплатный аудит, а не на звонок", () => {
-    const target = salesCtaTarget(null);
-
-    expect(target.kind).toBe("audit");
-    expect(target.href).toBe(AUDIT_FALLBACK.href);
-    expect(target.external).toBe(false);
+  it("без контакта зовёт на бесплатный аудит, а не на звонок", () => {
+    expect(salesCtaTarget(null)).toEqual({ kind: "audit", label: AUDIT_FALLBACK.label });
   });
 
-  it("можно задать свой запасной путь", () => {
-    const target = salesCtaTarget(null, { label: "See a sample report", href: "/sample-report" });
-
-    expect(target).toEqual({
+  it("можно задать свою подпись запасного пути", () => {
+    expect(salesCtaTarget(null, "See a sample report")).toEqual({
       kind: "audit",
       label: "See a sample report",
-      href: "/sample-report",
-      external: false,
     });
   });
 
-  it("с контактом ведёт на него и помечает ссылку внешней", () => {
+  it("с контактом зовёт к человеку и подписью берёт его подпись", () => {
     const target = salesCtaTarget({ label: "Talk to the founder", href: "mailto:a@b.example" });
 
-    expect(target).toEqual({
-      kind: "sales",
-      label: "Talk to the founder",
-      href: "mailto:a@b.example",
-      external: true,
-    });
+    expect(target).toEqual({ kind: "sales", label: "Talk to the founder" });
   });
 
-  it("внутренний путь в контакте внешней ссылкой не считается", () => {
-    const target = salesCtaTarget({ label: "Book a call", href: "/call" });
+  it("запасная подпись с заданным контактом не используется", () => {
+    const target = salesCtaTarget({ label: "Book a call", href: "https://cal.example/x" }, "Audit");
 
-    expect(target.kind).toBe("sales");
-    expect(target.external).toBe(false);
+    expect(target.label).toBe("Book a call");
   });
 
   it("без переменных окружения контакта нет, и страницы это видят", () => {
