@@ -130,7 +130,6 @@
 .mk .toggle button { border: 0; background: transparent; padding: 6px 12px; border-radius: 999px; color: var(--cw-ink-2); cursor: pointer; white-space: nowrap; }
 .mk .toggle button[aria-pressed="true"] { background: #fff; color: var(--cw-ink); box-shadow: 0 1px 2px rgb(0 0 0 / 0.08); }
 .mk .report { width: 100%; max-width: 460px; background: #fff; border-radius: 4px; box-shadow: var(--cw-shadow-report); overflow: hidden; color: var(--cw-ink); }
-.mk .report.tilt { transform: rotate(-2deg); }
 .mk .r-bar { height: 6px; background: var(--agency); transition: background 0.3s; }
 .mk .r-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 18px 22px 8px; }
 .mk .r-logo { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px; color: var(--agency); transition: color 0.3s; }
@@ -527,7 +526,17 @@
 .mk .rd-axis { position: relative; height: 14px; border-radius: 3px; background: var(--cw-paper-2); }
 .mk .rd-band { position: absolute; top: 0; bottom: 0; background: rgb(0 166 62 / 0.2); border: 1.5px solid var(--client); border-radius: 3px; }
 .mk .rd-dot { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--client-ink); }
-.mk .conf-table-card { max-width: 640px; }
+/*
+  Карточка порогов занимает всю ширину, как остальные блоки страницы.
+  Столбец с числом при этом не уезжает к краю: таблице задана своя
+  ширина колонок, иначе между подписью и цифрой оставалась бы пустая
+  полоса во весь экран, и строку стало бы трудно прочитать глазом.
+*/
+.mk .conf-table-card .ba { table-layout: fixed; }
+.mk .conf-table-card .ba th:first-child,
+.mk .conf-table-card .ba td:first-child { width: 260px; }
+.mk .conf-table-card .ba th:last-child,
+.mk .conf-table-card .ba td:last-child { text-align: left; }
 /* ================= responsive ================= */
 @media (max-width: 1060px) {
   .mk .g4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -581,7 +590,6 @@
   .mk .sec-head .n { font-size: 22px; }
   .mk .sec-head p { grid-column: 1 / -1; font-size: 16.5px; }
   .mk .g2, .mk .g3, .mk .g4 { grid-template-columns: minmax(0, 1fr); }
-  .mk .report.tilt { transform: rotate(-1.2deg); }
   .mk .r-title { font-size: 20px; }
   .mk .metric .v { font-size: 46px; }
   .mk .metric .v.sm { font-size: 40px; }

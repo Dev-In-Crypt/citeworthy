@@ -56,7 +56,7 @@ export function AgencyCard({
         toggle
       )}
       <article
-        className="report tilt"
+        className="report"
         aria-label={ariaLabel}
         data-testid={testId}
         style={{ "--agency": agency.color } as CSSProperties}
