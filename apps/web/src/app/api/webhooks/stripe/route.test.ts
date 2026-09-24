@@ -1,7 +1,6 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   hmacSha256Hex,
-  InMemoryPaymentEventLedger,
   PAST_DUE_GRACE_DAYS,
   PLAN_LIMITS,
   StripePaymentProvider,
@@ -83,7 +82,20 @@ afterAll(async () => {
 
 /** Подпись считается тем же алгоритмом, что у Stripe, а не подменяется. */
 async function post(event: unknown, at = new Date()): Promise<Response> {
-  const payload = JSON.stringify(event);
+  /**
+   * Имя события уникально для прогона.
+   *
+   * Журнал теперь в базе и переживает не только процесс, но и прогон
+   * тестов: с постоянными именами второй запуск нашёл бы все события уже
+   * обработанными. Внутри прогона имена остаются говорящими, и повтор
+   * одного события остаётся повтором.
+   */
+  const withRunId = { ...(event as Record<string, unknown>) };
+  if (typeof withRunId["id"] === "string") {
+    withRunId["id"] = `${withRunId["id"]}_${RUN}`;
+  }
+
+  const payload = JSON.stringify(withRunId);
   const timestamp = Math.floor(at.getTime() / 1000);
   const signature = await hmacSha256Hex(SECRET, `${timestamp}.${payload}`);
 
@@ -139,13 +151,18 @@ function subscriptionEvent(patch: {
   };
 }
 
+/** Метка прогона: журнал в базе живёт дольше, чем тесты. */
+const RUN = Math.random().toString(36).slice(2, 10);
+
 describe("stripe webhook", () => {
   let agencyId = "";
   let customerId = "";
 
   beforeEach(async () => {
     setPaymentProvider(provider);
-    setPaymentEventLedger(new InMemoryPaymentEventLedger());
+    // Настоящий журнал, а не заглушка: вебхук проверяется тем же путём,
+    // которым он работает в проде.
+    setPaymentEventLedger(null);
     const agency = await createAgency(db, { name: "Webhook Agency", clientLimit: 3 });
     agencyId = agency.id;
     customerId = `cus_${agency.id.slice(0, 8)}`;

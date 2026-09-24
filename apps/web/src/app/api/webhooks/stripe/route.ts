@@ -39,7 +39,7 @@ export async function POST(request: Request): Promise<Response> {
   const { db, close } = createDb();
 
   try {
-    const result = await applyPaymentEvent(db, envelope, getPaymentEventLedger());
+    const result = await applyPaymentEvent(db, envelope, getPaymentEventLedger(db));
 
     if (result.status !== "applied") {
       // 200 намеренно: провайдер иначе будет слать это событие снова и снова.
