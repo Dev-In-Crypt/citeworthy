@@ -156,7 +156,7 @@ export function SchedulePanel({ clientId }: { clientId: string }) {
       ? estimateSchedule({
           plan: options.plan,
           prompts: options.promptCount,
-          assistants: platforms.length,
+          assistants: platforms,
           samplesPerPrompt: samples,
           cadence,
         })

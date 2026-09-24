@@ -8,7 +8,8 @@ import {
   refuseSchedule,
   refuseScheduleForPlan,
 } from "./capacity";
-import { DEFAULT_PLATFORMS, PLATFORM_IDS } from "./types";
+import { DEFAULT_PLATFORMS, PLATFORM_IDS, type Platform } from "./types";
+import { ANSWER_PRICES } from "./pricing";
 import { ESTIMATED_COST_PER_ANSWER_USD, PLAN_LIMITS } from "../billing/period";
 import {
   CADENCES,
@@ -233,12 +234,15 @@ describe("что предлагается в форме", () => {
 });
 
 describe("оценка расхода", () => {
-  const setting = { prompts: 24, assistants: 3, samplesPerPrompt: 3 };
+  const TRIO: Platform[] = ["chatgpt", "perplexity", "gemini"];
+  const setting = { prompts: 24, assistants: TRIO, samplesPerPrompt: 3 };
 
   it("ответов в месяц — ровно столько, сколько считает конфиг", () => {
     for (const cadence of CADENCES) {
       const estimate = estimateSchedule({ plan: "growth", cadence, ...setting });
-      expect(estimate.answersPerMonth).toBe(monthlyAnswers({ ...setting, cadence }));
+      expect(estimate.answersPerMonth).toBe(
+        monthlyAnswers({ ...setting, assistants: TRIO.length, cadence }),
+      );
     }
   });
 
@@ -251,13 +255,43 @@ describe("оценка расхода", () => {
     expect(daily.answersPerMonth / weekly.answersPerMonth).toBeCloseTo(6.9, 1);
   });
 
-  it("расход — ответы × измеренная цена ответа, без своих чисел", () => {
+  it("расход считается по цене каждого ассистента, а не по одной на всех", () => {
     const estimate = estimateSchedule({ plan: "growth", cadence: "weekly", ...setting });
+    const each = estimate.answersPerMonth / TRIO.length;
 
     expect(estimate.estimatedCostUsd).toBeCloseTo(
-      estimate.answersPerMonth * ESTIMATED_COST_PER_ANSWER_USD,
+      TRIO.reduce((sum, id) => sum + ANSWER_PRICES[id].usd * each, 0),
       6,
     );
+  });
+
+  it("два набора одного размера стоят по-разному", () => {
+    // Ровно та ошибка, которая здесь была: цена зависела только от количества.
+    const cheap = estimateSchedule({
+      plan: "growth",
+      cadence: "weekly",
+      prompts: 24,
+      assistants: ["perplexity", "grok"],
+      samplesPerPrompt: 3,
+    });
+    const dear = estimateSchedule({
+      plan: "growth",
+      cadence: "weekly",
+      prompts: 24,
+      assistants: ["gemini", "claude"],
+      samplesPerPrompt: 3,
+    });
+
+    expect(dear.answersPerMonth).toBe(cheap.answersPerMonth);
+    expect(dear.estimatedCostUsd).toBeGreaterThan(cheap.estimatedCostUsd * 3);
+  });
+
+  it("прежняя оценка по цене ChatGPT занижала расход запускной тройки", () => {
+    const estimate = estimateSchedule({ plan: "growth", cadence: "weekly", ...setting });
+    const old = estimate.answersPerMonth * ESTIMATED_COST_PER_ANSWER_USD;
+
+    expect(old).toBeLessThan(estimate.estimatedCostUsd);
+    expect(estimate.estimatedCostUsd / old).toBeGreaterThan(1.15);
   });
 
   it("обычная настройка укладывается в лимит любого тарифа", () => {
@@ -272,7 +306,7 @@ describe("оценка расхода", () => {
     const estimate = estimateSchedule({
       plan: "starter",
       prompts: 60,
-      assistants: 5,
+      assistants: PLATFORM_IDS,
       samplesPerPrompt: 5,
       cadence: "daily",
     });
@@ -287,7 +321,7 @@ describe("оценка расхода", () => {
     const estimate = estimateSchedule({
       plan: "starter",
       prompts: 0,
-      assistants: 0,
+      assistants: [],
       samplesPerPrompt: 3,
       cadence: "weekly",
     });

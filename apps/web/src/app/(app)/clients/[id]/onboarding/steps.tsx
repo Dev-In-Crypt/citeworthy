@@ -1,6 +1,6 @@
 "use client";
 
-import { DEFAULT_PLATFORMS } from "@repo/core";
+import { api } from "@/trpc/react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -41,21 +41,29 @@ export function OnboardingSteps({ current }: { current: 1 | 2 | 3 }) {
  * на странице расходов.
  */
 export function SamplingCost({
+  clientId,
   prompts,
   samplesPerPrompt = 3,
   runsPerMonth = 2,
 }: {
+  clientId: string;
   prompts: number;
   samplesPerPrompt?: number;
   runsPerMonth?: number;
 }) {
-  // Оценка — для набора по умолчанию. Считать по всем измеряемым значило бы
-  // обещать расход на ассистентов, которых клиенту никто не включал.
-  const assistants = DEFAULT_PLATFORMS.length;
+  /**
+   * Оценка — для набора, который тариф даёт новому клиенту.
+   *
+   * Не общий литерал: наборы у тарифов разные, и считать всем по одному
+   * значило бы обещать расход на ассистентов, которых клиенту никто не
+   * включал, — или наоборот, промолчать о тех, кто включён.
+   */
+  const capacity = api.runs.capacity.useQuery({ clientId });
+  const assistants = capacity.data?.defaultAssistants.length ?? 0;
   const perRun = prompts * assistants * samplesPerPrompt;
   const perMonth = perRun * runsPerMonth;
 
-  if (prompts === 0) {
+  if (prompts === 0 || assistants === 0) {
     return (
       <span className="text-sm text-muted-foreground">
         Save a prompt set to see what a schedule will cost.

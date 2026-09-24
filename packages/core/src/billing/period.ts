@@ -1,3 +1,5 @@
+import { ANSWER_PRICES } from "../adapters/pricing";
+
 /**
  * Биллинговый период — календарный месяц в UTC.
  *
@@ -49,22 +51,25 @@ export interface PlanLimits {
 export const CHECKS_PER_CLIENT_MONTH = 935;
 
 /**
- * Во что обходится один ответ ассистента.
+ * Во что обходится один ответ ChatGPT — единственный живой замер в проекте.
  *
- * Замер 2026-08-12 на живом адаптере ChatGPT при reasoning=medium: $0.0247,
- * из них около четырёх пятых — вызовы веб-поиска. Число нужно, чтобы
- * показать цену расписания до того, как его сохранят: агентство должно
- * видеть, во что обойдётся «давайте замерять почаще».
+ * 2026-08-12, reasoning=medium: $0.0242, из них около четырёх пятых —
+ * вызовы веб-поиска. Здесь стояло $0.0247, и оно расходилось с самим
+ * адаптером, с фикстурами и с моделью себестоимости; никто не мог сказать,
+ * откуда взялась разница. Цифра теперь одна и лежит там же, где цены
+ * остальных ассистентов.
  *
- * Это оценка для интерфейса. Настоящая стоимость каждого ответа пишется
- * в БД самим адаптером и считается по ней, а не по этой константе.
+ * Средней ценой ответа это не является и называться не должно: ассистенты
+ * различаются почти впятеро. Оценка расхода по набору считается в
+ * `answersCostUsd`, а настоящая стоимость каждого ответа пишется в БД
+ * самим адаптером.
  */
-export const ESTIMATED_COST_PER_ANSWER_USD = 0.0247;
+export const ESTIMATED_COST_PER_ANSWER_USD = ANSWER_PRICES.chatgpt.usd;
 
 export const PLAN_LIMITS: Record<"starter" | "growth" | "scale", PlanLimits> = {
   starter: { clientLimit: 3, aiCheckAllowance: 4_000, priceUsd: 499 },
   growth: { clientLimit: 10, aiCheckAllowance: 13_000, priceUsd: 1_299 },
-  scale: { clientLimit: 25, aiCheckAllowance: 32_500, priceUsd: 2_499 },
+  scale: { clientLimit: 25, aiCheckAllowance: 26_000, priceUsd: 2_499 },
 };
 
 export interface UsageStatus {

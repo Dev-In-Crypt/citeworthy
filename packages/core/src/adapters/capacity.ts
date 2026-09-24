@@ -1,4 +1,5 @@
 import { ASSISTANTS } from "./catalogue";
+import { answersCostUsd } from "./pricing";
 import { PLATFORM_IDS, type Platform } from "./types";
 import { ESTIMATED_COST_PER_ANSWER_USD } from "../billing/period";
 import type { PlanId } from "../billing/entitlements";
@@ -129,11 +130,12 @@ export interface CapacityEstimate {
   ratio: number;
   overAllowance: boolean;
   /**
-   * Оценка расхода на измерение: ответы × измеренная цена ответа.
+   * Оценка расхода на измерение — по цене каждого выбранного ассистента.
    *
-   * Цена берётся из `ESTIMATED_COST_PER_ANSWER_USD` — единственной цифры
-   * стоимости ответа в коде. Своих чисел здесь нет и быть не должно:
-   * настоящая стоимость каждого ответа пишется в БД адаптером.
+   * Раньше считалось по одной цифре на всех, и это была цена ответа ChatGPT:
+   * набор из дорогих ассистентов занижался вдвое. Своих чисел здесь нет —
+   * они в `ANSWER_PRICES`, а настоящая стоимость каждого ответа пишется в
+   * БД адаптером.
    */
   estimatedCostUsd: number;
 }
@@ -151,26 +153,36 @@ export const ESTIMATE_BASIS = {
 export function estimateSchedule(input: {
   plan: PlanId;
   prompts: number;
-  assistants: number;
+  /**
+   * Именно список, а не количество.
+   *
+   * Число ответов от личности ассистента не зависит, а деньги зависят сильно:
+   * между самым дешёвым и самым дорогим почти пятикратная разница. Пока сюда
+   * приходило количество, цена набора была неотличима от цены любого другого
+   * набора того же размера.
+   */
+  assistants: readonly Platform[];
   samplesPerPrompt: number;
   cadence: Cadence;
 }): CapacityEstimate {
   const answersPerMonth = monthlyAnswers({
     prompts: input.prompts,
-    assistants: input.assistants,
+    assistants: input.assistants.length,
     samplesPerPrompt: input.samplesPerPrompt,
     cadence: input.cadence,
   });
   const allowance = monthlyCheckAllowance(input.plan);
+
+  // Ответов на одного ассистента за месяц: общее число делится поровну,
+  // потому что каждый отвечает на каждый вопрос в каждом прогоне.
+  const answersEach = input.assistants.length > 0 ? answersPerMonth / input.assistants.length : 0;
 
   return {
     answersPerMonth,
     allowance,
     ratio: allowance > 0 ? answersPerMonth / allowance : 0,
     overAllowance: answersPerMonth > allowance,
-    // Шесть знаков — та же точность, что у колонки cost_usd.
-    estimatedCostUsd:
-      Math.round(answersPerMonth * ESTIMATED_COST_PER_ANSWER_USD * 1_000_000) / 1_000_000,
+    estimatedCostUsd: answersCostUsd(input.assistants, answersEach),
   };
 }
 

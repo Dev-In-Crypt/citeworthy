@@ -66,13 +66,21 @@ describe("PLAN_LIMITS", () => {
   });
 
   it("allowance покрывает обычную работу с запасом, но не втрое", () => {
-    // Обещать больше, чем продукт потребляет, — значит продать себе убыток:
-    // клиент вправе забрать обещанное. Запас держим в коридоре 1.2–1.6.
+    /**
+     * Обещать больше, чем продукт потребляет, — значит продать себе убыток:
+     * клиент вправе забрать обещанное.
+     *
+     * Нижняя граница опущена с 1.2 до 1.1 осознанно. Коридор считался, когда
+     * все тарифы мерили одну и ту же тройку ассистентов; теперь наборы у
+     * тарифов разные, и на старшем он дороже — ответ Gemini стоит впятеро
+     * дороже ответа Perplexity. Держать прежний запас на старшем тарифе
+     * значит обещать объём, который съедает почти три четверти платежа.
+     */
     for (const plan of [PLAN_LIMITS.starter, PLAN_LIMITS.growth, PLAN_LIMITS.scale]) {
       const typical = plan.clientLimit * CHECKS_PER_CLIENT_MONTH;
       const headroom = plan.aiCheckAllowance / typical;
 
-      expect(headroom).toBeGreaterThan(1.2);
+      expect(headroom).toBeGreaterThan(1.1);
       expect(headroom).toBeLessThan(1.6);
     }
   });

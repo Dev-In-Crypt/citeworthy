@@ -92,7 +92,7 @@ export default function OnboardingPage({ params }: { params: Promise<{ id: strin
         />
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
-          <SamplingCost prompts={savedPrompts} />
+          <SamplingCost clientId={id} prompts={savedPrompts} />
           <button
             type="button"
             data-testid="onboarding-continue"

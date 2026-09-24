@@ -7,6 +7,7 @@
 export const CORE_PACKAGE_NAME = "@repo/core";
 
 export * from "./adapters/types";
+export * from "./adapters/pricing";
 export { MockAdapter, stableHash } from "./adapters/mock";
 export {
   DEFAULT_OPENAI_MODEL,
