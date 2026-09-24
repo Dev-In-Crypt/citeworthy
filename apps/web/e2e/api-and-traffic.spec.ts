@@ -29,7 +29,10 @@ test("an API key is shown once and then reads the agency's own numbers", async (
   await page.getByRole("button", { name: "Create client" }).click();
   await expect(page).toHaveURL(/\/onboarding$/);
 
-  await page.getByRole("link", { name: "API" }).click();
+  // Ключи живут в настройках агентства, а не отдельным пунктом меню:
+  // за ними заходят раз в жизнь, и искать их станут именно там.
+  await page.goto("/settings");
+  await page.getByRole("link", { name: "API keys" }).click();
   await expect(page).toHaveURL(/\/settings\/api$/);
 
   await page.getByLabel("What is it for").fill("Looker Studio");

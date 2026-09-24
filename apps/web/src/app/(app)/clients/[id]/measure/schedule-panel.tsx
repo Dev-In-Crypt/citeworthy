@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { DEFAULT_PLATFORMS, type Platform } from "@repo/core";
+import { type Platform } from "@repo/core";
 import { estimateSchedule, type Cadence } from "@repo/core/adapters/capacity";
 import { api } from "@/trpc/react";
 import { buttonClass } from "@/components/ui/button";
@@ -47,9 +47,15 @@ export function SchedulePanel({ clientId }: { clientId: string }) {
    * эксперимент и важно точнее знать дату сдвига, — и стоит вдвое дороже.
    */
   const [cadence, setCadence] = useState<Cadence>("biweekly");
-  // Запускная тройка включена сразу; остальные — осознанным выбором: у них
-  // должен быть ключ на сервере, и каждая добавляет ответы в каждый прогон.
-  const [platforms, setPlatforms] = useState<Platform[]>([...DEFAULT_PLATFORMS]);
+  /**
+   * Пусто до тех пор, пока не известно, что предлагать.
+   *
+   * Раньше здесь стояла запускная тройка литералом, и на младшем тарифе
+   * форма предлагала заранее отмеченным ассистента, которого тариф не
+   * разрешает: агентство жало «Save» и получало отказ сервера на первом же
+   * экране. Умолчание знает только тариф, и оно приходит с ёмкостью.
+   */
+  const [platforms, setPlatforms] = useState<Platform[]>([]);
   const [samples, setSamples] = useState(3);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,15 +65,28 @@ export function SchedulePanel({ clientId }: { clientId: string }) {
    * Форма показывает сохранённое расписание, а не умолчания. Без этого клиент
    * с включённым Claude при повторном заходе видел бы галочки запускной
    * тройки, и нажатие «Save» молча выключало бы то, что настроено.
+   *
+   * Расписания нет — берём умолчание тарифа, и только после того, как
+   * запрос расписания ответил: пустой ответ и «ещё не ответил» выглядят
+   * одинаково, а подставить умолчание поверх настроенного нельзя.
    */
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => {
-    if (!saved || hydrated) return;
-    setCadence(saved.cadence);
-    setSamples(saved.samplesPerPrompt);
-    setPlatforms(saved.platforms as Platform[]);
-    setHydrated(true);
-  }, [saved, hydrated]);
+    if (hydrated) return;
+
+    if (saved) {
+      setCadence(saved.cadence);
+      setSamples(saved.samplesPerPrompt);
+      setPlatforms(saved.platforms as Platform[]);
+      setHydrated(true);
+      return;
+    }
+
+    if (schedule.isSuccess && capacity.data) {
+      setPlatforms([...capacity.data.defaultAssistants]);
+      setHydrated(true);
+    }
+  }, [saved, hydrated, schedule.isSuccess, capacity.data]);
   const save = api.runs.saveSchedule.useMutation({
     onSuccess: async () => {
       setError(null);

@@ -9,6 +9,8 @@ import {
 } from "@repo/db";
 import { promptClusters, prompts, runSchedules } from "@repo/db/schema/measurement";
 import { eq } from "drizzle-orm";
+import { DEFAULT_PLAN } from "@repo/core";
+import { capabilitiesFor } from "@repo/core/config/measurement";
 import { orchestrateRun, planRunJobs } from "./run-orchestration";
 
 /** Verify T17: 2 промпта × 3 платформы × 3 сэмпла = ровно 18 ответов, run.status=done. */
@@ -140,16 +142,26 @@ describe("orchestrateRun (mock-режим)", () => {
     expect(perPlatform).toHaveLength(6); // 2 промпта × 3 сэмпла
   });
 
-  it("прогон без расписания берёт запускную тройку, а не все платформы", async () => {
-    // Новые платформы включаются осознанно: у них может не быть ключа, и
-    // разовый аудит не должен ни падать из-за этого, ни тратить чужие деньги.
+  it("прогон без расписания берёт набор, который даёт тариф", async () => {
+    /**
+     * Не общий литерал: с тех пор как тарифы развели по ассистентам, общего
+     * умолчания не существует. Прогон по ассистенту, которого тариф не даёт,
+     * потратил бы наши деньги на то, за что агентство не платило.
+     *
+     * У агентства из теста подписки нет, значит действует умолчание —
+     * младший тариф. Ожидание берётся из того же конфига, что и поведение:
+     * вписать сюда три имени значило бы завести вторую точку правды, которая
+     * разойдётся с первой при следующем решении по тарифам.
+     */
     const bare = await createRun(db, { clientId, scheduleId: null, trigger: "manual" });
 
     const outcome = await orchestrateRun(db, bare.id, "mock");
     const platforms = new Set((await listResponsesByRun(db, bare.id)).map((r) => r.platform));
 
     expect(outcome.status).toBe("done");
-    expect([...platforms].sort()).toEqual(["chatgpt", "gemini", "perplexity"]);
+    expect([...platforms].sort()).toEqual(
+      [...capabilitiesFor(DEFAULT_PLAN).defaultAssistants].sort(),
+    );
   });
 
   it("Claude и Grok измеряются, когда включены в расписании клиента", async () => {

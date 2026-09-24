@@ -3,10 +3,10 @@ import { TRPCError } from "@trpc/server";
 import {
   billingPeriod,
   canStartMeasurement,
-  DEFAULT_PLATFORMS,
   MIN_SAMPLES_PER_CELL,
   parseAdaptersMode,
   PLATFORM_IDS,
+  type PlanId,
 } from "@repo/core";
 import {
   capacityOptions,
@@ -14,6 +14,7 @@ import {
   refuseScheduleForPlan,
   type Cadence,
 } from "@repo/core/adapters/capacity";
+import { capabilitiesFor } from "@repo/core/config/measurement";
 import { completeRun } from "@repo/pipeline";
 import {
   createRun,
@@ -62,7 +63,7 @@ const cadenceSchema = z.custom<Cadence>(
 async function assertMeasurementAllowed(
   db: TrpcContext["db"],
   agencyId: string,
-  checksPlanned = 0,
+  run?: RunSize,
 ): Promise<void> {
   const entitlements = await entitlementsForAgency(db, agencyId);
 
@@ -83,7 +84,7 @@ async function assertMeasurementAllowed(
   const decision = canStartMeasurement(
     entitlements,
     counter?.aiChecksUsed ?? 0,
-    checksPlanned,
+    run ? plannedChecks(entitlements.plan, run) : 0,
   );
 
   if (!decision.allowed) {
@@ -91,12 +92,20 @@ async function assertMeasurementAllowed(
   }
 }
 
-/** Во сколько ответов обойдётся прогон: по нему решается, хватает ли остатка. */
-function plannedChecks(
-  promptCount: number,
-  schedule: { platforms: string[]; samplesPerPrompt: number } | null | undefined,
-): number {
-  const platforms = schedule?.platforms.length || DEFAULT_PLATFORMS.length;
+interface RunSize {
+  promptCount: number;
+  schedule: { platforms: string[]; samplesPerPrompt: number } | null | undefined;
+}
+
+/**
+ * Во сколько ответов обойдётся прогон: по нему решается, хватает ли остатка.
+ *
+ * Без расписания набор берётся у тарифа, а не из общего литерала: умолчание
+ * на младшем тарифе уже, чем на старших, и считать всем по широкому значило
+ * бы отказывать в прогоне, который на самом деле помещается в остаток.
+ */
+function plannedChecks(plan: PlanId, { promptCount, schedule }: RunSize): number {
+  const platforms = schedule?.platforms.length || capabilitiesFor(plan).defaultAssistants.length;
   const samples = schedule?.samplesPerPrompt ?? MIN_SAMPLES_PER_CELL;
   return promptCount * platforms * samples;
 }
@@ -239,7 +248,7 @@ export const runsRouter = router({
       await assertMeasurementAllowed(
         ctx.db,
         ctx.user.agencyId,
-        plannedChecks(prompts.length, schedule),
+        { promptCount: prompts.length, schedule },
       );
 
       const mode = parseAdaptersMode(process.env.ADAPTERS_MODE);
@@ -289,7 +298,7 @@ export const runsRouter = router({
       await assertMeasurementAllowed(
         ctx.db,
         ctx.user.agencyId,
-        plannedChecks(prompts.length, null),
+        { promptCount: prompts.length, schedule: null },
       );
 
       const mode = parseAdaptersMode(process.env.ADAPTERS_MODE);

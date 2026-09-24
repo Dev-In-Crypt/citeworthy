@@ -5,7 +5,18 @@ import { expect, test, type ConsoleMessage } from "@playwright/test";
  * в консоли нет ошибок. Регистрация в каждом прогоне даёт свежее агентство.
  */
 
-const ROUTES = ["/dashboard", "/clients", "/reports", "/settings", "/settings/usage"] as const;
+/**
+ * Пункты бокового меню. Меню перестроено по частоте: сверху то, ради чего
+ * заходят каждый день, внизу — хозяйство агентства. Экраны ключей и расхода
+ * из меню ушли и достижимы со своих страниц — это проверяется отдельно.
+ */
+const ROUTES = ["/dashboard", "/clients", "/reports", "/settings/billing", "/settings"] as const;
+
+/** Экраны без своего пункта в меню: до них должна вести ссылка со страницы. */
+const REACHABLE = [
+  { from: "/settings", link: "API keys", to: "/settings/api" },
+  { from: "/settings/billing", link: "Where the checks went", to: "/settings/usage" },
+] as const;
 
 test("app shell renders every route without console errors", async ({ page }) => {
   const consoleErrors: string[] = [];
@@ -36,6 +47,14 @@ test("app shell renders every route without console errors", async ({ page }) =>
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     // Активный пункт навигации подсвечен.
     await expect(page.locator(`aside a[href="${route}"][aria-current="page"]`)).toBeVisible();
+  }
+
+  // Экран без пункта в меню — не экран без входа: до каждого ведёт ссылка.
+  for (const { from, link, to } of REACHABLE) {
+    await page.goto(from);
+    await page.getByRole("link", { name: link }).click();
+    await expect(page).toHaveURL(new RegExp(`${to}$`));
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   }
 
   // На каждом экране есть empty state или метрика — экранов без содержимого быть не должно.

@@ -1,10 +1,10 @@
 import {
   billingPeriod,
-  DEFAULT_PLATFORMS,
   getAdapter,
   type AdaptersMode,
   type Platform,
 } from "@repo/core";
+import { capabilitiesFor } from "@repo/core/config/measurement";
 import {
   createResponse,
   countResponsesByRun,
@@ -19,6 +19,7 @@ import {
   updateResponseStorageKey,
 } from "@repo/db";
 import type { Database } from "@repo/db";
+import { entitlementsForAgency } from "./entitlements";
 import { rawResponseKey, storage } from "./storage";
 import { storeCitations } from "./parse-job";
 
@@ -136,16 +137,26 @@ export async function orchestrateRun(
   }
 
   const schedule = run.scheduleId ? await getRunSchedule(db, run.scheduleId) : undefined;
-  // Без расписания берём весь запускной набор платформ, а не одну.
-  // Молча измерить только ChatGPT и показать это как «видимость» — хуже,
-  // чем потратить больше: агентство не узнало бы, что охват неполный.
-  // Новые платформы сюда не входят: у них может не быть ключа, а прогон по
-  // платформе без адаптера падает целиком.
-  const platforms = (schedule?.platforms ?? DEFAULT_PLATFORMS) as Platform[];
+  const agencyId = await getAgencyIdForRun(db, runId);
+
+  /**
+   * Без расписания берём набор, который тариф даёт новому клиенту.
+   *
+   * Не литерал: с тех пор как тарифы развели по ассистентам, общего
+   * умолчания не существует — на младшем тарифе оно одно, на старших
+   * другое. Прогон по ассистенту, которого тариф не разрешает, потратил бы
+   * наши деньги на то, за что агентство не платило, и показал бы долю,
+   * посчитанную по более широкому знаменателю, чем у соседа на том же плане.
+   *
+   * Весь набор, а не одна платформа: молча измерить только ChatGPT и
+   * показать это как «видимость» — хуже, чем потратить больше, потому что
+   * агентство не узнало бы, что охват неполный.
+   */
+  const plan = agencyId ? (await entitlementsForAgency(db, agencyId)).plan : "starter";
+  const platforms = (schedule?.platforms ?? capabilitiesFor(plan).defaultAssistants) as Platform[];
   const samples = schedule?.samplesPerPrompt ?? 3;
 
   const prompts = await listActivePromptsForClient(db, run.clientId);
-  const agencyId = await getAgencyIdForRun(db, runId);
   const jobs = planRunJobs(runId, prompts, platforms, samples).map((job) => ({ ...job, agencyId }));
 
   await startRun(db, runId);

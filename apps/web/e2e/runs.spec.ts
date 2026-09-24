@@ -67,35 +67,45 @@ test("saving a schedule and running a check produces a completed run", async ({ 
   await expect(page.getByTestId("runs-list")).toContainText("done");
 });
 
-test("Claude and Grok are off until chosen, and stay chosen after a reload", async ({ page }) => {
+test("the plan decides what is offered, and locked assistants are visible", async ({ page }) => {
   const clientId = await setUpClientWithPrompts(page);
   await page.goto(`/clients/${clientId}/measure`);
 
-  // Запускная тройка включена сразу, новые платформы — нет: они стоят денег
-  // и требуют ключа, поэтому включаются осознанно.
+  // Свежее агентство сидит на младшем тарифе. Форма предлагает ровно тот
+  // набор, который этот тариф разрешает: раньше она предлагала общую тройку
+  // литералом, и заранее отмеченным оказывался ассистент, которого тариф не
+  // даёт, — «Save» отказывал на первом же экране нового клиента.
   await expect(page.getByLabel("ChatGPT")).toBeChecked();
-  await expect(page.getByLabel("Claude")).not.toBeChecked();
-  await expect(page.getByLabel("Grok")).not.toBeChecked();
-
-  await page.getByLabel("Claude").check();
-  await page.getByLabel("Grok").check();
-  await page.getByRole("button", { name: "Save schedule" }).click();
-  await expect(page.getByTestId("schedule-summary")).toContainText("claude");
-  await expect(page.getByTestId("schedule-summary")).toContainText("grok");
-
-  // Форма показывает сохранённое, а не умолчания: иначе следующее «Save»
-  // молча выключило бы то, что настроено.
-  await page.reload();
-  await expect(page.getByLabel("Claude")).toBeChecked();
+  await expect(page.getByLabel("Perplexity")).toBeChecked();
   await expect(page.getByLabel("Grok")).toBeChecked();
+
+  // Запертое видно, а не спрятано, и подписано тарифом, на котором включается.
+  await expect(page.getByLabel("Claude")).not.toBeChecked();
+  await expect(page.getByLabel("Claude")).toBeDisabled();
+  await expect(page.getByTestId("assistant-locked-claude")).toContainText("growth");
+
+  // Умолчание тарифа сохраняется без отказа.
+  await page.getByRole("button", { name: "Save schedule" }).click();
+  await expect(page.getByTestId("schedule-summary")).toContainText("chatgpt");
+  await expect(page.getByTestId("schedule-summary")).toContainText("grok");
+  await expect(page.getByTestId("form-error")).toHaveCount(0);
+
+  // Снятое остаётся снятым: форма показывает сохранённое, а не умолчания —
+  // иначе следующее «Save» молча вернуло бы выключенное.
+  await page.getByLabel("Grok").uncheck();
+  await page.getByRole("button", { name: "Save schedule" }).click();
+  await expect(page.getByTestId("schedule-summary")).not.toContainText("grok");
+
+  await page.reload();
+  await expect(page.getByLabel("Grok")).not.toBeChecked();
+  await expect(page.getByLabel("ChatGPT")).toBeChecked();
 
   await page.getByRole("button", { name: "Run now" }).click();
   await expect(page.getByTestId("run-status")).toContainText("done", { timeout: 30_000 });
 
-  // Теперь это измеряемые ассистенты: в матрице у них свои столбцы, а в
-  // заметке «не измеряем» остаются только те, у кого нет API.
+  // Claude измеряем — у него есть API, он просто не куплен. В заметке
+  // «не измеряем» остаются только те, у кого API нет вовсе.
   await page.goto(`/clients/${clientId}`);
-  await expect(page.getByTestId("matrix-grid")).toContainText("Claude");
   const note = page.getByTestId("unmeasured-note");
   await expect(note).toContainText("Copilot");
   await expect(note).not.toContainText("Claude");
