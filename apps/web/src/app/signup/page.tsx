@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ASSISTANTS, DEFAULT_PLATFORMS, FREE_CHECK_ALLOWANCE, MARKETING_COPY } from "@repo/core";
+import { FREE_CHECK_ALLOWANCE, MARKETING_COPY } from "@repo/core";
+import { defaultAssistantSentence } from "@repo/core/adapters/capacity";
 import { AuthForm } from "@/components/auth-form";
 import { MarketingShell } from "@/components/marketing/chrome";
 
@@ -22,10 +23,11 @@ export const metadata: Metadata = {
   description: `Run the free audit on one brand: ${FREE_CHECK_ALLOWANCE} AI checks, no card.`,
 };
 
-/** Подписи запускной тройки — из каталога, а не литералом на экране. */
-const DEFAULT_ASSISTANTS = DEFAULT_PLATFORMS.map(
-  (id) => ASSISTANTS.find((assistant) => assistant.id === id)?.label ?? id,
-).join(", ");
+/**
+ * Ассистенты, которых получит новый аккаунт. Регистрация заводит агентство
+ * на starter, и называть здесь общую тройку значило бы пообещать лишнее.
+ */
+const DEFAULT_ASSISTANTS = defaultAssistantSentence("starter");
 
 const INCLUDED = [
   `${FREE_CHECK_ALLOWANCE} free AI checks — one full audit on one brand`,

@@ -18,13 +18,17 @@ import type { Database } from "@repo/db";
 /**
  * Ёмкость измерения приходит из конфига, а не из литералов в роутере.
  *
- * Главное утверждение — сегодняшнее поведение не изменилось: конфиг разрешает
- * всё, и ни одна настройка, которая сохранялась раньше, не перестала
- * сохраняться. Сам запрет проверяется отдельно, чистой функцией на урезанных
- * возможностях: умолчания тарифов трогать нельзя.
+ * Тесты работают на агентстве без подписки, то есть на starter. С момента,
+ * когда тарифы развели, это значит: три самых дешёвых ассистента и опрос не
+ * чаще раза в неделю. Проверяется и то, что разрешено, и то, что роутер
+ * отказывает сам, а не полагается на форму.
  *
  * Требует поднятой БД (docker compose up -d && pnpm db:migrate).
  */
+
+/** Что даёт starter — умолчание для агентства без подписки. */
+const STARTER_ASSISTANTS = ["chatgpt", "perplexity", "grok"] as const;
+const STARTER_CADENCES = ["biweekly", "weekly"] as const;
 
 const { db, close } = createDb();
 
@@ -71,10 +75,15 @@ describe("ёмкость расписания", () => {
     const capacity = await caller.runs.capacity({ clientId });
 
     // Агентство без подписки работает на starter — это умолчание продукта.
-    expect(capacity.cadences.map((c) => c.id)).toEqual([...CADENCES]);
+    expect(capacity.cadences.map((c) => c.id)).toEqual([...STARTER_CADENCES]);
+    // Ассистенты приходят все, но дорогие — запертыми: спрятанного
+    // ассистента агентство не увидит и не узнает, что он есть.
     expect(capacity.assistants.map((a) => a.id)).toEqual([...PLATFORM_IDS]);
+    expect(capacity.assistants.filter((a) => a.allowed).map((a) => a.id)).toEqual([
+      ...STARTER_ASSISTANTS,
+    ]);
     expect(capacity.monthlyCheckAllowance).toBe(PLAN_LIMITS[capacity.plan].aiCheckAllowance);
-    expect(capacity.defaultAssistants).toEqual([...DEFAULT_PLATFORMS]);
+    expect(capacity.defaultAssistants).toEqual([...STARTER_ASSISTANTS]);
     expect(capacity.promptsPerClient).toBeNull();
   });
 
@@ -104,13 +113,13 @@ describe("ёмкость расписания", () => {
     await deleteAgency(db, other.id);
   });
 
-  it.each([...CADENCES])("частота %s сохраняется как и раньше", async (cadence) => {
+  it.each([...STARTER_CADENCES])("частота %s сохраняется на starter", async (cadence) => {
     const caller = appRouter.createCaller(contextFor(userIn(agencyId)));
 
     const saved = await caller.runs.saveSchedule({
       clientId,
       cadence,
-      platforms: [...DEFAULT_PLATFORMS],
+      platforms: [...STARTER_ASSISTANTS],
       samplesPerPrompt: 3,
       active: true,
     });
@@ -118,26 +127,48 @@ describe("ёмкость расписания", () => {
     expect(saved.cadence).toBe(cadence);
   });
 
-  it("сохраняются все ассистенты сразу — тариф сегодня не ограничивает", async () => {
+  it("ежедневный опрос роутер не сохраняет на starter", async () => {
+    // Отказывает сервер, а не форма: расписание можно сохранить и в обход
+    // экрана, а частота — сильнейший рычаг расхода.
     const caller = appRouter.createCaller(contextFor(userIn(agencyId)));
 
-    const saved = await caller.runs.saveSchedule({
-      clientId,
-      cadence: "biweekly",
-      platforms: [...PLATFORM_IDS],
-      samplesPerPrompt: 3,
-      active: true,
-    });
-
-    expect(saved.platforms).toEqual([...PLATFORM_IDS]);
+    await expect(
+      caller.runs.saveSchedule({
+        clientId,
+        cadence: "daily",
+        platforms: [...STARTER_ASSISTANTS],
+        samplesPerPrompt: 3,
+        active: true,
+      }),
+    ).rejects.toSatisfy(
+      (error: unknown) => error instanceof TRPCError && error.code === "BAD_REQUEST",
+      "ожидался TRPCError с кодом BAD_REQUEST",
+    );
   });
 
-  it("умолчание расписания осталось biweekly и запускная тройка", async () => {
+  it("дорогого ассистента роутер не сохраняет на starter", async () => {
+    const caller = appRouter.createCaller(contextFor(userIn(agencyId)));
+
+    await expect(
+      caller.runs.saveSchedule({
+        clientId,
+        cadence: "biweekly",
+        platforms: [...STARTER_ASSISTANTS, "claude"],
+        samplesPerPrompt: 3,
+        active: true,
+      }),
+    ).rejects.toSatisfy(
+      (error: unknown) => error instanceof TRPCError && error.code === "BAD_REQUEST",
+      "ожидался TRPCError с кодом BAD_REQUEST",
+    );
+  });
+
+  it("умолчание расписания осталось biweekly", async () => {
     const caller = appRouter.createCaller(contextFor(userIn(agencyId)));
     const capacity = await caller.runs.capacity({ clientId });
 
     expect(capacity.cadences[0]?.id).toBe("biweekly");
-    expect(capacity.defaultAssistants).toEqual([...DEFAULT_PLATFORMS]);
+    expect(capacity.defaultAssistants).toEqual([...STARTER_ASSISTANTS]);
   });
 
   it("незнакомая частота отвергается входной схемой", async () => {
@@ -168,6 +199,8 @@ describe("ёмкость расписания", () => {
 
     expect(refusal?.code).toBe("cadence");
     expect(refusal?.message).toMatch(/not part of this plan/);
-    expect(capabilitiesFor("starter").cadences).toEqual([...CADENCES]);
+    // Подмена возможностей тест не портит: реальный конфиг на месте.
+    expect(capabilitiesFor("starter").cadences).toEqual(["biweekly", "weekly"]);
+    expect(capabilitiesFor("scale").cadences).toEqual([...CADENCES]);
   });
 });

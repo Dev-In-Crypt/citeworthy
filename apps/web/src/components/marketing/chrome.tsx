@@ -76,9 +76,9 @@ export function MarketingFooter() {
           <div className="foot-brand">
             <Wordmark dot="#7C86FF" />
             <p>
-              AI visibility measurement, diagnosis and white-label reporting for agencies. Measures
-              ChatGPT, Perplexity and Gemini by default; Claude and Grok can be switched on per
-              client.
+              AI visibility measurement, diagnosis and white-label reporting for agencies.
+              Measures ChatGPT, Perplexity, Gemini, Claude and Grok; which of them a workspace can
+              switch on depends on its plan.
             </p>
           </div>
           <div className="foot-col">

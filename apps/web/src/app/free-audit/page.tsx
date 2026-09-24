@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { MARKETING_COPY, REPORT_COPY, SAMPLE_AUDIT_REPORT } from "@repo/core";
+import { defaultAssistantSentence } from "@repo/core/adapters/capacity";
 import { Faq, MethodLink, SecHead, TalkOrAudit } from "@/components/marketing/bits";
 import { MarketingShell } from "@/components/marketing/chrome";
 import { AUDIT_STEPS, checkoutCopy, SALES_CONTACT } from "@/components/marketing/content";
@@ -20,10 +21,19 @@ import { ReportPreview } from "@/components/marketing/report-preview";
  * несколько раз, и время зависит от числа вопросов.
  */
 
+/**
+ * Что спрашивает бесплатный аудит.
+ *
+ * Регистрация заводит агентство на starter, поэтому здесь именно его
+ * тройка, а не общая: назвать литералом «ChatGPT, Perplexity и Gemini»
+ * значило бы пообещать ассистента, которого на этом тарифе нет.
+ */
+const FREE_TRIO = defaultAssistantSentence("starter");
+
 export const metadata: Metadata = {
   title: "Free audit · Citeworthy",
   description:
-    "Audit one of your own clients for free: what ChatGPT, Perplexity and Gemini say about it, which sources they cite, ranked work with reasons, and an opportunity report in your brand.",
+    `Audit a brand you work on for free: what ${FREE_TRIO} say about it, which sources they cite, ranked work with reasons, and an opportunity report in your brand.`,
 };
 
 function faqItems(paymentsOn: boolean) {
@@ -34,7 +44,7 @@ function faqItems(paymentsOn: boolean) {
   },
   {
     q: "Which assistants does the audit use?",
-    a: `ChatGPT, Perplexity and Gemini, each with its own cited sources. Claude and Grok can be switched on per client later. ${MARKETING_COPY.notMeasuredSurfaces}`,
+    a: `${FREE_TRIO}, each with its own cited sources. Gemini and Claude come with Growth and can be switched on per client. ${MARKETING_COPY.notMeasuredSurfaces}`,
   },
   {
     q: "What happens right after the audit?",
@@ -66,7 +76,7 @@ export default function FreeAuditPage() {
               Audit one of your own clients, <em>for free.</em>
             </h1>
             <p className="lead">
-              See what ChatGPT, Perplexity and Gemini say about a client and its competitors, which
+              See what {FREE_TRIO} say about a brand and its competitors, which
               sources they cite, and what to work on first, as a report in your brand you can take
               into the next client meeting.
             </p>

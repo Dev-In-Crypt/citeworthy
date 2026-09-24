@@ -31,36 +31,87 @@ import type { PlanId } from "../billing/entitlements";
 
 const PLANS = Object.keys(PLAN_LIMITS) as PlanId[];
 
-describe("сегодняшние возможности: ничего не ограничено", () => {
-  it.each(PLANS)("тариф %s разрешает все частоты", (plan) => {
-    for (const cadence of CADENCES) {
-      expect(refuseScheduleForPlan(plan, { cadence, assistants: DEFAULT_PLATFORMS })).toBeNull();
+describe("сегодняшняя политика тарифов", () => {
+  const STARTER_THREE = ["chatgpt", "perplexity", "grok"] as const;
+
+  it.each(PLANS)("тариф %s разрешает опрос раз в две недели и раз в неделю", (plan) => {
+    for (const cadence of ["biweekly", "weekly"] as const) {
+      expect(refuseScheduleForPlan(plan, { cadence, assistants: STARTER_THREE })).toBeNull();
     }
   });
 
-  it.each(PLANS)("тариф %s разрешает всех ассистентов сразу", (plan) => {
+  it("ежедневный опрос доступен только на scale", () => {
+    // Частота — самый сильный рычаг расхода: ×2 при недельном, ×14 при
+    // ежедневном. Единственная опасная клетка модели себестоимости
+    // создаётся именно им.
+    expect(
+      refuseScheduleForPlan("scale", { cadence: "daily", assistants: STARTER_THREE }),
+    ).toBeNull();
+
+    for (const plan of ["starter", "growth"] as const) {
+      const refusal = refuseScheduleForPlan(plan, {
+        cadence: "daily",
+        assistants: STARTER_THREE,
+      });
+
+      expect(refusal?.code, `${plan} не должен давать ежедневный опрос`).toBe("cadence");
+      // Отказ называет, что доступно взамен.
+      expect(refusal?.message).toContain("every two weeks");
+    }
+  });
+
+  it.each(PLANS)("у тарифа %s нет потолка промптов", (plan) => {
+    expect(capabilitiesFor(plan).promptsPerClient).toBeNull();
+  });
+
+  it("умолчание частоты осталось biweekly", () => {
+    // Каденс — самый сильный рычаг расхода (×14 при daily). Менять его
+    // умолчание можно только решением фаундера.
+    expect(CADENCES[0]).toBe("biweekly");
+  });
+
+  it("starter даёт три самых дешёвых ассистента", () => {
+    // Разброс цены ответа между самым дешёвым и самым дорогим почти
+    // пятикратный, и на младшем тарифе он съедал бы маржу быстрее всего.
+    expect(capabilitiesFor("starter").assistants).toEqual([...STARTER_THREE]);
+    expect(
+      refuseScheduleForPlan("starter", { cadence: "biweekly", assistants: STARTER_THREE }),
+    ).toBeNull();
+  });
+
+  it("starter отказывает в дорогих ассистентах и называет их", () => {
+    for (const assistant of ["gemini", "claude"] as const) {
+      const refusal = refuseScheduleForPlan("starter", {
+        cadence: "biweekly",
+        assistants: [assistant],
+      });
+
+      expect(refusal?.code, `${assistant} должен быть заперт на starter`).toBe("assistant");
+      // В отказе названы и запертый, и то, что взамен доступно.
+      expect(refusal?.message).toContain(assistant === "gemini" ? "Gemini" : "Claude");
+      expect(refusal?.message).toContain("ChatGPT");
+    }
+  });
+
+  it.each(["growth", "scale"] as const)("тариф %s даёт всех", (plan) => {
     expect(
       refuseScheduleForPlan(plan, { cadence: "biweekly", assistants: PLATFORM_IDS }),
     ).toBeNull();
   });
 
-  it.each(PLANS)("у тарифа %s нет потолка промптов", (plan) => {
-    expect(capabilitiesFor(plan).promptsPerClient).toBeNull();
-    expect(
-      refuseScheduleForPlan(plan, {
-        cadence: "daily",
-        assistants: PLATFORM_IDS,
-        promptCount: 10_000,
-      }),
-    ).toBeNull();
-  });
-
-  it("умолчание частоты осталось biweekly", () => {
-    expect(CADENCES[0]).toBe("biweekly");
-  });
-
-  it("набор ассистентов по умолчанию не поменялся", () => {
+  it("умолчание каждого тарифа помещается в то, что он разрешает", () => {
+    // Иначе новый клиент заводился бы с ассистентом, которого тариф не
+    // даёт, и первое же сохранение расписания упиралось бы в отказ.
     for (const plan of PLANS) {
+      const { assistants, defaultAssistants } = capabilitiesFor(plan);
+      for (const id of defaultAssistants) {
+        expect(assistants, `${plan}: умолчание вне разрешённого`).toContain(id);
+      }
+    }
+  });
+
+  it("на growth и scale умолчание прежнее", () => {
+    for (const plan of ["growth", "scale"] as const) {
       expect(capacityOptions(plan).defaultAssistants).toEqual(DEFAULT_PLATFORMS);
     }
   });
@@ -170,7 +221,14 @@ describe("что предлагается в форме", () => {
   });
 
   it("частоты идут от редкой к частой: первая — умолчание", () => {
-    expect(capacityOptions("starter").cadences.map((c) => c.id)).toEqual(["biweekly", "weekly", "daily"]);
+    // Порядок важен: первая в списке становится выбранной в форме, и это
+    // должен быть самый дешёвый вариант, а не самый частый.
+    expect(capacityOptions("scale").cadences.map((c) => c.id)).toEqual([
+      "biweekly",
+      "weekly",
+      "daily",
+    ]);
+    expect(capacityOptions("starter").cadences.map((c) => c.id)).toEqual(["biweekly", "weekly"]);
   });
 });
 
@@ -272,8 +330,22 @@ describe("ассистенты в форме расписания", () => {
     expect(ids).not.toContain("copilot");
   });
 
-  it("при сегодняшнем конфиге разрешены все и запертых нет", () => {
-    for (const plan of ["starter", "growth", "scale"] as const) {
+  it("на starter дорогие видны, но заперты и подписаны тарифом", () => {
+    const assistants = capacityOptions("starter").assistants;
+
+    for (const id of ["gemini", "claude"] as const) {
+      const locked = assistants.find((a) => a.id === id);
+      expect(locked?.allowed, `${id} должен быть заперт`).toBe(false);
+      expect(locked?.unlocksOn).toBe("growth");
+    }
+
+    for (const id of ["chatgpt", "perplexity", "grok"] as const) {
+      expect(assistants.find((a) => a.id === id)?.allowed).toBe(true);
+    }
+  });
+
+  it("на growth и scale запертых нет", () => {
+    for (const plan of ["growth", "scale"] as const) {
       for (const assistant of capacityOptions(plan).assistants) {
         expect(assistant.allowed).toBe(true);
         expect(assistant.unlocksOn).toBeUndefined();

@@ -261,3 +261,20 @@ export function capacityOptions(
     estimatedCostPerAnswerUsd: ESTIMATED_COST_PER_ANSWER_USD,
   };
 }
+
+/**
+ * Подписи ассистентов, которых тариф включает новому клиенту.
+ *
+ * Нужна витрине: с тех пор как тарифы развели, называть тройку литералом
+ * на странице нельзя — на младшем тарифе она другая, и страница начала бы
+ * обещать то, чего агентство не получит. Здесь один источник и для
+ * конфига, и для текста.
+ */
+export function defaultAssistantLabels(plan: PlanId): string[] {
+  return capabilitiesFor(plan).defaultAssistants.map(assistantLabel);
+}
+
+/** Те же подписи через запятую и «and» перед последней — для предложения. */
+export function defaultAssistantSentence(plan: PlanId): string {
+  return listed(defaultAssistantLabels(plan));
+}

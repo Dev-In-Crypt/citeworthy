@@ -36,28 +36,65 @@ export interface MeasurementCapabilities {
 }
 
 /**
- * Одинаково для всех тарифов — сегодняшнее поведение.
+ * Ассистенты, доступные на младшем тарифе.
  *
- * Разводить тарифы по объёму измерения имеет смысл вместе с решением по
- * себестоимости (см. docs/cost-model.md): на Scale расходы уже составляют
- * заметную долю цены, и ограничение частоты — один из рычагов. Пока рычаг
- * есть, но не задействован.
+ * Три самых дешёвых ответа: Perplexity ($0.0116), Grok ($0.0220),
+ * ChatGPT ($0.0242). Дорогие — Gemini ($0.0550) и Claude ($0.0560) —
+ * начинаются с Growth: разброс цены между самым дешёвым и самым дорогим
+ * почти пятикратный, и на Starter он съедал бы маржу быстрее всего
+ * (см. docs/cost-model.md).
+ *
+ * Gemini уехал со Starter не только из-за цены. Условия Google на
+ * grounded-поиск запрещают хранить и анализировать результаты так, как
+ * это делает продукт (docs/open-questions/gemini-grounding.md). Пока
+ * вопрос не решён, чем меньше клиентов измеряется Gemini по умолчанию,
+ * тем меньше цена ошибки.
  */
-const EVERY_PLAN: MeasurementCapabilities = {
+const STARTER_ASSISTANTS: readonly Platform[] = ["chatgpt", "perplexity", "grok"] as const;
+
+/**
+ * Ежедневный опрос — только на старшем тарифе.
+ *
+ * Частота самый сильный рычаг расхода: переход на еженедельный удваивает
+ * число ответов, на ежедневный — умножает на 14. Именно ежедневный и
+ * создаёт единственную опасную клетку модели себестоимости, поэтому он
+ * и ограничен, а не что-то ещё.
+ *
+ * Умолчание при этом не трогается: новый клиент по-прежнему меряется раз
+ * в две недели на любом тарифе.
+ */
+const WITHOUT_DAILY: readonly Cadence[] = ["biweekly", "weekly"] as const;
+
+const ALL_ASSISTANTS: MeasurementCapabilities = {
   promptsPerClient: null,
   cadences: CADENCES,
   assistants: PLATFORM_IDS,
   defaultAssistants: DEFAULT_PLATFORMS,
 };
 
+/**
+ * Что тариф разрешает включить.
+ *
+ * Частоты и потолок вопросов пока одинаковы у всех: решение по ним ещё не
+ * принято, и разводить их «заодно» значило бы менять поведение без
+ * причины. Разведены только ассистенты.
+ */
 export const MEASUREMENT_CAPABILITIES: Record<PlanId, MeasurementCapabilities> = {
-  starter: EVERY_PLAN,
-  growth: EVERY_PLAN,
-  scale: EVERY_PLAN,
+  starter: {
+    promptsPerClient: null,
+    cadences: WITHOUT_DAILY,
+    assistants: STARTER_ASSISTANTS,
+    // Умолчание не может предлагать то, чего тариф не разрешает.
+    defaultAssistants: STARTER_ASSISTANTS,
+  },
+  growth: { ...ALL_ASSISTANTS, cadences: WITHOUT_DAILY },
+  scale: ALL_ASSISTANTS,
 };
 
 export function capabilitiesFor(plan: PlanId): MeasurementCapabilities {
-  return MEASUREMENT_CAPABILITIES[plan] ?? EVERY_PLAN;
+  // Неизвестный тариф трактуется как младший: ошибка в сторону меньшего
+  // расхода, а не большего.
+  return MEASUREMENT_CAPABILITIES[plan] ?? MEASUREMENT_CAPABILITIES.starter;
 }
 
 /** Разрешена ли частота на этом тарифе. */
