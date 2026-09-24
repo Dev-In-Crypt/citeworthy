@@ -1,6 +1,13 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { parseAdaptersMode, PLATFORM_IDS } from "@repo/core";
+import {
+  billingPeriod,
+  canStartMeasurement,
+  DEFAULT_PLATFORMS,
+  MIN_SAMPLES_PER_CELL,
+  parseAdaptersMode,
+  PLATFORM_IDS,
+} from "@repo/core";
 import {
   capacityOptions,
   isCadence,
@@ -15,6 +22,7 @@ import {
   getPromptById,
   getPromptClusterById,
   getScheduleForClient,
+  getUsageCounter,
   listActivePromptsForClient,
   listResponsesForPrompt,
   listRecentRuns,
@@ -51,7 +59,11 @@ const cadenceSchema = z.custom<Cadence>(
  * Публичный отчёт `/r/[token]` этой проверки не получает намеренно: клиент
  * агентства не отвечает за его карту и не должен видеть закрытую дверь.
  */
-async function assertMeasurementAllowed(db: TrpcContext["db"], agencyId: string): Promise<void> {
+async function assertMeasurementAllowed(
+  db: TrpcContext["db"],
+  agencyId: string,
+  checksPlanned = 0,
+): Promise<void> {
   const entitlements = await entitlementsForAgency(db, agencyId);
 
   if (!entitlements.active) {
@@ -59,6 +71,34 @@ async function assertMeasurementAllowed(db: TrpcContext["db"], agencyId: string)
     // а не гадать над кодом ошибки.
     throw new TRPCError({ code: "FORBIDDEN", message: entitlements.reason });
   }
+
+  /**
+   * Бесплатный аккаунт ограничен по числу проверок, платящий — нет.
+   *
+   * До этой проверки месячный лимит нигде не проверялся: он только
+   * показывался на экране. Незаплативший мог гонять аудиты бесконечно, и
+   * каждый стоил нам живых денег у пяти провайдеров.
+   */
+  const counter = await getUsageCounter(db, agencyId, billingPeriod());
+  const decision = canStartMeasurement(
+    entitlements,
+    counter?.aiChecksUsed ?? 0,
+    checksPlanned,
+  );
+
+  if (!decision.allowed) {
+    throw new TRPCError({ code: "FORBIDDEN", message: decision.message });
+  }
+}
+
+/** Во сколько ответов обойдётся прогон: по нему решается, хватает ли остатка. */
+function plannedChecks(
+  promptCount: number,
+  schedule: { platforms: string[]; samplesPerPrompt: number } | null | undefined,
+): number {
+  const platforms = schedule?.platforms.length || DEFAULT_PLATFORMS.length;
+  const samples = schedule?.samplesPerPrompt ?? MIN_SAMPLES_PER_CELL;
+  return promptCount * platforms * samples;
 }
 
 export const runsRouter = router({
@@ -184,7 +224,6 @@ export const runsRouter = router({
     .mutation(async ({ ctx, input }) => {
       const client = await getClientById(ctx.db, input.clientId);
       assertTenant(client, ctx.user.agencyId);
-      await assertMeasurementAllowed(ctx.db, ctx.user.agencyId);
 
       const prompts = await listActivePromptsForClient(ctx.db, input.clientId);
       if (prompts.length === 0) {
@@ -195,6 +234,14 @@ export const runsRouter = router({
       }
 
       const schedule = await getScheduleForClient(ctx.db, input.clientId);
+      // Размер прогона известен до его создания: отказать надо раньше, чем
+      // запись появится в базе и повиснет в ожидании навсегда.
+      await assertMeasurementAllowed(
+        ctx.db,
+        ctx.user.agencyId,
+        plannedChecks(prompts.length, schedule),
+      );
+
       const mode = parseAdaptersMode(process.env.ADAPTERS_MODE);
 
       const run = await createRun(ctx.db, {
@@ -229,7 +276,6 @@ export const runsRouter = router({
     .mutation(async ({ ctx, input }) => {
       const client = await getClientById(ctx.db, input.clientId);
       assertTenant(client, ctx.user.agencyId);
-      await assertMeasurementAllowed(ctx.db, ctx.user.agencyId);
 
       const prompts = await listActivePromptsForClient(ctx.db, input.clientId);
       if (prompts.length === 0) {
@@ -238,6 +284,13 @@ export const runsRouter = router({
           message: "Generate or import prompts before running an audit.",
         });
       }
+
+      // У аудита расписания нет — он идёт по полному набору ассистентов.
+      await assertMeasurementAllowed(
+        ctx.db,
+        ctx.user.agencyId,
+        plannedChecks(prompts.length, null),
+      );
 
       const mode = parseAdaptersMode(process.env.ADAPTERS_MODE);
       const run = await createRun(ctx.db, {

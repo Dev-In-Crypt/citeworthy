@@ -1,5 +1,5 @@
-import { entitlementsFor, type Entitlements } from "@repo/core";
-import { getSubscriptionByAgency, type Database } from "@repo/db";
+import { billingPeriod, canStartMeasurement, entitlementsFor, type Entitlements, type LimitDecision } from "@repo/core";
+import { getSubscriptionByAgency, getUsageCounter, type Database } from "@repo/db";
 
 /**
  * Права агентства по его подписке.
@@ -30,4 +30,22 @@ export async function entitlementsForAgency(
       : null,
     now,
   );
+}
+
+/**
+ * Можно ли начать измерение агентству: и права, и остаток бесплатных проверок.
+ *
+ * Тем же правилом, что и в вебе. Иначе расписание обходило бы границу,
+ * закрытую для кнопки: бесплатный аккаунт продолжал бы опрашивать
+ * ассистентов раз в две недели за наш счёт.
+ */
+export async function measurementAllowedForAgency(
+  db: Database,
+  agencyId: string,
+  now: Date = new Date(),
+): Promise<LimitDecision> {
+  const entitlements = await entitlementsForAgency(db, agencyId, now);
+  const counter = await getUsageCounter(db, agencyId, billingPeriod(now));
+
+  return canStartMeasurement(entitlements, counter?.aiChecksUsed ?? 0);
 }

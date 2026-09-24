@@ -4,10 +4,12 @@ import {
   createClient,
   createDb,
   deleteAgency,
+  incrementAiChecks,
   listRunsByClient,
   setScheduleNextRun,
   upsertSubscription,
 } from "@repo/db";
+import { billingPeriod, FREE_CHECK_ALLOWANCE } from "@repo/core";
 import { runSchedules } from "@repo/db/schema/measurement";
 import { nextRunAfter, tickSchedules } from "./scheduler";
 import { createConnection, createQueues } from "./queues";
@@ -155,6 +157,18 @@ describe("tickSchedules", () => {
 
     const { started } = await tickSchedules(db, new Date());
     expect(started.filter((r) => r.scheduleId === scheduleId)).toHaveLength(1);
+  });
+
+  it("расписание бесплатного аккаунта останавливается на границе проверок", async () => {
+    // Кнопку закрыли, а расписание обходило бы границу стороной: раз в две
+    // недели, месяцами, за наш счёт.
+    await setScheduleNextRun(db, scheduleId, new Date(Date.now() - 1000));
+    await incrementAiChecks(db, agencyId, billingPeriod(), FREE_CHECK_ALLOWANCE);
+
+    const { started, skipped } = await tickSchedules(db, new Date());
+
+    expect(started.filter((r) => r.scheduleId === scheduleId)).toHaveLength(0);
+    expect(skipped.find((s) => s.scheduleId === scheduleId)?.reason).toMatch(/free audit/i);
   });
 
   it("действующая подписка измерение не останавливает", async () => {

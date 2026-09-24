@@ -24,4 +24,4 @@ export { generateOpportunities } from "./opportunity-job";
 export type { GenerateOpportunitiesOutcome } from "./opportunity-job";
 export { refreshOpportunities } from "./refresh-opportunities";
 export { clientVisibility, clientSources, toCitationFacts, PRESENCE_CAVEAT } from "./read-models";
-export { entitlementsForAgency } from "./entitlements";
+export { entitlementsForAgency, measurementAllowedForAgency } from "./entitlements";

@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import { TRPCError } from "@trpc/server";
+import { billingPeriod, FREE_CHECK_ALLOWANCE } from "@repo/core";
 import {
   createAgency,
   createClient,
@@ -7,6 +8,7 @@ import {
   createPrompt,
   createPromptCluster,
   deleteAgency,
+  incrementAiChecks,
   upsertSubscription,
 } from "@repo/db";
 import { appRouter } from "./root";
@@ -171,5 +173,45 @@ describe("запуск измерения и подписка", () => {
 
     await expect(caller(agencyId).runs.list({ clientId })).resolves.toBeInstanceOf(Array);
     await expect(caller(agencyId).runs.schedule({ clientId })).resolves.toBeDefined();
+  });
+
+  it("бесплатные проверки кончаются, и измерение останавливается", async () => {
+    // Раньше незаплативший аккаунт мог гонять аудиты бесконечно: месячный
+    // лимит нигде не проверялся, он только показывался на экране.
+    await incrementAiChecks(db, agencyId, billingPeriod(), FREE_CHECK_ALLOWANCE);
+
+    await expect(caller(agencyId).runs.triggerManual({ clientId })).rejects.toSatisfy(
+      (error: unknown) =>
+        error instanceof TRPCError &&
+        error.code === "FORBIDDEN" &&
+        /free audit/i.test(error.message),
+    );
+  });
+
+  it("та же граница закрывает и разовый аудит", async () => {
+    await incrementAiChecks(db, agencyId, billingPeriod(), FREE_CHECK_ALLOWANCE);
+
+    await expect(caller(agencyId).runs.startAudit({ clientId })).rejects.toSatisfy(
+      (error: unknown) => error instanceof TRPCError && error.code === "FORBIDDEN",
+    );
+  });
+
+  it("оплата снимает границу: перерасход не отключает посреди месяца", async () => {
+    await incrementAiChecks(db, agencyId, billingPeriod(), FREE_CHECK_ALLOWANCE * 100);
+    await subscribe(agencyId, "active", new Date(Date.now() + 30 * DAY));
+
+    const result = await caller(agencyId).runs.triggerManual({ clientId });
+    expect(result.runId).toBeTruthy();
+  });
+
+  it("отказ случается до создания прогона, а не после", async () => {
+    // Иначе запись повисла бы в ожидании навсегда: воркер её не возьмёт,
+    // а на экране она будет выглядеть начатым замером.
+    await incrementAiChecks(db, agencyId, billingPeriod(), FREE_CHECK_ALLOWANCE);
+
+    await expect(caller(agencyId).runs.triggerManual({ clientId })).rejects.toThrow();
+
+    const runs = await caller(agencyId).runs.list({ clientId });
+    expect(runs).toHaveLength(0);
   });
 });

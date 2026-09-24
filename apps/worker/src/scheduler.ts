@@ -1,6 +1,6 @@
 import { createRun, getClientById, listDueSchedules, setScheduleNextRun } from "@repo/db";
 import type { Database } from "@repo/db";
-import { entitlementsForAgency } from "@repo/pipeline";
+import { measurementAllowedForAgency } from "@repo/pipeline";
 
 export type Cadence = "daily" | "weekly" | "biweekly";
 
@@ -58,7 +58,7 @@ export async function tickSchedules(
   // Права на агентство читаются один раз за тик: у одного агентства обычно
   // созревает сразу несколько клиентов, и спрашивать базу на каждого — это
   // те же данные тем же запросом.
-  const byAgency = new Map<string, { active: boolean; reason: string }>();
+  const byAgency = new Map<string, { allowed: boolean; message: string }>();
 
   for (const schedule of due) {
     const client = await getClientById(db, schedule.clientId);
@@ -72,18 +72,17 @@ export async function tickSchedules(
       continue;
     }
 
-    let entitlements = byAgency.get(client.agencyId);
-    if (!entitlements) {
-      const resolved = await entitlementsForAgency(db, client.agencyId, now);
-      entitlements = { active: resolved.active, reason: resolved.reason };
-      byAgency.set(client.agencyId, entitlements);
+    let decision = byAgency.get(client.agencyId);
+    if (!decision) {
+      decision = await measurementAllowedForAgency(db, client.agencyId, now);
+      byAgency.set(client.agencyId, decision);
     }
 
-    if (!entitlements.active) {
+    if (!decision.allowed) {
       skipped.push({
         scheduleId: schedule.id,
         clientId: schedule.clientId,
-        reason: entitlements.reason,
+        reason: decision.message,
       });
       continue;
     }

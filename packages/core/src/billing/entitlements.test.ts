@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { PLAN_LIMITS } from "./period";
 import {
+  FREE_CHECK_ALLOWANCE,
   PAST_DUE_GRACE_DAYS,
   canAddClient,
+  canStartMeasurement,
   canSwitchToPlan,
   entitlementsFor,
   type SubscriptionSnapshot,
@@ -154,5 +156,55 @@ describe("canSwitchToPlan", () => {
       PLAN_LIMITS.growth.clientLimit,
     );
     expect(decision.allowed).toBe(true);
+  });
+});
+
+describe("canStartMeasurement", () => {
+  const free = entitlementsFor(null, NOW);
+  const paid = entitlementsFor(snapshot(), NOW);
+
+  it("до первой оплаты бесплатные проверки кончаются", () => {
+    // Без этой границы незаплативший измерял бы бесконечно: месячный лимит
+    // тарифа нигде не проверялся, он только показывался на экране.
+    expect(canStartMeasurement(free, 0).allowed).toBe(true);
+    expect(canStartMeasurement(free, FREE_CHECK_ALLOWANCE - 1).allowed).toBe(true);
+
+    const spent = canStartMeasurement(free, FREE_CHECK_ALLOWANCE);
+    expect(spent.allowed).toBe(false);
+    expect(spent.message).toMatch(/plan/i);
+  });
+
+  it("прогон, который не помещается в остаток, не начинается", () => {
+    // Наполовину сделанный прогон — это доля по неполной выборке, то есть
+    // цифра, по которой нельзя принимать решение (контракт C3).
+    const decision = canStartMeasurement(free, FREE_CHECK_ALLOWANCE - 10, 216);
+
+    expect(decision.allowed).toBe(false);
+    expect(decision.message).toContain("216");
+    expect(decision.message).toContain("10");
+  });
+
+  it("плательщику не отказывают даже за пределами тарифа", () => {
+    // «Перерасход ничего не отключает посреди месяца» — обещание со
+    // страницы тарифов, и оно дано плательщику.
+    expect(canStartMeasurement(paid, 10_000_000, 216).allowed).toBe(true);
+  });
+
+  it("просрочка в пределах отсрочки — это ещё плательщик", () => {
+    const pastDue = entitlementsFor(
+      snapshot({ status: "past_due", currentPeriodEnd: new Date("2026-09-14T00:00:00.000Z") }),
+      NOW,
+    );
+
+    expect(pastDue.paying).toBe(true);
+    expect(canStartMeasurement(pastDue, 10_000_000).allowed).toBe(true);
+  });
+
+  it("выключенный аккаунт не измеряет вовсе", () => {
+    const cancelled = entitlementsFor(snapshot({ status: "canceled" }), NOW);
+    const decision = canStartMeasurement(cancelled, 0);
+
+    expect(decision.allowed).toBe(false);
+    expect(decision.message).toMatch(/cancelled/i);
   });
 });
