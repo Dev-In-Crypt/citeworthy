@@ -661,3 +661,40 @@
   .mk .calc-in, .mk .calc-out { padding: 18px; }
   .mk .market-note blockquote { font-size: 18px; }
 }
+
+/* ---------- вход и регистрация в обрамлении витрины ---------- */
+/*
+  Экраны входа стоят на той же сетке, что разделы страниц: крупный
+  серифный заголовок во всю ширину, форма в левой колонке, справа — что
+  человек получит. Без шапки эти экраны были тупиком: попав сюда с
+  главной, уйти можно было только кнопкой «назад».
+*/
+.mk .auth-sec { padding: 96px 0 112px; }
+.mk .auth-lead { max-width: 60ch; margin-top: 18px; }
+.mk .auth-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
+  gap: 56px;
+  align-items: start;
+  margin-top: 44px;
+}
+.mk .auth-form { display: grid; gap: 18px; }
+.mk .auth-alt { color: var(--cw-muted); }
+.mk .auth-included {
+  display: grid;
+  gap: 14px;
+  padding-left: 22px;
+  border-left: 1px solid var(--cw-rule);
+  list-style: none;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--cw-ink-2);
+  max-width: 52ch;
+}
+
+@media (max-width: 860px) {
+  .mk .auth-sec { padding: 56px 0 72px; }
+  /* Отступ слева съел бы половину строки, а колонка — всю форму. */
+  .mk .auth-cols { grid-template-columns: minmax(0, 1fr); gap: 32px; }
+  .mk .auth-included { padding-left: 0; border-left: 0; border-top: 1px solid var(--cw-rule); padding-top: 24px; }
+}

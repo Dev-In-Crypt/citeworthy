@@ -1,34 +1,44 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { AuthForm } from "@/components/auth-form";
+import { MarketingShell } from "@/components/marketing/chrome";
+
+/**
+ * Вход в том же обрамлении, что и регистрация.
+ *
+ * Правой колонки здесь нет намеренно: человек, который возвращается,
+ * продукт уже выбрал, и перечислять ему заново, что входит, — шум.
+ * Ему нужны два выхода: забытый пароль и регистрация.
+ */
+
+export const metadata: Metadata = {
+  title: "Sign in · Citeworthy",
+  description: "Sign in to your Citeworthy workspace.",
+};
 
 export default function LoginPage() {
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-sm flex-col justify-center gap-6 px-6">
-      <div className="flex flex-col gap-1.5">
-        <h1 className="text-xl font-semibold tracking-tight">Sign in</h1>
-        <p className="text-sm text-muted-foreground">Welcome back.</p>
+    <MarketingShell>
+      <div className="wrap">
+        <section className="auth-sec">
+          <div className="kicker page-kicker">Sign in</div>
+          <h1 className="display">
+            Welcome <em>back.</em>
+          </h1>
+
+          <div className="auth-cols">
+            <div className="auth-form">
+              <AuthForm mode="login" />
+              <p className="small auth-alt">
+                <Link href="/forgot-password">Forgot your password?</Link>
+              </p>
+              <p className="small auth-alt">
+                No account yet? <Link href="/signup">Create your workspace</Link>
+              </p>
+            </div>
+          </div>
+        </section>
       </div>
-
-      <AuthForm mode="login" />
-
-      <p className="text-sm text-muted-foreground">
-        <Link
-          href="/forgot-password"
-          className="font-medium text-primary underline-offset-4 hover:underline"
-        >
-          Forgot your password?
-        </Link>
-      </p>
-
-      <p className="text-sm text-muted-foreground">
-        No account yet?{" "}
-        <Link
-          href="/signup"
-          className="font-medium text-primary underline-offset-4 hover:underline"
-        >
-          Create one
-        </Link>
-      </p>
-    </main>
+    </MarketingShell>
   );
 }
