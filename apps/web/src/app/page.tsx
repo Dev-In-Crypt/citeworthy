@@ -342,7 +342,7 @@ export default async function HomePage() {
           <h2 className="h1">Start with one client, for free</h2>
           <div>
             <p className="prose">
-              Create an agency account, add one client and run the audit. It takes longer than a page
+              Create a workspace, add one brand and run the audit. It takes longer than a page
               load, because every question is asked several times on each assistant. You end with a
               diagnosis, ranked work and a report in your brand to take into the next client meeting.
             </p>

@@ -52,7 +52,7 @@ export function SampleFrame({
 
       <div data-surface="marketing" className="mk sample-cta">
         <div className="wrap">
-          <h2 className="h3">Run this for one of your clients</h2>
+          <h2 className="h3">Run this for a brand you work on</h2>
           <p className="prose">
             The free audit asks ChatGPT, Perplexity and Gemini your client’s buyer questions, several
             times each, and ends on a page like this one, in your agency’s brand.

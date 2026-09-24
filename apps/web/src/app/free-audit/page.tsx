@@ -72,7 +72,7 @@ export default function FreeAuditPage() {
             </p>
             <div className="ctas">
               <Link className="btn primary" href="/signup" data-testid="audit-cta">
-                Create your agency account
+                Create your workspace
               </Link>
               <a className="link" href="#how">
                 What happens, step by step ↓
@@ -256,12 +256,12 @@ export default function FreeAuditPage() {
           <h2 className="h1">Pick one client and see what the assistants say about them</h2>
           <div>
             <p className="prose">
-              Create the agency account, add the client and run the audit. The report is yours to
+              Create the workspace, add the brand and run the audit. The report is yours to
               send.
             </p>
             <div className="ctas" style={{ marginTop: 22 }}>
               <Link className="btn primary" href="/signup">
-                Create your agency account
+                Create your workspace
               </Link>
               {SALES_CONTACT && <TalkOrAudit />}
             </div>

@@ -78,7 +78,7 @@ const THE_LINE = [
 
 /** Шаги — ровно то, что агентство делает в продукте, без обещанных сроков. */
 const START_STEPS = [
-  "Create an agency account and add one client you already work with. No card is asked for.",
+  "Create a workspace and add one brand you already work on. No card is asked for.",
   "Generate the buyer questions from templates or import your own, then edit them until they read the way that client's buyers actually ask.",
   "Run the free audit and read the diagnosis: where the client is named, where a competitor is named instead, and which sources the assistants cited.",
   "Send the report in your own brand and use it as the pitch for the retainer line you want to sell.",

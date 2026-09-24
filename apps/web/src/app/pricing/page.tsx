@@ -71,7 +71,7 @@ function faqItems(paymentsOn: boolean) {
   { q: "Can we pay by card on the site?", a: checkoutCopy(paymentsOn).faqAnswer },
   {
     q: "Is the free audit really free?",
-    a: "Yes. Creating an agency account and running the audit costs nothing, and no card is asked for.",
+    a: "Yes. Creating a workspace and running the audit costs nothing, and no card is asked for.",
   },
   ];
 }
@@ -269,7 +269,7 @@ export default function PricingPage() {
             <li className="card">
               <span className="num">1</span>
               <h3>Run the free audit</h3>
-              <p>Create an agency account and audit one of your own clients. Nothing is charged to run it.</p>
+              <p>Create a workspace and audit a brand you work on — a client's, or your own. Nothing is charged to run it.</p>
             </li>
             <li className="card">
               <span className="num">2</span>

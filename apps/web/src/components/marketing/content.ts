@@ -69,9 +69,9 @@ export const PRICING_NOTES = {
   checkoutHeadingSelfServe: "Pick a plan and pay by card",
   checkoutHeadingDirect: "No self-serve checkout yet",
   checkoutLeadSelfServe:
-    "Start with the free audit on one of your clients, then pick a plan in the product and pay by card. Cards are handled by the payment provider; we never see the number.",
+    "Start with the free audit on a brand you work on, then pick a plan in the product and pay by card. Cards are handled by the payment provider; we never see the number.",
   checkoutLeadDirect:
-    "Start with the free audit on one of your clients. Plans and billing are then set up with us directly; there is no “Buy now” button to pretend with.",
+    "Start with the free audit on a brand you work on. Plans and billing are then set up with us directly; there is no “Buy now” button to pretend with.",
   seoSuite:
     "Keep your SEO suite. Semrush or Ahrefs stay where your keyword and backlink work lives; Citeworthy is the client-facing AI-visibility layer next to them and does not try to replace them.",
 };
@@ -125,7 +125,7 @@ export const SPARKTORO_STUDY = {
  * от числа вопросов и очереди.
  */
 export const AUDIT_STEPS: { text: string; who: { label: string; ours?: boolean }[] }[] = [
-  { text: "Create your agency account. No card is asked for.", who: [{ label: "you" }] },
+  { text: "Create your workspace. No card is asked for.", who: [{ label: "you" }] },
   {
     text: "Add the client and the competitors you want it compared with",
     who: [{ label: "you" }],
