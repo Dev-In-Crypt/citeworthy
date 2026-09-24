@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { createDb } from "./client";
 import { agencies, clients, users } from "./schema/tenancy";
 import { promptClusters, prompts, runSchedules } from "./schema/measurement";
@@ -128,7 +128,28 @@ export async function seed(db: Database): Promise<void> {
         status: "active",
       },
     ])
-    .onConflictDoNothing({ target: clients.id });
+    /**
+     * Повторный посев обновляет описание клиента, а не пропускает его.
+     *
+     * С `onConflictDoNothing` `pnpm db:seed` не делал того, что обещает
+     * названием: правка имён конкурентов в этом файле не доезжала до уже
+     * заведённой базы. Разработчик видел зелёные тесты на старых данных, а
+     * CI на чистой базе — красные. Ровно так и случилось при переименовании
+     * демо-брендов.
+     *
+     * Обновляются только описательные поля. `status` не трогается: клиента
+     * могли заархивировать руками, и посев не должен это отменять.
+     */
+    .onConflictDoUpdate({
+      target: clients.id,
+      set: {
+        name: sql`excluded.name`,
+        domain: sql`excluded.domain`,
+        industry: sql`excluded.industry`,
+        brandNames: sql`excluded.brand_names`,
+        competitorNames: sql`excluded.competitor_names`,
+      },
+    });
 
   await db
     .insert(promptClusters)

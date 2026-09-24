@@ -119,6 +119,6 @@ describe("seed", () => {
     const rows = await db.select().from(clients).where(eq(clients.id, SEED_CLIENT_ACME_ID));
     const acme = rows[0];
     expect(acme?.brandNames).toEqual(["AcmeCRM", "Acme CRM", "Acme"]);
-    expect(acme?.competitorNames).toContain("HubSpot");
+    expect(acme?.competitorNames).toContain("Northstack");
   });
 });
