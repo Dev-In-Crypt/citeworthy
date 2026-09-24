@@ -26,6 +26,7 @@ export async function entitlementsForAgency(
           status: subscription.status,
           currentPeriodEnd: subscription.currentPeriodEnd,
           cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+          extraClientAccounts: subscription.extraClientAccounts,
         }
       : null,
     now,

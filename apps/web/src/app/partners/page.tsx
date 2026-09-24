@@ -1,6 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { MARKETING_COPY, METHOD_COPY } from "@repo/core";
+import {
+  MARKETING_COPY,
+  METHOD_COPY,
+  PARTNER_COPY,
+  partnerTerms,
+  REFERRAL_MONTHS,
+  REFERRAL_RATE,
+  VOLUME_ACCOUNT_PRICE_USD,
+  VOLUME_DISCOUNT,
+  VOLUME_THRESHOLD,
+} from "@repo/core";
 import { Faq, MethodLink, SecHead } from "@/components/marketing/bits";
 import { MarketingShell } from "@/components/marketing/chrome";
 import { checkoutCopy, PRICING_NOTES, RESALE } from "@/components/marketing/content";
@@ -27,6 +37,21 @@ export const metadata: Metadata = {
   description:
     "Run AI-visibility measurement as your own service: a workspace per client, reports in your brand, priced per client account. You set your own price and keep the client relationship.",
 };
+
+/**
+ * Условия с подставленными числами.
+ *
+ * Собираются один раз и используются и в разделе, и в вопросах: две
+ * формулировки одного условия на одной странице — это два обещания, из
+ * которых агентство выберет выгодное для себя, и будет право.
+ */
+const TERMS = partnerTerms({
+  threshold: VOLUME_THRESHOLD,
+  accountPriceUsd: VOLUME_ACCOUNT_PRICE_USD,
+  discountPct: Math.round(VOLUME_DISCOUNT * 100),
+  referralPct: Math.round(REFERRAL_RATE * 100),
+  referralMonths: REFERRAL_MONTHS,
+});
 
 /** Что агентство получает. Каждый пункт — то, что уже работает в продукте. */
 const WHAT_YOU_GET = [
@@ -71,8 +96,8 @@ const THE_LINE = [
     body: MARKETING_COPY.limits.nothingPublished,
   },
   {
-    title: "No reseller tier yet",
-    body: "There is no partner discount, revenue share or reseller agreement today. The plans on the pricing page are the only terms that exist, and this page will not invent others.",
+    title: "Partner terms do not change any of the above",
+    body: `${PARTNER_COPY.notIncluded} The wholesale rate and the referral commission are money between us and you; your client never sees either.`,
   },
 ];
 
@@ -97,7 +122,11 @@ function faqItems(paymentsOn: boolean) {
   },
   {
     q: "Is there a partner programme or revenue share?",
-    a: "Not today. Agencies buy a plan at the listed price and resell their own service on top of it. If that changes it will be written on the pricing page, not implied here.",
+    a: `Yes, and both parts are printed above rather than described. ${TERMS.volume} ${TERMS.referral} ${PARTNER_COPY.howItRuns}`,
+  },
+  {
+    q: "Do we have to commit to anything for the wholesale rate?",
+    a: `${PARTNER_COPY.notIncluded} The rate follows the number of client accounts you actually run, so it appears when you cross ${VOLUME_THRESHOLD} and goes away if you drop back below.`,
   },
   {
     q: "What does it cost us per client?",
@@ -143,14 +172,17 @@ export default function PartnersPage() {
               <a href="#money">
                 <i>2</i>The money
               </a>
+              <a href="#terms">
+                <i>3</i>Partner terms
+              </a>
               <a href="#line">
-                <i>3</i>Where the line is
+                <i>4</i>Where the line is
               </a>
               <a href="#start">
-                <i>4</i>How to start
+                <i>5</i>How to start
               </a>
               <a href="#never">
-                <i>5</i>What we never claim
+                <i>6</i>What we never claim
               </a>
             </nav>
           </div>
@@ -177,6 +209,19 @@ export default function PartnersPage() {
                 <dt>Cost per client</dt>
                 <dd>
                   {usd(PER_CLIENT_MIN)}–{usd(PER_CLIENT_MAX)}
+                </dd>
+              </div>
+              <div>
+                {/* Условия названы числами прямо в карточке: агентство с
+                    большой книгой сравнивает именно их, и отправлять его за
+                    ними на третий экран — значит терять его на первом. */}
+                <dt>Above {VOLUME_THRESHOLD} accounts</dt>
+                <dd>{usd(VOLUME_ACCOUNT_PRICE_USD)} each</dd>
+              </div>
+              <div>
+                <dt>Referral</dt>
+                <dd>
+                  {Math.round(REFERRAL_RATE * 100)}% · {REFERRAL_MONTHS} mo
                 </dd>
               </div>
               <div>
@@ -258,10 +303,46 @@ export default function PartnersPage() {
         </div>
       </section>
 
-      {/* 3 · где проходит граница */}
+      {/*
+        Партнёрские условия стоят после раздела про деньги и до раздела про
+        границу: сначала агентство считает свою экономику на списочной цене,
+        потом видит, что при объёме она другая, и только потом читает, чего
+        программа не меняет.
+      */}
+      <section className="sec" id="terms">
+        <div className="wrap">
+          <SecHead n={3} title="Partner terms, with the numbers">
+            {PARTNER_COPY.published}
+          </SecHead>
+          <div className="g2" data-testid="partner-terms">
+            <div className="limit">
+              <h3>Wholesale rate on volume</h3>
+              <p data-testid="partner-volume">{TERMS.volume}</p>
+              <p className="small" style={{ marginTop: 12 }}>
+                {PARTNER_COPY.volumeShape}
+              </p>
+            </div>
+            <div className="limit">
+              <h3>Referral commission</h3>
+              <p data-testid="partner-referral">{TERMS.referral}</p>
+              <p className="small" style={{ marginTop: 12 }}>
+                {PARTNER_COPY.howItRuns}
+              </p>
+            </div>
+          </div>
+          <div className="row-between">
+            <p className="small">{PARTNER_COPY.notIncluded}</p>
+            <Link className="link" href="/pricing">
+              See the plans these terms sit on top of →
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* 4 · где проходит граница */}
       <section className="sec" id="line">
         <div className="wrap">
-          <SecHead n={3} title="Where the line is">
+          <SecHead n={4} title="Where the line is">
             Worth being blunt about, because you are the one standing in front of the client.
           </SecHead>
           <div className="g2" data-testid="partners-line">
@@ -275,10 +356,10 @@ export default function PartnersPage() {
         </div>
       </section>
 
-      {/* 4 · как начать */}
+      {/* 5 · как начать */}
       <section className="sec" id="start">
         <div className="wrap">
-          <SecHead n={4} title="How to start">
+          <SecHead n={5} title="How to start">
             Nothing here needs a contract or a call. The order matters more than the speed: the
             audit is what turns a conversation into an offer.
           </SecHead>
@@ -318,10 +399,10 @@ export default function PartnersPage() {
         </div>
       </section>
 
-      {/* 5 · чего мы не утверждаем — агентство перепродаёт и эти пределы тоже */}
+      {/* 6 · чего мы не утверждаем — агентство перепродаёт и эти пределы тоже */}
       <section className="sec" id="never">
         <div className="wrap">
-          <SecHead n={5} title="What we never claim — and neither should your pitch">
+          <SecHead n={6} title="What we never claim — and neither should your pitch">
             You are going to repeat these lines to your own client, so they are here rather than
             in a footnote.
           </SecHead>
@@ -355,7 +436,7 @@ export default function PartnersPage() {
 
       <section className="sec">
         <div className="wrap">
-          <SecHead n={6} title="Questions agencies ask first" />
+          <SecHead n={7} title="Questions agencies ask first" />
           <Faq items={faqItems(paymentsOn)} testId="partners-faq" />
         </div>
       </section>

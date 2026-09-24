@@ -80,6 +80,15 @@ export const subscriptions = pgTable(
     currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
     cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
     /**
+     * Клиентские аккаунты сверх тарифа, купленные по оптовой цене.
+     *
+     * Здесь, а не поднятым лимитом у агентства: там поле производное, его
+     * переписывает каждое событие подписки, и агентство с сорока клиентами
+     * однажды проснулось бы с потолком в двадцать пять. Событие провайдера
+     * это число не несёт, поэтому запись подписки его не трогает.
+     */
+    extraClientAccounts: integer("extra_client_accounts").notNull().default(0),
+    /**
      * Время события провайдера, которым записано это состояние.
      *
      * Доставка вебхуков не упорядочена: задержавшийся повтор более раннего

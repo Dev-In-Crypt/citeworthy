@@ -1,0 +1,1 @@
+ALTER TABLE "subscriptions" ADD COLUMN "extra_client_accounts" integer DEFAULT 0 NOT NULL;

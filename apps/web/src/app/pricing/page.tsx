@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { MARKETING_COPY } from "@repo/core";
+import { MARKETING_COPY, VOLUME_ACCOUNT_PRICE_USD, VOLUME_DISCOUNT, VOLUME_THRESHOLD } from "@repo/core";
 import { Faq, SecHead, TalkOrAudit } from "@/components/marketing/bits";
 import { MarketingShell } from "@/components/marketing/chrome";
 import { checkoutCopy, PRICING_NOTES, RESALE, SALES_CONTACT } from "@/components/marketing/content";
@@ -183,6 +183,17 @@ export default function PricingPage() {
                 The plan sets how many client accounts the workspace can hold at once:{" "}
                 {clientLimitsText}. Adding one beyond that means moving to the next plan, and the
                 product asks you to rather than failing quietly.
+              </p>
+              {/*
+                Над старшим тарифом следующего плана нет, и до сих пор страница
+                об этом молчала. Число напечатано здесь же, а не спрятано в
+                «напишите нам»: это и есть условие, а не приглашение к торгу.
+              */}
+              <p className="small" data-testid="volume-rate">
+                Above {VOLUME_THRESHOLD} accounts there is no next plan: every further client
+                account is {usd(VOLUME_ACCOUNT_PRICE_USD)} a month,{" "}
+                {Math.round(VOLUME_DISCOUNT * 100)}% off what the top plan works out to per
+                account. <Link className="link" href="/partners#terms">The full terms are here</Link>.
               </p>
               <div className="basis">Billing unit: the client account. Not seats, not sources, not prompts.</div>
             </div>

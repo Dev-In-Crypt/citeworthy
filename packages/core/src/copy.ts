@@ -225,6 +225,61 @@ export function reportAssistantBasisFor(comparison: AssistantSetComparison): str
   }
 }
 
+/**
+ * Партнёрские условия словами.
+ *
+ * Числа в текст не вписаны — подставляются из `billing/partner.ts`, того же
+ * места, откуда их берёт биллинг. Цена, набранная в тексте руками, однажды
+ * разойдётся с той, по которой выставлен счёт, и разойдётся в сторону
+ * агентства, которое уже согласилось на старую.
+ */
+export const PARTNER_COPY = {
+  /** Почему условия вообще напечатаны. */
+  published:
+    "Both terms below are published in full, with the numbers. The rest of this category says “discounted licenses” and “flexible rate cards” and prints nothing, so you cannot compare anything until you are on a call.",
+  /**
+   * Оптовая цена: %THRESHOLD%, %PRICE%, %DISCOUNT% подставляются.
+   *
+   * «Past %THRESHOLD%», а не «с %THRESHOLD%-го»: двадцать пятый аккаунт
+   * входит в тариф и стоит тарифных денег. Порядковое числительное здесь
+   * сдвигало бы границу на один аккаунт в пользу читателя — а это цена,
+   * напечатанная на сайте, и спорить о ней потом будет поздно.
+   */
+  volume:
+    "Once you are past %THRESHOLD% client accounts, every further account is $%PRICE% a month — %DISCOUNT%% off the rate the top plan works out to. It applies only to the accounts above %THRESHOLD%, never to the ones the plan already covers, so adding a client never makes your bill jump sideways.",
+  /** Почему скидка марджинальная, а не на всё сразу. */
+  volumeShape:
+    "We price it this way because the alternative has a cliff in it: if the discount applied to every account at once, your 26th client would cost us more than your 25th, and we would end up discouraging the thing we want.",
+  /** Комиссия: %RATE%, %MONTHS% подставляются. */
+  referral:
+    "Introduce another agency and you get %RATE%% of what they pay for their first %MONTHS% months. It is paid on their actual invoices, it stops at %MONTHS% months, and it does not apply to your own accounts or to an agency already talking to us.",
+  /** Как это администрируется на самом деле. */
+  howItRuns:
+    "Neither is self-serve yet. Both are agreed by email and applied to your account by hand, and the referral is tracked the same way. Saying that is more use to you than a dashboard we have not built.",
+  /** Что программа не даёт — чтобы не додумывали. */
+  notIncluded:
+    "There is no exclusivity, no minimum commitment, no territory and no tier you have to qualify for. Nothing here changes what your clients see or who owns the relationship.",
+} as const;
+
+/** Подставляет числа партнёрских условий в их текст. */
+export function partnerTerms(input: {
+  threshold: number;
+  accountPriceUsd: number;
+  discountPct: number;
+  referralPct: number;
+  referralMonths: number;
+}): { volume: string; referral: string } {
+  return {
+    volume: PARTNER_COPY.volume
+      .replaceAll("%THRESHOLD%", String(input.threshold))
+      .replace("%PRICE%", String(input.accountPriceUsd))
+      .replace("%DISCOUNT%", String(input.discountPct)),
+    referral: PARTNER_COPY.referral
+      .replace("%RATE%", String(input.referralPct))
+      .replaceAll("%MONTHS%", String(input.referralMonths)),
+  };
+}
+
 export const OPPORTUNITY_COPY = {
   /** Что это за экран. Стоит над списком, а не в подсказке. */
   basis:

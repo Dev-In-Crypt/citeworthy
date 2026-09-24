@@ -25,6 +25,15 @@ export interface SubscriptionSnapshot {
   status: SubscriptionStatus;
   currentPeriodEnd: Date | null;
   cancelAtPeriodEnd: boolean;
+  /**
+   * Клиентские аккаунты сверх тарифа, купленные по оптовой цене.
+   *
+   * Отдельным числом, а не поднятым вручную лимитом у агентства: лимит там
+   * производный, его переписывает каждое событие подписки, и однажды
+   * агентство с сорока клиентами проснулось бы с потолком в двадцать пять.
+   * Условия — `billing/partner.ts`.
+   */
+  extraClientAccounts?: number;
 }
 
 export interface Entitlements extends PlanLimits {
@@ -76,7 +85,16 @@ export function entitlementsFor(
     };
   }
 
-  const limits = PLAN_LIMITS[subscription.plan];
+  /**
+   * Докупленные аккаунты прибавляются к вместимости тарифа.
+   *
+   * Только пока агентство платит: в отменённой подписке их нет, потому что
+   * нет и платежа за них. Отрицательное число трактуется как ноль — лимит,
+   * уменьшенный опечаткой в служебном поле, отрезал бы агентству клиентов.
+   */
+  const extra = Math.max(0, subscription.extraClientAccounts ?? 0);
+  const planLimits = PLAN_LIMITS[subscription.plan];
+  const limits = { ...planLimits, clientLimit: planLimits.clientLimit + extra };
 
   switch (subscription.status) {
     case "active":

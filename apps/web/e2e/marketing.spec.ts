@@ -1,5 +1,10 @@
 import { expect, test } from "@playwright/test";
 import { PLAN_LIMITS } from "../../../packages/core/src/billing/period";
+import {
+  VOLUME_ACCOUNT_PRICE_USD,
+  VOLUME_DISCOUNT,
+  VOLUME_THRESHOLD,
+} from "../../../packages/core/src/billing/partner";
 import { SAMPLE_CONFIDENCE_THRESHOLDS } from "../../../packages/core/src/metrics/confidence";
 import { collectConsoleErrors } from "./console";
 
@@ -143,6 +148,17 @@ test("pricing figures are the ones the API enforces", async ({ page }) => {
   expect(text).not.toMatch(/\bprospect/i);
   // Предупреждения о перерасходе в продукте нет — и на странице его не обещают.
   expect(text).not.toMatch(/you get a warning/i);
+
+  /**
+   * Оптовая цена напечатана и совпадает с той, по которой считает биллинг.
+   *
+   * Это обещание покупателю, а не украшение страницы: число, набранное в
+   * тексте руками, однажды разойдётся с тем, по которому выставлен счёт.
+   */
+  const volume = page.getByTestId("volume-rate");
+  await expect(volume).toContainText(usd(VOLUME_ACCOUNT_PRICE_USD));
+  await expect(volume).toContainText(`${VOLUME_THRESHOLD} accounts`);
+  await expect(volume).toContainText(`${Math.round(VOLUME_DISCOUNT * 100)}%`);
 
   // Тот же источник цен на главной.
   await page.goto("/");

@@ -1,4 +1,9 @@
-import { MARKETING_COPY } from "@repo/core";
+import {
+  MARKETING_COPY,
+  VOLUME_ACCOUNT_PRICE_USD,
+  VOLUME_DISCOUNT,
+  VOLUME_THRESHOLD,
+} from "@repo/core";
 import {
   PER_CLIENT_MAX,
   PER_CLIENT_MIN,
@@ -51,8 +56,12 @@ export const PRICING_NOTES = {
    */
   overage:
     "Going past the allowance does not cut anything off mid-month. The usage bar on your dashboard shows where you stand, and we agree the next step together.",
-  clientLimit:
-    "The plan sets how many client accounts the workspace can hold at once. Adding one beyond that means moving to the next plan, and the product asks you to rather than failing quietly.",
+  /**
+   * Что происходит на потолке — включая потолок старшего тарифа, за которым
+   * следующего плана уже нет. Пока здесь об этом молчали, ответ на самый
+   * частый вопрос агентства с большой книгой был «напишите нам».
+   */
+  clientLimit: `The plan sets how many client accounts the workspace can hold at once. Adding one beyond that means moving to the next plan, and the product asks you to rather than failing quietly. Above the top plan there is no next one: from the ${VOLUME_THRESHOLD}th account every further account is ${usd(VOLUME_ACCOUNT_PRICE_USD)} a month, ${Math.round(VOLUME_DISCOUNT * 100)}% off what the top plan works out to per account.`,
   seats: "The number of people on your team is not counted, and there is no charge per seat.",
   extraAssistants: `Claude and Grok have no separate price. Switching them on for a client means five assistants instead of three, so that client uses about 5/3 as many AI checks (roughly ${int(TYPICAL_CHECKS_FIVE_ASSISTANTS)} a month if measured weekly).`,
   /**

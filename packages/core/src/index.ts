@@ -86,6 +86,7 @@ export type { SerpProvider, SurfaceCapability, SurfaceRequirement } from "./adap
 export * from "./billing/period";
 export * from "./billing/cost";
 export * from "./billing/entitlements";
+export * from "./billing/partner";
 export * from "./billing/payments";
 export {
   StripePaymentProvider,

@@ -104,6 +104,9 @@ export async function applySubscriptionChange(
     status: saved.status,
     currentPeriodEnd: saved.currentPeriodEnd,
     cancelAtPeriodEnd: saved.cancelAtPeriodEnd,
+    // Докупленные аккаунты — из сохранённой записи: событие провайдера их не
+    // несёт, и потерять их здесь значит отрезать агентству клиентов.
+    extraClientAccounts: saved.extraClientAccounts,
   });
 
   await applyPlanToAgency(db, agencyId, entitlements.plan, entitlements.clientLimit);
