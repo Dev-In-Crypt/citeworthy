@@ -6,6 +6,7 @@ import { estimateSchedule, type Cadence } from "@repo/core/adapters/capacity";
 import { api } from "@/trpc/react";
 import { buttonClass } from "@/components/ui/button";
 import { inputClass } from "@/components/ui/field";
+import { cn } from "@/lib/utils";
 
 function cadenceLabelOf(
   options: { id: string; label: string }[],
@@ -114,18 +115,21 @@ export function SchedulePanel({ clientId }: { clientId: string }) {
     : [...allowedCadences, { id: cadence, label: cadence, allowed: options === undefined }];
 
   /**
-   * То же и с ассистентами: включённый, но больше не разрешённый тарифом
-   * остаётся видимым, чтобы его можно было снять. Заново поставить нельзя.
+   * Ассистенты показываются все, включая запертых тарифом.
+   *
+   * Прятать недоступное — худший из вариантов: агентство не узнаёт, что
+   * ассистент существует, а увидев его потом у соседа, решает, что
+   * продукт что-то скрывал. Запертый виден, выключен и подписан тарифом,
+   * на котором включается.
+   *
+   * Включённый, но больше не разрешённый (тариф понизили) остаётся
+   * доступным для снятия: иначе расписание нельзя было бы починить.
    */
-  const allowedAssistants = (options?.assistants ?? []).map((option) => ({
-    ...option,
-    allowed: true,
-  }));
   const assistantOptions = [
-    ...allowedAssistants,
+    ...(options?.assistants ?? []),
     ...platforms
-      .filter((id) => !allowedAssistants.some((option) => option.id === id))
-      .map((id) => ({ id, label: id, allowed: options === undefined })),
+      .filter((id) => !(options?.assistants ?? []).some((option) => option.id === id))
+      .map((id) => ({ id, label: id, allowed: options === undefined, unlocksOn: undefined })),
   ];
 
   const estimate =
@@ -180,17 +184,36 @@ export function SchedulePanel({ clientId }: { clientId: string }) {
         <fieldset className="flex flex-col gap-1.5">
           <legend className="text-sm font-medium">Platforms</legend>
           <div className="flex flex-wrap gap-x-4 gap-y-1.5">
-            {assistantOptions.map(({ id, label, allowed }) => (
-              <label key={id} className="flex items-center gap-1.5 text-sm">
-                <input
-                  type="checkbox"
-                  checked={platforms.includes(id)}
-                  disabled={!allowed && !platforms.includes(id)}
-                  onChange={() => togglePlatform(id)}
-                />
-                {label}
-              </label>
-            ))}
+            {assistantOptions.map(({ id, label, allowed, unlocksOn }) => {
+              const locked = !allowed && !platforms.includes(id);
+
+              return (
+                <label
+                  key={id}
+                  className={cn(
+                    "flex items-center gap-1.5 text-sm",
+                    locked && "text-muted-foreground",
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    checked={platforms.includes(id)}
+                    disabled={locked}
+                    onChange={() => togglePlatform(id)}
+                  />
+                  {label}
+                  {locked && unlocksOn && (
+                    /* Отказ с ответом «что делать», а не серая галочка. */
+                    <span
+                      data-testid={`assistant-locked-${id}`}
+                      className="metric rounded-full bg-muted px-1.5 py-0.5 text-[11px]"
+                    >
+                      {unlocksOn} and up
+                    </span>
+                  )}
+                </label>
+              );
+            })}
           </div>
           <p className="max-w-prose text-xs text-muted-foreground">
             Every assistant you add asks each prompt again on every run, so it adds to the cost. An

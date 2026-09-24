@@ -1,5 +1,5 @@
 import { ASSISTANTS } from "./catalogue";
-import type { Platform } from "./types";
+import { PLATFORM_IDS, type Platform } from "./types";
 import { ESTIMATED_COST_PER_ANSWER_USD } from "../billing/period";
 import type { PlanId } from "../billing/entitlements";
 import {
@@ -179,10 +179,17 @@ export interface CapacityOption<T extends string> {
   label: string;
 }
 
+export interface AssistantOption extends CapacityOption<Platform> {
+  /** Разрешён ли он текущим тарифом. */
+  allowed: boolean;
+  /** Самый дешёвый тариф, на котором он включается. Есть только у запертых. */
+  unlocksOn?: PlanId;
+}
+
 export interface CapacityOptions {
   plan: PlanId;
   cadences: CapacityOption<Cadence>[];
-  assistants: CapacityOption<Platform>[];
+  assistants: AssistantOption[];
   defaultAssistants: readonly Platform[];
   promptsPerClient: number | null;
   monthlyCheckAllowance: number;
@@ -196,8 +203,28 @@ export interface CapacityOptions {
  * которой адаптера ещё нет, и предлагать её галочкой нельзя — по ней не будет
  * ни одного ответа. Сегодня пересечение совпадает с `PLATFORMS`.
  */
-export function capacityOptions(plan: PlanId): CapacityOptions {
-  const capabilities = capabilitiesFor(plan);
+/**
+ * Самый дешёвый тариф, на котором ассистент включается.
+ *
+ * `null` — не включается нигде: такого сегодня нет, но молча показать
+ * «доступно на» несуществующем тарифе было бы хуже, чем не показать.
+ */
+function cheapestPlanWith(
+  assistant: Platform,
+  capabilitiesOf: CapabilitiesLookup,
+): PlanId | null {
+  const order: PlanId[] = ["starter", "growth", "scale"];
+  return order.find((plan) => capabilitiesOf(plan).assistants.includes(assistant)) ?? null;
+}
+
+/** Подменяется в тестах: разведение тарифов надо проверять до того, как оно случится. */
+export type CapabilitiesLookup = (plan: PlanId) => MeasurementCapabilities;
+
+export function capacityOptions(
+  plan: PlanId,
+  capabilitiesOf: CapabilitiesLookup = capabilitiesFor,
+): CapacityOptions {
+  const capabilities = capabilitiesOf(plan);
 
   return {
     plan,
@@ -205,9 +232,29 @@ export function capacityOptions(plan: PlanId): CapacityOptions {
       id: cadence,
       label: CADENCE_LABELS[cadence],
     })),
-    assistants: capabilities.assistants
-      .filter((id) => ASSISTANTS.some((a) => a.id === id && a.measurable))
-      .map((id) => ({ id, label: assistantLabel(id) })),
+    /**
+     * Все измеримые ассистенты, а не только разрешённые тарифом.
+     *
+     * Недоступного не должно не быть на экране — его должно быть видно
+     * выключенным. Иначе агентство на младшем тарифе не узнаёт, что
+     * ассистент вообще существует, а увидев потом у соседа, решает, что
+     * продукт что-то скрывал. `unlocksOn` называет самый дешёвый тариф,
+     * на котором он включается, — чтобы отказ был с ответом «что делать»,
+     * а не просто серой галочкой.
+     */
+    assistants: PLATFORM_IDS.filter((id) =>
+      ASSISTANTS.some((assistant) => assistant.id === id && assistant.measurable),
+    ).map((id) => {
+      const allowed = capabilities.assistants.includes(id);
+      const unlocksOn = allowed ? null : cheapestPlanWith(id, capabilitiesOf);
+
+      return {
+        id,
+        label: assistantLabel(id),
+        allowed,
+        ...(unlocksOn ? { unlocksOn } : {}),
+      };
+    }),
     defaultAssistants: capabilities.defaultAssistants,
     promptsPerClient: capabilities.promptsPerClient,
     monthlyCheckAllowance: monthlyCheckAllowance(plan),

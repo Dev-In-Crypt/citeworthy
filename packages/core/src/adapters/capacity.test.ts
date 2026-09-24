@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   CADENCE_LABELS,
   capacityOptions,
+  type CapabilitiesLookup,
   estimateSchedule,
   isCadence,
   refuseSchedule,
@@ -252,5 +253,52 @@ describe("разбор частоты", () => {
     for (const cadence of CADENCES) {
       expect(CADENCE_LABELS[cadence as Cadence]).toBeTruthy();
     }
+  });
+});
+
+describe("ассистенты в форме расписания", () => {
+  it("показываются все измеримые, а не только разрешённые тарифом", () => {
+    // Спрятанный ассистент — это ассистент, о котором агентство не узнает.
+    const ids = capacityOptions("starter").assistants.map((a) => a.id);
+
+    for (const id of ["chatgpt", "perplexity", "gemini", "claude", "grok"]) {
+      expect(ids).toContain(id);
+    }
+  });
+
+  it("неизмеримая поверхность в список не попадает", () => {
+    // По ней нет адаптера: галочка обещала бы измерение, которого не будет.
+    const ids = capacityOptions("scale").assistants.map((a) => a.id);
+    expect(ids).not.toContain("copilot");
+  });
+
+  it("при сегодняшнем конфиге разрешены все и запертых нет", () => {
+    for (const plan of ["starter", "growth", "scale"] as const) {
+      for (const assistant of capacityOptions(plan).assistants) {
+        expect(assistant.allowed).toBe(true);
+        expect(assistant.unlocksOn).toBeUndefined();
+      }
+    }
+  });
+
+  it("запертый называет тариф, на котором включается", () => {
+    // Проверка на подменённом конфиге: сегодня тарифы не разведены, но
+    // рычаг обязан работать в тот день, когда их разведут — иначе на
+    // экране появится серая галочка без объяснения.
+    const restricted: CapabilitiesLookup = (plan) =>
+      plan === "starter"
+        ? { ...capabilitiesFor(plan), assistants: ["chatgpt", "perplexity", "grok"] }
+        : capabilitiesFor(plan);
+
+    const assistants = capacityOptions("starter", restricted).assistants;
+    const claude = assistants.find((a) => a.id === "claude");
+    const chatgpt = assistants.find((a) => a.id === "chatgpt");
+
+    // Запертый виден, выключен и подписан самым дешёвым подходящим тарифом.
+    expect(claude?.allowed).toBe(false);
+    expect(claude?.unlocksOn).toBe("growth");
+    // Разрешённый подписи не несёт: «доступно на starter» на starter — шум.
+    expect(chatgpt?.allowed).toBe(true);
+    expect(chatgpt?.unlocksOn).toBeUndefined();
   });
 });
