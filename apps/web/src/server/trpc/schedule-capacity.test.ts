@@ -8,7 +8,7 @@ import {
   createPromptCluster,
   deleteAgency,
 } from "@repo/db";
-import { DEFAULT_PLATFORMS, PLAN_LIMITS, PLATFORM_IDS } from "@repo/core";
+import { DEFAULT_PLATFORMS, isMeasurableAssistant, PLAN_LIMITS, PLATFORM_IDS } from "@repo/core";
 import { CADENCES, capabilitiesFor } from "@repo/core/config/measurement";
 import { refuseSchedule } from "@repo/core/adapters/capacity";
 import { appRouter } from "./root";
@@ -76,9 +76,12 @@ describe("ёмкость расписания", () => {
 
     // Агентство без подписки работает на starter — это умолчание продукта.
     expect(capacity.cadences.map((c) => c.id)).toEqual([...STARTER_CADENCES]);
-    // Ассистенты приходят все, но дорогие — запертыми: спрятанного
-    // ассистента агентство не увидит и не узнает, что он есть.
-    expect(capacity.assistants.map((a) => a.id)).toEqual([...PLATFORM_IDS]);
+    // Приходят все измеряемые, но дорогие — запертыми: спрятанного
+    // ассистента агентство не увидит и не узнает, что он есть. Тот,
+    // кого продукт не измеряет, в списке не появляется вовсе.
+    expect(capacity.assistants.map((a) => a.id)).toEqual([
+      ...PLATFORM_IDS.filter((id) => isMeasurableAssistant(id)),
+    ]);
     expect(capacity.assistants.filter((a) => a.allowed).map((a) => a.id)).toEqual([
       ...STARTER_ASSISTANTS,
     ]);

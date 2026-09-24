@@ -381,8 +381,17 @@ export const MARKETING_COPY = {
   experimentWithoutControl:
     "Without untouched topics there is nothing to compare against, and the report says so instead of showing a difference.",
   /** Кого не измеряем и почему. */
+  /**
+   * Две разные причины не измерять, и обе названы.
+   *
+   * У Copilot и поверхностей Google нет программного доступа к ответу. У
+   * Gemini он есть, и адаптер написан, — но условия Google на
+   * grounded-поиск не дают ни анализировать результаты, ни хранить их так,
+   * чтобы цифру можно было перепроверить. Писать «нет API» было бы
+   * неправдой, а молчать — хуже: Gemini спросят первым.
+   */
   notMeasuredSurfaces:
-    "Microsoft Copilot and Google AI Overviews / AI Mode offer no public API, so they are not measured, and no report estimates them.",
+    "Microsoft Copilot and Google AI Overviews / AI Mode offer no public API. Gemini has one, but Google's terms for grounded search do not allow its answers to be analysed or kept the way every figure here is kept so it can be rechecked. None of them is measured, and no report estimates them.",
   /** Пределы, названные вслух на главной. */
   limits: {
     quarter:
@@ -406,7 +415,7 @@ export const MARKETING_COPY = {
    * вопросов и от очереди, а обещание, которое нельзя сдержать, хуже молчания.
    */
   auditTakesTime:
-    "Each question is asked three times on each of ChatGPT, Perplexity and Gemini, so an audit of two dozen questions is over two hundred answers. It takes longer than a page load, on purpose: one answer per question would be noise.",
+    "Each question is asked three times on each of ChatGPT, Perplexity and Grok, so an audit of two dozen questions is over two hundred answers. It takes longer than a page load, on purpose: one answer per question would be noise.",
   /**
    * Белая этикетка. Абсолюты вроде «ничего нашего» не говорим: ссылка живёт на
    * нашем домене, письмо уходит с нашего адреса отправки.

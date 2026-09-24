@@ -165,20 +165,20 @@ export default function MethodPage() {
               <div className="chip-row">
                 <span className="a-chip">ChatGPT</span>
                 <span className="a-chip">Perplexity</span>
-                <span className="a-chip">Gemini</span>
+                <span className="a-chip">Grok</span>
               </div>
               <p className="small" style={{ margin: "16px 0 8px" }}>
                 Switched on per client, using more AI checks rather than costing extra
               </p>
               <div className="chip-row">
                 <span className="a-chip opt">Claude</span>
-                <span className="a-chip opt">Grok</span>
               </div>
               <p className="small" style={{ margin: "16px 0 8px" }}>Not measured</p>
               <div className="chip-row">
                 <span className="a-chip off">Copilot</span>
                 <span className="a-chip off">AI Overviews</span>
                 <span className="a-chip off">AI Mode</span>
+                <span className="a-chip off">Gemini</span>
               </div>
               <div className="basis" style={{ marginTop: 16 }}>
                 {MARKETING_COPY.notMeasuredSurfaces}

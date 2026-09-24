@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ASSISTANTS } from "./catalogue";
 import { isPlatform } from "./registry";
 import { PLATFORM_IDS } from "./types";
+import { capabilitiesFor } from "../config/measurement";
 import {
   SurfaceProviderNotConfiguredError,
   UnconfiguredSerpProvider,
@@ -56,15 +57,35 @@ describe("surfaceCapabilities", () => {
     expect(copilot?.requirement).toBe("serp-provider");
   });
 
-  it("неизмеряемую поверхность нельзя поставить в расписание", () => {
-    // Самая дешёвая защита от выдуманной цифры: поверхность без адаптера
-    // просто не существует для прогонов, очередей и enum в БД.
+  it("неизмеряемую поверхность не разрешает ни один тариф", () => {
+    /**
+     * Защита от выдуманной цифры. Раньше она читалась проще: неизмеряемой
+     * поверхности нет в enum базы, значит её негде и поставить.
+     *
+     * Так больше не везде. Перестать измерять можно и ту платформу, по
+     * которой ответы уже записаны, — значение остаётся в enum, потому что
+     * на него ссылаются строки, а удалять данные мы не удаляем. Поэтому
+     * проверяется то, что важно на самом деле: в расписание её не поставить.
+     */
     const unmeasured = surfaceCapabilities().filter((entry) => !entry.measurable);
 
     expect(unmeasured.length).toBeGreaterThan(0);
     for (const surface of unmeasured) {
-      expect(PLATFORM_IDS as readonly string[]).not.toContain(surface.id);
-      expect(isPlatform(surface.id)).toBe(false);
+      for (const plan of ["starter", "growth", "scale"] as const) {
+        expect(capabilitiesFor(plan).assistants as readonly string[]).not.toContain(surface.id);
+        expect(capabilitiesFor(plan).defaultAssistants as readonly string[]).not.toContain(
+          surface.id,
+        );
+      }
+    }
+  });
+
+  it("поверхность без адаптера не существует и для базы", () => {
+    // У тех, кого мы не измеряли никогда, нет и значения в enum: ни одна
+    // строка на него не сошлётся.
+    for (const id of ["copilot", "ai-overviews", "ai-mode"]) {
+      expect(PLATFORM_IDS as readonly string[]).not.toContain(id);
+      expect(isPlatform(id)).toBe(false);
     }
   });
 

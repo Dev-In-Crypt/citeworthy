@@ -25,7 +25,7 @@ import { ReportPreview } from "@/components/marketing/report-preview";
  * Что спрашивает бесплатный аудит.
  *
  * Регистрация заводит агентство на starter, поэтому здесь именно его
- * тройка, а не общая: назвать литералом «ChatGPT, Perplexity и Gemini»
+ * тройка, а не общая: назвать её литералом
  * значило бы пообещать ассистента, которого на этом тарифе нет.
  */
 const FREE_TRIO = defaultAssistantSentence("starter");
@@ -44,7 +44,7 @@ function faqItems(paymentsOn: boolean) {
   },
   {
     q: "Which assistants does the audit use?",
-    a: `${FREE_TRIO}, each with its own cited sources. Gemini and Claude come with Growth and can be switched on per client. ${MARKETING_COPY.notMeasuredSurfaces}`,
+    a: `${FREE_TRIO}, each with its own cited sources. Claude comes with Growth and can be switched on per client. ${MARKETING_COPY.notMeasuredSurfaces}`,
   },
   {
     q: "What happens right after the audit?",

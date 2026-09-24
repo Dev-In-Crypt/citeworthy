@@ -8,6 +8,7 @@ import {
   refuseSchedule,
   refuseScheduleForPlan,
 } from "./capacity";
+import { ASSISTANTS } from "./catalogue";
 import { DEFAULT_PLATFORMS, PLATFORM_IDS, type Platform } from "./types";
 import { ANSWER_PRICES } from "./pricing";
 import { ESTIMATED_COST_PER_ANSWER_USD, PLAN_LIMITS } from "../billing/period";
@@ -80,23 +81,34 @@ describe("сегодняшняя политика тарифов", () => {
     ).toBeNull();
   });
 
-  it("starter отказывает в дорогих ассистентах и называет их", () => {
-    for (const assistant of ["gemini", "claude"] as const) {
-      const refusal = refuseScheduleForPlan("starter", {
-        cadence: "biweekly",
-        assistants: [assistant],
-      });
+  it("starter отказывает в дорогом ассистенте и называет его", () => {
+    const refusal = refuseScheduleForPlan("starter", {
+      cadence: "biweekly",
+      assistants: ["claude"],
+    });
 
-      expect(refusal?.code, `${assistant} должен быть заперт на starter`).toBe("assistant");
-      // В отказе названы и запертый, и то, что взамен доступно.
-      expect(refusal?.message).toContain(assistant === "gemini" ? "Gemini" : "Claude");
-      expect(refusal?.message).toContain("ChatGPT");
+    expect(refusal?.code).toBe("assistant");
+    // В отказе названы и запертый, и то, что взамен доступно.
+    expect(refusal?.message).toContain("Claude");
+    expect(refusal?.message).toContain("ChatGPT");
+  });
+
+  it("неизмеряемого ассистента не даёт ни один тариф", () => {
+    // Запрет условий поставщика — не то же, что «дорого для младшего
+    // тарифа»: Gemini не открывается переходом на старший.
+    for (const plan of PLANS) {
+      expect(
+        refuseScheduleForPlan(plan, { cadence: "biweekly", assistants: ["gemini"] })?.code,
+      ).toBe("assistant");
     }
   });
 
-  it.each(["growth", "scale"] as const)("тариф %s даёт всех", (plan) => {
+  it.each(["growth", "scale"] as const)("тариф %s даёт всех измеряемых", (plan) => {
     expect(
-      refuseScheduleForPlan(plan, { cadence: "biweekly", assistants: PLATFORM_IDS }),
+      refuseScheduleForPlan(plan, {
+        cadence: "biweekly",
+        assistants: capabilitiesFor(plan).assistants,
+      }),
     ).toBeNull();
   });
 
@@ -205,10 +217,20 @@ describe("что предлагается в форме", () => {
   it.each(PLANS)("тариф %s предлагает только измеряемых ассистентов", (plan) => {
     const options = capacityOptions(plan);
 
-    expect(options.assistants.map((a) => a.id)).toEqual([...PLATFORM_IDS]);
-    // Copilot и AI Overviews не измеряются — в расписании их быть не может.
-    expect(options.assistants.map((a) => a.id)).not.toContain("copilot");
-    expect(options.assistants.map((a) => a.id)).not.toContain("ai-overviews");
+    const offered = options.assistants.map((a) => a.id);
+
+    // Список берётся из каталога, а не вписан: платформа, которую перестали
+    // измерять, обязана исчезнуть из формы сама.
+    expect(offered).toEqual(
+      ASSISTANTS.filter((a) => a.measurable && PLATFORM_IDS.includes(a.id as never)).map(
+        (a) => a.id,
+      ),
+    );
+    // Неизмеряемым в расписании места нет — ни тем, у кого нет API, ни
+    // Gemini, которого запрещают условия поставщика.
+    for (const id of ["copilot", "ai-overviews", "gemini"]) {
+      expect(offered).not.toContain(id);
+    }
   });
 
   it.each(PLANS)("тариф %s отдаёт свой месячный лимит проверок", (plan) => {
@@ -353,7 +375,7 @@ describe("ассистенты в форме расписания", () => {
     // Спрятанный ассистент — это ассистент, о котором агентство не узнает.
     const ids = capacityOptions("starter").assistants.map((a) => a.id);
 
-    for (const id of ["chatgpt", "perplexity", "gemini", "claude", "grok"]) {
+    for (const id of ["chatgpt", "perplexity", "claude", "grok"]) {
       expect(ids).toContain(id);
     }
   });
@@ -362,16 +384,17 @@ describe("ассистенты в форме расписания", () => {
     // По ней нет адаптера: галочка обещала бы измерение, которого не будет.
     const ids = capacityOptions("scale").assistants.map((a) => a.id);
     expect(ids).not.toContain("copilot");
+    // Gemini перестал измеряться — из формы он обязан исчезнуть так же,
+    // как поверхность без API: галочка обещала бы то, чего не будет.
+    expect(ids).not.toContain("gemini");
   });
 
-  it("на starter дорогие видны, но заперты и подписаны тарифом", () => {
+  it("на starter дорогой виден, но заперт и подписан тарифом", () => {
     const assistants = capacityOptions("starter").assistants;
 
-    for (const id of ["gemini", "claude"] as const) {
-      const locked = assistants.find((a) => a.id === id);
-      expect(locked?.allowed, `${id} должен быть заперт`).toBe(false);
-      expect(locked?.unlocksOn).toBe("growth");
-    }
+    const locked = assistants.find((a) => a.id === "claude");
+    expect(locked?.allowed).toBe(false);
+    expect(locked?.unlocksOn).toBe("growth");
 
     for (const id of ["chatgpt", "perplexity", "grok"] as const) {
       expect(assistants.find((a) => a.id === id)?.allowed).toBe(true);

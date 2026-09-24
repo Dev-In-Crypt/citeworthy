@@ -22,7 +22,7 @@ const { db, close } = createDb();
  * Нужен, чтобы пройти ветку живого режима, не уходя в сеть и не тратя
  * ключей. Тесты никогда не ходят наружу — это правило проекта.
  */
-for (const platform of ["chatgpt", "perplexity", "gemini"] as const) {
+for (const platform of ["chatgpt", "perplexity", "grok"] as const) {
   registerLiveAdapter(platform, () => new MockAdapter(platform));
 }
 
@@ -59,7 +59,7 @@ describe("usage counters", () => {
         .insert(runSchedules)
         .values({
           clientId: client.id,
-          platforms: ["chatgpt", "perplexity", "gemini"],
+          platforms: ["chatgpt", "perplexity", "grok"],
           samplesPerPrompt: 3,
         })
         .returning()

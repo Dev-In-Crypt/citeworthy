@@ -68,7 +68,7 @@ test("raw answers show highlighted client and competitor mentions", async ({ pag
   // Версия модели и стоимость видны у каждого ответа: без версии история
   // измерений несравнима между собой (провайдер меняет модель под тем же именем).
   // Имена моделей — из набора, который даёт младший тариф: свежее агентство
-  // сидит на нём, и Gemini ему не положен.
+  // сидит на нём.
   await expect(responses).toContainText("gpt-4o");
   await expect(responses).toContainText("grok-4-1-fast-fixture");
   await expect(responses.locator("> li").first()).toContainText("$0.");

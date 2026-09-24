@@ -20,7 +20,7 @@ async function main(): Promise<void> {
 
   const platform = process.argv[2] ?? "chatgpt";
   if (!isPlatform(platform)) {
-    throw new Error(`Unknown platform "${platform}". Use chatgpt, perplexity, gemini, claude or grok.`);
+    throw new Error(`Unknown platform "${platform}". Use chatgpt, perplexity, claude or grok.`);
   }
 
   const registered = registerLiveAdapters();

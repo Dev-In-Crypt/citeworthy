@@ -32,7 +32,7 @@ export const metadata: Metadata = {
 /** Выдуманный пример измерения. Совпадает с примером отчёта на витрине. */
 const EXAMPLE_SCOPE = [
   { item: "Buyer questions tracked", value: "24" },
-  { item: "Assistants asked", value: "ChatGPT, Perplexity, Gemini" },
+  { item: "Assistants asked", value: "ChatGPT, Perplexity, Grok" },
   { item: "Answers per question per assistant, per run", value: "3" },
   { item: "How often", value: "every two weeks" },
   { item: "Competitors compared", value: "4" },

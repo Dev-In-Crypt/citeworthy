@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ASSISTANTS } from "./catalogue";
 import { MockAdapter, stableHash } from "./mock";
 import {
   getAdapter,
@@ -140,14 +141,23 @@ describe("контракт адаптера", () => {
 
 describe("набор по умолчанию", () => {
   it("состоит из запускной тройки и входит в полный набор", () => {
-    expect([...DEFAULT_PLATFORMS]).toEqual(["chatgpt", "perplexity", "gemini"]);
+    expect([...DEFAULT_PLATFORMS]).toEqual(["chatgpt", "perplexity", "grok"]);
     for (const platform of DEFAULT_PLATFORMS) {
       expect(PLATFORMS).toContain(platform);
     }
   });
 
-  it("новые платформы не включаются сами: они требуют ключа и стоят денег", () => {
+  it("умолчание не предлагает того, кого мы не измеряем", () => {
+    // Gemini ушёл отсюда не из-за цены: его запрещают условия Google.
+    // Заводить нового клиента с ассистентом, по которому не будет ни одного
+    // ответа, — обещать измерение, которого не случится.
+    for (const platform of DEFAULT_PLATFORMS) {
+      expect(ASSISTANTS.find((a) => a.id === platform)?.measurable).toBe(true);
+    }
+    expect(DEFAULT_PLATFORMS).not.toContain("gemini");
+  });
+
+  it("дорогой ассистент сам не включается: он стоит денег, о которых не просили", () => {
     expect(DEFAULT_PLATFORMS).not.toContain("claude");
-    expect(DEFAULT_PLATFORMS).not.toContain("grok");
   });
 });

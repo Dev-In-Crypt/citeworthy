@@ -23,7 +23,7 @@ export const PLATFORMS: readonly Platform[] = PLATFORM_IDS;
 export const DEFAULT_PLATFORMS: readonly Platform[] = [
   "chatgpt",
   "perplexity",
-  "gemini",
+  "grok",
 ] as const;
 
 export interface Citation {

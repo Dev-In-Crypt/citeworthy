@@ -4,6 +4,7 @@ import {
   type AdaptersMode,
   type Platform,
 } from "@repo/core";
+import { isMeasurableAssistant } from "@repo/core";
 import { capabilitiesFor } from "@repo/core/config/measurement";
 import {
   createResponse,
@@ -153,7 +154,28 @@ export async function orchestrateRun(
    * агентство не узнало бы, что охват неполный.
    */
   const plan = agencyId ? (await entitlementsForAgency(db, agencyId)).plan : "starter";
-  const platforms = (schedule?.platforms ?? capabilitiesFor(plan).defaultAssistants) as Platform[];
+  /**
+   * Из сохранённого расписания отсеиваются те, кого продукт больше не
+   * измеряет.
+   *
+   * Расписание переживает решение перестать измерять платформу: строку с
+   * ним никто не переписывает — данные мы не трогаем. Поэтому набор
+   * сверяется с каталогом в момент прогона. Иначе клиент, у которого
+   * Gemini включён с прошлого года, продолжал бы его опрашивать после
+   * того, как измерять его стало нельзя.
+   *
+   * Фильтр только по этому признаку. Ассистент, которого расписание
+   * содержит, а тариф больше не разрешает (агентство перешло на младший),
+   * здесь не трогается: форма показывает его включённым, и молча не
+   * измерять то, что человек видит включённым, — ровно та тихая подмена,
+   * от которой продукт уходит. Расхождение закрывается на экране, а не
+   * здесь.
+   */
+  const platforms = (
+    schedule
+      ? schedule.platforms.filter((id) => isMeasurableAssistant(id))
+      : [...capabilitiesFor(plan).defaultAssistants]
+  ) as Platform[];
   const samples = schedule?.samplesPerPrompt ?? 3;
 
   const prompts = await listActivePromptsForClient(db, run.clientId);

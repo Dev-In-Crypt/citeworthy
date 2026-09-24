@@ -301,7 +301,7 @@ export default function ProductPage() {
               </div>
             </div>
             <div className="tape-item">
-              <div className="src"><span>Gemini · answer 3 of 3</span><span>25 Jun</span></div>
+              <div className="src"><span>Grok · answer 3 of 3</span><span>25 Jun</span></div>
               <q>
                 On review sites, <span className="nm-comp">Loambox</span> and{" "}
                 <span className="nm-comp">Quillstack</span> collect the most studio reviews …

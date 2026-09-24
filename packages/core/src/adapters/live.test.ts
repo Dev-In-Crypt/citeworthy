@@ -23,16 +23,27 @@ describe("registerLiveAdapters", () => {
     expect(registerLiveAdapters({ XAI_API_KEY: "x" })).toEqual(["grok"]);
   });
 
-  it("все пять платформ подключаются своими ключами", () => {
+  it("измеряемые платформы подключаются своими ключами", () => {
     const registered = registerLiveAdapters({
       OPENAI_API_KEY: "o",
       PERPLEXITY_API_KEY: "p",
-      GEMINI_API_KEY: "g",
       ANTHROPIC_API_KEY: "a",
       XAI_API_KEY: "x",
     });
 
-    expect(registered.sort()).toEqual(["chatgpt", "claude", "gemini", "grok", "perplexity"]);
+    expect(registered.sort()).toEqual(["chatgpt", "claude", "grok", "perplexity"]);
+  });
+
+  it("Gemini не подключается даже с ключом", () => {
+    /**
+     * Условия Google запрещают то, ради чего продукт существует. Выключено
+     * здесь, а не забытой галочкой в расписании: заданный ключ не должен
+     * означать, что вызов возможен.
+     */
+    const registered = registerLiveAdapters({ GEMINI_API_KEY: "g" });
+
+    expect(registered).toEqual([]);
+    expect(() => getAdapter("gemini", "live")).toThrow(/No live adapter/);
   });
 
   it("зарегистрированные Claude и Grok отдаются реестром в live-режиме", () => {

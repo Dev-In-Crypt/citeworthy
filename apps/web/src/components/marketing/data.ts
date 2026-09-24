@@ -88,7 +88,7 @@ function evidenceRow(assistant: string, named: number, answers: number): Evidenc
 export const EVIDENCE_ROWS: EvidenceRow[] = [
   evidenceRow("ChatGPT", 48, PER_ASSISTANT),
   evidenceRow("Perplexity", 37, PER_ASSISTANT),
-  evidenceRow("Gemini", 39, PER_ASSISTANT),
+  evidenceRow("Grok", 39, PER_ASSISTANT),
 ];
 
 export const EVIDENCE_TOTAL = evidenceRow(
@@ -130,7 +130,7 @@ export function periodMean(series: number[], [from, to]: readonly [number, numbe
 
 /* ---------------- промпт × ассистент ---------------- */
 
-export const MATRIX_ASSISTANTS = ["ChatGPT", "Perplexity", "Gemini", "Claude", "Grok"] as const;
+export const MATRIX_ASSISTANTS = ["ChatGPT", "Perplexity", "Grok", "Claude"] as const;
 
 /** Число — доля ответов; "floor" — ниже порога сэмплов; null — ассистента не спрашивают. */
 export type MatrixCell = number | "floor" | null;

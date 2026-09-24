@@ -96,7 +96,7 @@ describe("seed", () => {
     const rows = await db.select().from(runSchedules).where(eq(runSchedules.id, SEED_SCHEDULE_ID));
     const schedule = rows[0];
 
-    expect(schedule?.platforms).toEqual(["chatgpt", "perplexity", "gemini"]);
+    expect(schedule?.platforms).toEqual(["chatgpt", "perplexity", "grok"]);
     // Контракт C3: visibility считается по доле, поэтому сэмплов минимум 3.
     expect(schedule?.samplesPerPrompt).toBeGreaterThanOrEqual(3);
   });

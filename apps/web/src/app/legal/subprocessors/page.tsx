@@ -43,12 +43,6 @@ const ASSISTANT_ROWS: Row[] = [
     where: "United States",
   },
   {
-    name: "Google",
-    purpose: "Answers the tracked questions as Gemini",
-    data: "The question text and the brand and competitor names in it",
-    where: "United States",
-  },
-  {
     name: "Anthropic",
     purpose: "Answers the tracked questions as Claude, when switched on for a client",
     data: "The question text and the brand and competitor names in it",
@@ -56,7 +50,7 @@ const ASSISTANT_ROWS: Row[] = [
   },
   {
     name: "xAI",
-    purpose: "Answers the tracked questions as Grok, when switched on for a client",
+    purpose: "Answers the tracked questions as Grok",
     data: "The question text and the brand and competitor names in it",
     where: "United States",
   },

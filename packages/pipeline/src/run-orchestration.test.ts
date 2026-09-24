@@ -24,7 +24,7 @@ describe("planRunJobs", () => {
   ];
 
   it("раскладывает прогон в промпт × платформа × сэмпл", () => {
-    const jobs = planRunJobs("run-1", twoPrompts, ["chatgpt", "perplexity", "gemini"], 3);
+    const jobs = planRunJobs("run-1", twoPrompts, ["chatgpt", "perplexity", "grok"], 3);
     expect(jobs).toHaveLength(18);
   });
 
@@ -79,7 +79,7 @@ describe("orchestrateRun (mock-режим)", () => {
         .values({
           clientId,
           cadence: "weekly",
-          platforms: ["chatgpt", "perplexity", "gemini"],
+          platforms: ["chatgpt", "perplexity", "grok"],
           samplesPerPrompt: 3,
         })
         .returning()
@@ -136,7 +136,7 @@ describe("orchestrateRun (mock-режим)", () => {
     const written = await listResponsesByRun(db, runId);
 
     const platforms = new Set(written.map((r) => r.platform));
-    expect([...platforms].sort()).toEqual(["chatgpt", "gemini", "perplexity"]);
+    expect([...platforms].sort()).toEqual(["chatgpt", "grok", "perplexity"]);
 
     const perPlatform = written.filter((r) => r.platform === "chatgpt");
     expect(perPlatform).toHaveLength(6); // 2 промпта × 3 сэмпла
@@ -162,6 +162,25 @@ describe("orchestrateRun (mock-режим)", () => {
     expect([...platforms].sort()).toEqual(
       [...capabilitiesFor(DEFAULT_PLAN).defaultAssistants].sort(),
     );
+  });
+
+  it("платформа, которую перестали измерять, из старого расписания выпадает", async () => {
+    /**
+     * Расписание переживает такое решение: строку с ним никто не
+     * переписывает, потому что данные мы не удаляем. Значит прогон обязан
+     * сверяться с каталогом сам — иначе клиент, у которого Gemini включён
+     * с прошлого года, продолжал бы его опрашивать.
+     */
+    await db
+      .update(runSchedules)
+      .set({ platforms: ["chatgpt", "gemini"] })
+      .where(eq(runSchedules.id, scheduleId));
+
+    const outcome = await orchestrateRun(db, runId, "mock");
+    const written = await listResponsesByRun(db, runId);
+
+    expect(outcome.status).toBe("done");
+    expect([...new Set(written.map((r) => r.platform))]).toEqual(["chatgpt"]);
   });
 
   it("Claude и Grok измеряются, когда включены в расписании клиента", async () => {

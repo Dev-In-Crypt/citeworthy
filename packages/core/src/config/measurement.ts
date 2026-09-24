@@ -1,5 +1,6 @@
 import { PLAN_LIMITS } from "../billing/period";
 import type { PlanId } from "../billing/entitlements";
+import { ASSISTANTS } from "../adapters/catalogue";
 import { DEFAULT_PLATFORMS, PLATFORM_IDS, type Platform } from "../adapters/types";
 
 /**
@@ -39,16 +40,14 @@ export interface MeasurementCapabilities {
  * Ассистенты, доступные на младшем тарифе.
  *
  * Три самых дешёвых ответа: Perplexity ($0.0116), Grok ($0.0220),
- * ChatGPT ($0.0242). Дорогие — Gemini ($0.0550) и Claude ($0.0560) —
- * начинаются с Growth: разброс цены между самым дешёвым и самым дорогим
- * почти пятикратный, и на Starter он съедал бы маржу быстрее всего
- * (см. docs/cost-model.md).
+ * ChatGPT ($0.0242). Дорогой Claude ($0.0560) начинается с Growth:
+ * разброс цены между самым дешёвым и самым дорогим почти пятикратный, и
+ * на Starter он съедал бы маржу быстрее всего (docs/cost-model.md).
  *
- * Gemini уехал со Starter не только из-за цены. Условия Google на
- * grounded-поиск запрещают хранить и анализировать результаты так, как
- * это делает продукт (docs/open-questions/gemini-grounding.md). Пока
- * вопрос не решён, чем меньше клиентов измеряется Gemini по умолчанию,
- * тем меньше цена ошибки.
+ * Gemini здесь когда-то стоял и уехал не из-за цены: условия Google на
+ * grounded-поиск запрещают анализировать результаты и строить из них
+ * индекс, а продукт делает ровно это. Его больше не измеряет ни один
+ * тариф (docs/open-questions/gemini-grounding.md).
  */
 const STARTER_ASSISTANTS: readonly Platform[] = ["chatgpt", "perplexity", "grok"] as const;
 
@@ -65,10 +64,21 @@ const STARTER_ASSISTANTS: readonly Platform[] = ["chatgpt", "perplexity", "grok"
  */
 const WITHOUT_DAILY: readonly Cadence[] = ["biweekly", "weekly"] as const;
 
+/**
+ * Все, кого мы действительно спрашиваем.
+ *
+ * Не весь `PLATFORM_IDS`: значение остаётся в enum базы, пока по нему есть
+ * записанные ответы, даже когда платформу перестали измерять. Разрешить
+ * тарифу то, чего продукт не делает, значит продать несуществующее.
+ */
+const MEASURABLE: readonly Platform[] = PLATFORM_IDS.filter((id) =>
+  ASSISTANTS.some((assistant) => assistant.id === id && assistant.measurable),
+);
+
 const ALL_ASSISTANTS: MeasurementCapabilities = {
   promptsPerClient: null,
   cadences: CADENCES,
-  assistants: PLATFORM_IDS,
+  assistants: MEASURABLE,
   defaultAssistants: DEFAULT_PLATFORMS,
 };
 

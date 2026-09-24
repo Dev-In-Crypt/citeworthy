@@ -2,7 +2,6 @@ import { registerLiveAdapter } from "./registry";
 import { OpenAiAdapter } from "./openai";
 import type { ReasoningEffort } from "./openai";
 import { PerplexityAdapter } from "./perplexity";
-import { GeminiAdapter } from "./gemini";
 import { ClaudeAdapter } from "./claude";
 import { GrokAdapter } from "./grok";
 
@@ -49,21 +48,17 @@ export function registerLiveAdapters(env: NodeJS.ProcessEnv = process.env): stri
     registered.push("perplexity");
   }
 
-  const geminiKey = env["GEMINI_API_KEY"]?.trim();
-  if (geminiKey) {
-    const model = env["GEMINI_MODEL"]?.trim();
-    const endpoint = env["GEMINI_ENDPOINT"]?.trim();
-    registerLiveAdapter(
-      "gemini",
-      () =>
-        new GeminiAdapter({
-          apiKey: geminiKey,
-          ...(model ? { model } : {}),
-          ...(endpoint ? { endpoint } : {}),
-        }),
-    );
-    registered.push("gemini");
-  }
+  /**
+   * Gemini не регистрируется, даже когда ключ задан.
+   *
+   * Условия Google на grounded-поиск запрещают анализировать результаты,
+   * собирать из них ссылки программно и строить индекс, а хранить
+   * разрешают до двух лет и только ради улучшения отображения. Продукт
+   * делает ровно запрещённое. Класс адаптера оставлен и покрыт тестами:
+   * он верен и понадобится, если условия изменятся, — но запускать его
+   * нельзя, и выключено это здесь, а не забытой галочкой в расписании.
+   * Разбор условий — docs/open-questions/gemini-grounding.md.
+   */
 
   const claudeKey = env["ANTHROPIC_API_KEY"]?.trim();
   if (claudeKey) {

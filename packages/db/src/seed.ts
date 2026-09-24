@@ -179,7 +179,16 @@ export async function seed(db: Database): Promise<void> {
         intent: "purchase",
       },
     ])
-    .onConflictDoNothing({ target: promptClusters.id });
+    /**
+     * Обновляем, а не пропускаем — по той же причине, что и клиентов выше:
+     * пропуск означает, что правка в этом файле не доезжает до уже
+     * заведённой базы, разработчик видит старое, CI на чистой базе новое, и
+     * расходится это молча.
+     */
+    .onConflictDoUpdate({
+      target: promptClusters.id,
+      set: { name: sql`excluded.name`, intent: sql`excluded.intent` },
+    });
 
   /**
    * Промпты без фиксированных id, поэтому пустоту проверяем по каждому
@@ -216,10 +225,18 @@ export async function seed(db: Database): Promise<void> {
       id: SEED_SCHEDULE_ID,
       clientId: SEED_CLIENT_ACME_ID,
       cadence: "weekly",
-      platforms: ["chatgpt", "perplexity", "gemini"],
+      platforms: ["chatgpt", "perplexity", "grok"],
       samplesPerPrompt: 3,
     })
-    .onConflictDoNothing({ target: runSchedules.id });
+    /** Тот же довод: расписание в файле — это расписание, которое увидят. */
+    .onConflictDoUpdate({
+      target: runSchedules.id,
+      set: {
+        cadence: sql`excluded.cadence`,
+        platforms: sql`excluded.platforms`,
+        samplesPerPrompt: sql`excluded.samples_per_prompt`,
+      },
+    });
 }
 
 async function main(): Promise<void> {

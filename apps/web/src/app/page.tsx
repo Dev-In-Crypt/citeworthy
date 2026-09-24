@@ -55,7 +55,7 @@ export default async function HomePage() {
               Answer “Are we in ChatGPT?” <em>with numbers that show their work.</em>
             </h1>
             <p className="lead">
-              Citeworthy asks ChatGPT, Perplexity and Gemini the questions your client’s buyers ask,
+              Citeworthy asks ChatGPT, Perplexity and Grok the questions your client’s buyers ask,
               several times each. {MARKETING_COPY.evidencePromise} Your client gets it as a report in
               your brand.
             </p>
@@ -76,9 +76,8 @@ export default async function HomePage() {
               <div className="chip-row" aria-label="Assistants measured">
                 <span className="a-chip">ChatGPT</span>
                 <span className="a-chip">Perplexity</span>
-                <span className="a-chip">Gemini</span>
+                <span className="a-chip">Grok</span>
                 <span className="a-chip opt">Claude · per client</span>
-                <span className="a-chip opt">Grok · per client</span>
               </div>
             </div>
           </div>

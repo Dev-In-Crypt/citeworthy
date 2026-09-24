@@ -51,7 +51,16 @@ export default defineConfig({
     command: `pnpm build && pnpm start --port ${PORT}`,
     url: baseURL,
     reuseExistingServer: !process.env.CI,
-    timeout: 180_000,
+    /**
+     * Лимит на «собраться и подняться», а не на один тест.
+     *
+     * Здесь стояло три минуты, и production-сборка в них перестала
+     * помещаться — на этой машине она занимает три с небольшим. Лимит ниже
+     * реального времени сборки не защищает ни от чего: он превращает
+     * медленную машину в красный прогон, и разбирать потом приходится не
+     * тест, а погоду.
+     */
+    timeout: 600_000,
     env: {
       BETTER_AUTH_URL: baseURL,
       NEXT_PUBLIC_APP_URL: baseURL,

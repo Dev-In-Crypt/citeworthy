@@ -144,7 +144,7 @@ export const AUDIT_STEPS: { text: string; who: { label: string; ours?: boolean }
     who: [{ label: "drafted for you", ours: true }, { label: "you edit" }],
   },
   {
-    text: "Run the audit: every question, three times, on ChatGPT, Perplexity and Gemini",
+    text: "Run the audit: every question, three times, on ChatGPT, Perplexity and Grok",
     who: [{ label: "the product asks", ours: true }],
   },
   {

@@ -31,7 +31,17 @@ export interface Assistant {
 export const ASSISTANTS: readonly Assistant[] = [
   { id: "chatgpt", label: "ChatGPT", short: "GPT", measurable: true },
   { id: "perplexity", label: "Perplexity", short: "Pplx", measurable: true },
-  { id: "gemini", label: "Gemini", short: "Gemini", measurable: true },
+  /**
+   * Назван, но не измеряется — и мешает этому не техника.
+   *
+   * Адаптер написан, покрыт тестами и работает. Условия Google на
+   * grounded-поиск прямо запрещают анализировать результаты, собирать из
+   * них ссылки программно и строить индекс, а хранить разрешают до двух
+   * лет и только чтобы улучшить их отображение. Продукт делает ровно
+   * перечисленное и хранит постоянно — иначе цифру нельзя перепроверить.
+   * Подробности и что проверялось — docs/open-questions/gemini-grounding.md.
+   */
+  { id: "gemini", label: "Gemini", short: "Gemini", measurable: false },
   { id: "claude", label: "Claude", short: "Claude", measurable: true },
   { id: "copilot", label: "Copilot", short: "Copilot", measurable: false },
   { id: "ai-overviews", label: "AI Overviews", short: "AIO", measurable: false },

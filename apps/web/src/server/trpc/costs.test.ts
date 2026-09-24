@@ -49,7 +49,7 @@ describe("billing.costs", () => {
 
   async function addResponse(
     clientId: string,
-    platform: "chatgpt" | "perplexity" | "gemini",
+    platform: "chatgpt" | "perplexity" | "grok",
     costUsd: string,
     createdAt: Date,
     sampleIndex = 0,
@@ -98,7 +98,7 @@ describe("billing.costs", () => {
     await addResponse(acmeId, "chatgpt", "0.004500", IN_PERIOD);
     await addResponse(acmeId, "chatgpt", "0.005500", IN_PERIOD, 1);
     await addResponse(acmeId, "perplexity", "0.002000", IN_PERIOD);
-    await addResponse(globexId, "gemini", "0.010000", IN_PERIOD);
+    await addResponse(globexId, "grok", "0.010000", IN_PERIOD);
 
     const result = await caller(agencyId).billing.costs({ period: PERIOD });
 
