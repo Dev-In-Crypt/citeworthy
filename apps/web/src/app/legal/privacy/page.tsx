@@ -157,9 +157,9 @@ export default function PrivacyPage() {
 
       <h2>Cookies</h2>
       <p>
-        The product sets a cookie to keep you signed in and one to remember whether you chose the
-        dark theme. Both are necessary for the thing you asked for, and there is no advertising or
-        analytics cookie. The public report page sets nothing at all.
+        Signed into the product, one cookie keeps you signed in. That is the only one. The marketing
+        site and the client report page set none at all, and there is no advertising or analytics
+        cookie anywhere. Details are on the <Link href="/legal/cookies">cookies page</Link>.
       </p>
 
       <h2>Your rights</h2>

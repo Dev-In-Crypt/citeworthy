@@ -20,6 +20,7 @@ const DOCS = [
   { href: "/legal/privacy", label: "Privacy policy" },
   { href: "/legal/dpa", label: "Data processing" },
   { href: "/legal/subprocessors", label: "Sub-processors" },
+  { href: "/legal/cookies", label: "Cookies" },
   { href: "/legal/acceptable-use", label: "Acceptable use" },
   { href: "/legal/refunds", label: "Billing and refunds" },
 ] as const;

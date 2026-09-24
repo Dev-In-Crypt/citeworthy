@@ -135,6 +135,7 @@ export function MarketingFooter() {
             <Link href="/legal/privacy">Privacy</Link>
             <Link href="/legal/dpa">Data processing</Link>
             <Link href="/legal/subprocessors">Sub-processors</Link>
+            <Link href="/legal/cookies">Cookies</Link>
           </span>
           <span>© 2026 Citeworthy</span>
         </div>
