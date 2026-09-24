@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Code2, CreditCard, FileText, Settings, Users, Wallet } from "lucide-react";
+import { BarChart3, CreditCard, FileText, Settings, Users } from "lucide-react";
+import { api } from "@/trpc/react";
 import { cn } from "@/lib/utils";
 import { SignOutButton } from "@/components/sign-out-button";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -11,15 +12,18 @@ import { Mark } from "@/components/ui/mark";
 /**
  * Каркас приложения.
  *
- * Пункты разделены на две группы, потому что это два разных занятия. Работа с
- * клиентами — то, зачем сюда заходят каждый день; счёт, ключи и тариф — то,
- * куда заходят раз в месяц. Одним плоским списком из шести пунктов они
- * выглядели равнозначными, и глазу приходилось перечитывать весь список,
- * чтобы найти нужное.
+ * Разделено не по смыслу, а по частоте. Сверху три пункта, ради которых
+ * сюда заходят каждый день; внизу, прижатое к подписи агентства, — то, что
+ * открывают раз в месяц. Семь равнозначных пунктов заставляли перечитывать
+ * весь список, а три из них были нужны один раз в тридцать дней.
  *
- * Внизу сайдбара — агентство и текущий пользователь: сверху продукт, снизу
- * тот, кто в нём работает. Раньше имя агентства стояло сверху и читалось так,
- * будто приложение принадлежит ему; принадлежит ему только отчёт клиенту.
+ * Заголовков у групп нет: разделение читается расстоянием и чертой. Слово
+ * «Account» ничего не добавляло — внизу и так стоит имя агентства.
+ *
+ * «Plan and usage» — один пункт, потому что это один вопрос: сколько
+ * осталось и сколько за это платить. Рядом с ним стоит доля
+ * израсходованных проверок — единственное число, за которым агентство
+ * ходило на отдельный экран между делом.
  */
 
 const WORK = [
@@ -28,14 +32,12 @@ const WORK = [
   { href: "/reports", label: "Reports", icon: FileText },
 ] as const;
 
-const ACCOUNT = [
+const AGENCY = [
+  { href: "/settings/billing", label: "Plan and usage", icon: CreditCard },
   { href: "/settings", label: "Settings", icon: Settings },
-  { href: "/settings/usage", label: "Usage", icon: Wallet },
-  { href: "/settings/billing", label: "Plan", icon: CreditCard },
-  { href: "/settings/api", label: "API", icon: Code2 },
 ] as const;
 
-const NAV = [...WORK, ...ACCOUNT];
+const NAV = [...WORK, ...AGENCY];
 
 /**
  * Подсвечивается самый длинный подходящий пункт: иначе на /settings/usage
@@ -57,7 +59,7 @@ function NavGroup({
   current,
   label,
 }: {
-  items: typeof WORK | typeof ACCOUNT;
+  items: typeof WORK | typeof AGENCY;
   current: string | undefined;
   label?: string;
 }) {
@@ -88,11 +90,49 @@ function NavGroup({
               className={cn("size-4 shrink-0", active ? "text-primary" : "text-muted-foreground")}
               aria-hidden
             />
-            {text}
+            <span className="min-w-0 flex-1 truncate">{text}</span>
+            {href === "/settings/billing" && <UsageBadge />}
           </Link>
         );
       })}
     </div>
+  );
+}
+
+/**
+ * Доля израсходованных проверок — прямо в пункте меню.
+ *
+ * Молчит, пока данных нет: значок, показывающий ноль на незагруженном
+ * запросе, читался бы как «ничего не потрачено». Пока месяц не начался
+ * тратиться, тоже молчит — 0% ничего не сообщает и только шумит.
+ *
+ * Перерасход красится, но ничего не отключает: обещание «перерасход не
+ * режет посреди месяца» дано на странице тарифов, и значок ему не
+ * противоречит — он предупреждает, а не угрожает.
+ */
+function UsageBadge() {
+  const usage = api.billing.usage.useQuery(undefined, {
+    // Цифра меняется прогонами, а не переходами между экранами.
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  });
+
+  const checks = usage.data?.aiChecks;
+  if (!checks || checks.used === 0) return null;
+
+  const pct = Math.round(checks.ratio * 100);
+
+  return (
+    <span
+      data-testid="nav-usage"
+      title={`${checks.used.toLocaleString("en-US")} of ${checks.allowance.toLocaleString("en-US")} AI checks used this month`}
+      className={cn(
+        "metric shrink-0 text-[11px] tabular-nums",
+        checks.overAllowance ? "text-destructive" : "text-muted-foreground",
+      )}
+    >
+      {pct}%
+    </span>
   );
 }
 
@@ -119,14 +159,17 @@ export function AppShell({
           Citeworthy
         </Link>
 
-        <nav className="flex flex-col gap-5">
+        <nav className="flex flex-col">
           <NavGroup items={WORK} current={current} />
-          <NavGroup items={ACCOUNT} current={current} label="Account" />
         </nav>
 
-        {/* Прижато к низу: кто здесь работает — справочная информация, а не
-            то, с чего начинают читать экран. */}
-        <div className="mt-auto border-t px-2 pt-3">
+        {/* Хозяйство агентства прижато к низу, к его же имени: сверху то,
+            ради чего заходят, снизу то, что открывают раз в месяц. */}
+        <nav className="mt-auto flex flex-col border-t pt-3">
+          <NavGroup items={AGENCY} current={current} />
+        </nav>
+
+        <div className="mt-3 border-t px-2 pt-3">
           <p className="truncate text-sm font-medium" title={agencyName}>
             {agencyName}
           </p>

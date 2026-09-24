@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { headers } from "next/headers";
 import { createDb, getAgencyById } from "@repo/db";
 import { auth } from "@/lib/auth";
@@ -17,6 +18,16 @@ export default async function SettingsPage() {
         <PageHeader
           title="Settings"
           description="Agency profile, white-label branding and team. Reports carry your brand, never ours."
+          action={
+            /* Ключи ушли из навигации: заходят за ними редко, а искать
+               их станут здесь — это и есть настройки агентства. */
+            <Link
+              href="/settings/api"
+              className="text-sm text-primary underline-offset-4 hover:underline"
+            >
+              API keys →
+            </Link>
+          }
         />
         <SettingsForm
           initialName={agency?.name ?? ""}
