@@ -95,9 +95,17 @@ export async function executeRunJob(
   // поэтому раскладываются сразу; упоминания разбирает ParseJob.
   await storeCitations(db, response.id, result.citations);
 
-  // Расход считается после успешной записи: неудавшийся вызов не должен
-  // попадать в счёт агентству.
-  const agencyId = job.agencyId ?? (await getAgencyIdForRun(db, job.runId));
+  /**
+   * Расход считается после успешной записи: неудавшийся вызов не должен
+   * попадать в счёт агентству.
+   *
+   * Прогон на заглушках в расход не идёт вовсе: ассистента никто не
+   * спрашивал, денег он не стоил, и записывать его в израсходованные
+   * проверки значит выставлять агентству счёт за то, чего не было. Экран
+   * расхода это и так утверждает отдельной строкой — теперь счётчик с ним
+   * согласен. Заодно бесплатный аудит не съедает сам себя в демо-режиме.
+   */
+  const agencyId = mode === "live" ? (job.agencyId ?? (await getAgencyIdForRun(db, job.runId))) : null;
   if (agencyId) {
     await incrementAiChecks(db, agencyId, billingPeriod());
   }

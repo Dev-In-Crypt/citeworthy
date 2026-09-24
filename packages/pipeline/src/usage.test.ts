@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
-import { billingPeriod } from "@repo/core";
+import { billingPeriod, MockAdapter, registerLiveAdapter } from "@repo/core";
 import {
   createAgency,
   createClient,
@@ -15,6 +15,16 @@ import { orchestrateRun } from "./run-orchestration";
 /** Verify T20: прогон из T17 (18 ответов) увеличивает счётчик ровно на 18. */
 
 const { db, close } = createDb();
+
+/**
+ * Подставной живой адаптер: та же реализация, что у заглушек.
+ *
+ * Нужен, чтобы пройти ветку живого режима, не уходя в сеть и не тратя
+ * ключей. Тесты никогда не ходят наружу — это правило проекта.
+ */
+for (const platform of ["chatgpt", "perplexity", "gemini"] as const) {
+  registerLiveAdapter(platform, () => new MockAdapter(platform));
+}
 
 describe("usage counters", () => {
   let agencyId = "";
@@ -66,11 +76,22 @@ describe("usage counters", () => {
     await close();
   });
 
-  it("прогон на 18 ответов увеличивает счётчик ровно на 18", async () => {
-    await orchestrateRun(db, runId, "mock");
+  it("живой прогон на 18 ответов увеличивает счётчик ровно на 18", async () => {
+    // Живой режим с подставным адаптером: в сеть тест не ходит, но проходит
+    // ровно ту ветку, по которой расход и считается.
+    await orchestrateRun(db, runId, "live");
 
     const counter = await getUsageCounter(db, agencyId, billingPeriod());
     expect(counter?.aiChecksUsed).toBe(18);
+  });
+
+  it("прогон на заглушках в расход не идёт", async () => {
+    // Ассистента никто не спрашивал и денег он не стоил: записать такой
+    // прогон в израсходованные проверки значит выставить счёт за то, чего
+    // не было. Экран расхода это и так утверждает отдельной строкой.
+    await orchestrateRun(db, runId, "mock");
+
+    expect(await getUsageCounter(db, agencyId, billingPeriod())).toBeUndefined();
   });
 
   it("инкремент атомарен при параллельных вызовах", async () => {
