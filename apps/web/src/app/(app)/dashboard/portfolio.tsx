@@ -115,8 +115,16 @@ export function Portfolio() {
                   row.deltaPp !== null && row.deltaPp > 0 && "text-client-ink",
                   row.deltaPp !== null && row.deltaPp < 0 && "text-competitor-ink",
                 )}
+                /* Прочерк без причины читается как поломка экрана. */
+                title={
+                  row.deltaBasis === "same" ? undefined : MEASUREMENT_COPY.assistantSetChanged
+                }
               >
-                {formatPp(row.deltaPp)}
+                <span
+                  data-testid={row.deltaBasis === "same" ? undefined : "portfolio-basis-changed"}
+                >
+                  {formatPp(row.deltaPp)}
+                </span>
               </TD>
               <TD>
                 <span

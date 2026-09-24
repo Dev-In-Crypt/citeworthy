@@ -5,9 +5,12 @@ import {
   buildRecommendations,
   buildReportPayload,
   collapsePromptFacts,
+  compareAssistantSets,
   computeMovement,
   computePromptMatrix,
   diagnose,
+  measuredAssistants,
+  restrictToAssistants,
   PROPOSAL_CAVEATS,
   PROPOSAL_DEFAULTS,
   REPORT_COPY,
@@ -224,6 +227,48 @@ export const reportsRouter = router({
       ];
 
       /**
+       * Составы ассистентов на обоих концах периода — по срезам, а не по
+       * расписанию: важно, кто ответил, а не кого просили спросить.
+       *
+       * Берутся крайние недели периода. Именно они стоят в отчёте как
+       * «было» и «стало», и именно их знаменатели обязаны совпадать.
+       */
+      const platformRows = snapshotRows.filter(
+        (row) =>
+          row.clusterId === null &&
+          row.platform !== null &&
+          row.periodStart >= periodStart &&
+          row.periodStart <= periodEnd,
+      );
+      const weeks = [...new Set(platformRows.map((row) => row.periodStart.getTime()))].sort(
+        (a, b) => a - b,
+      );
+      const cellsOfWeek = (at: number | undefined) =>
+        platformRows
+          .filter((row) => row.periodStart.getTime() === at)
+          .map((row) => ({
+            assistantId: row.platform as string,
+            sampleCount: row.sampleCount,
+            clientVisibilityPct: Number(row.clientVisibilityPct),
+          }));
+
+      const firstCells = cellsOfWeek(weeks.at(0));
+      const lastCells = cellsOfWeek(weeks.at(-1));
+
+      /**
+       * Передаём только тогда, когда состав известен на обоих концах.
+       *
+       * Отсутствие срезов по платформам — это не «набор менялся», а «мы не
+       * знаем». Стереть на этом основании разницу, которую агентство уже
+       * показывало клиенту, значило бы сломать отчёт там, где никаких
+       * оснований для тревоги нет.
+       */
+      const assistantCells =
+        firstCells.length > 0 && lastCells.length > 0
+          ? { first: firstCells, last: lastCells }
+          : undefined;
+
+      /**
        * Движение по отдельным вопросам за период против такого же окна перед
        * ним. Считается по тем же ответам, что и экран клиента, и попадает
        * в отчёт только там, где обе выборки набрали порог: вопрос, который
@@ -244,33 +289,49 @@ export const reportsRouter = router({
         clusterId: prompt.clusterId,
       }));
 
-      const currentMatrix = computePromptMatrix({
+      const currentInput = {
         records: collapsePromptFacts(currentFacts),
         prompts: promptRows,
         from: periodStart,
         to: periodEnd,
-      });
-      const previousMatrix = computePromptMatrix({
+      };
+      const previousInput = {
         records: collapsePromptFacts(previousFacts),
         prompts: promptRows,
         from: previousStart,
         to: periodStart,
-      });
+      };
 
-      const deltas = new Map(
-        computeMovement(currentMatrix, previousMatrix).map((entry) => [
-          entry.promptId,
-          entry.deltaPp,
-        ]),
+      const currentMatrix = computePromptMatrix(currentInput);
+      const previousMatrix = computePromptMatrix(previousInput);
+
+      /**
+       * Движение считается по ассистентам, которых мерили в обоих окнах.
+       *
+       * Иначе включённый или выключенный ассистент попадает в отчёт клиенту
+       * как результат работы агентства: знаменатель доли другой, число
+       * поехало, и выборка этот сдвиг подтвердит — интервалы не пересекутся.
+       */
+      const movementBasis = compareAssistantSets(
+        measuredAssistants(currentMatrix),
+        measuredAssistants(previousMatrix),
       );
+      const comparable =
+        movementBasis.delta === "show"
+          ? { current: currentMatrix, previous: previousMatrix }
+          : {
+              current: restrictToAssistants(currentInput, movementBasis.shared),
+              previous: restrictToAssistants(previousInput, movementBasis.shared),
+            };
+
+      const movementEntries = computeMovement(comparable.current, comparable.previous);
+      const deltas = new Map(movementEntries.map((entry) => [entry.promptId, entry.deltaPp]));
 
       const distinguishable = new Set(
-        computeMovement(currentMatrix, previousMatrix)
-          .filter((entry) => entry.distinguishable)
-          .map((entry) => entry.promptId),
+        movementEntries.filter((entry) => entry.distinguishable).map((entry) => entry.promptId),
       );
 
-      const movement = currentMatrix.rows
+      const movement = comparable.current.rows
         // В отчёт клиенту идёт только то, что выборка действительно различает:
         // «+3 pp», неотличимые от шума, читаются как результат работы.
         .filter(
@@ -321,6 +382,7 @@ export const reportsRouter = router({
         periodEnd,
         snapshots,
         measuredPlatforms,
+        ...(assistantCells ? { assistantCells } : {}),
         completedActions: completedActions.map((action) => ({
           title: action.title,
           actionType: action.actionType,

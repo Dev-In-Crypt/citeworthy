@@ -3,6 +3,7 @@
  *
  * Инвариант 2 (CLAUDE.md): слова, заявляющие доказанную причинность, запрещены —
  * их точный список и машинная проверка живут в copy.honesty.test.ts.
+ *
  * Разрешены «estimated», «confidence», «evidence». Причина не в юридической
  * осторожности: спек прямо запрещает изображать причинность, которой нет —
  * измерить её на одном клиенте невозможно, а обещание, которое нельзя сдержать,
@@ -11,6 +12,8 @@
  * Все такие строки живут здесь, а не в компонентах, чтобы их можно было
  * проверить одним grep-тестом (T46).
  */
+
+import type { AssistantSetComparison } from "./metrics/comparability";
 
 export const CONFIDENCE_LABELS = {
   low: "Confidence: low",
@@ -60,6 +63,23 @@ export const MEASUREMENT_COPY = {
    */
   observedTogether:
     "Observed during the same period. Shown side by side because both moved, not because one produced the other.",
+  /**
+   * Состав измеренных ассистентов между периодами изменился.
+   *
+   * Стоит рядом с числом, а не в сноске: доля считается от тех ответов, что
+   * есть, и включённый или выключенный ассистент двигает её сам по себе.
+   */
+  assistantSetChanged:
+    "The set of assistants measured changed between these periods, so the two figures do not rest on the same answers.",
+  /** По какому набору посчитано изменение; %ASSISTANTS% подставляется. */
+  assistantSetComparedOn:
+    "Change worked out over %ASSISTANTS% — the assistants measured in both periods.",
+  /** Общих ассистентов нет вовсе. */
+  assistantSetDisjoint:
+    "No assistant was measured in both periods, so there is no like-for-like change to show.",
+  /** Нет записи о том, что мерялось в одном из периодов. */
+  assistantSetUnknown:
+    "There is no record of which assistants were measured in one of these periods, so the change is left out.",
   /** Почему в разделе движения не все вопросы. */
   movementBasis:
     "Only questions where the change is larger than this sample size can explain on its own. Anything smaller is left out rather than shown as a result.",
@@ -110,6 +130,18 @@ export const REPORT_COPY = {
   /** Идёт в каждый аудит: снимок «как сейчас», а не прогноз. */
   opportunityBasis:
     "This audit is a single measurement of how assistants answer today. The ranked work is what the current sources suggest, with expected effort — not a forecast of results.",
+  /**
+   * Состав ассистентов менялся внутри периода отчёта.
+   *
+   * Клиент читает «было → стало» как одно измерение в двух точках. Если
+   * точки стоят на разных наборах ответов, это не одно измерение, и сказать
+   * об этом надо там же, где числа, — %ASSISTANTS% подставляется.
+   */
+  assistantSetChanged:
+    "The set of assistants measured changed during this period. The figures here are worked out over %ASSISTANTS%, measured throughout, so both ends of the period can be read side by side.",
+  /** Общего ассистента на весь период не нашлось. */
+  assistantSetNoOverlap:
+    "No assistant was measured across the whole period. Each end is shown on its own, and no change between them is given.",
   /** Оговорка к предложенному объёму работ и деньгам. */
   scopeEstimate:
     "Retainer and effort are the agency's own estimates for the scope below, shown so the numbers behind the proposal are visible.",
@@ -140,6 +172,57 @@ export function measurementBasisFor(platforms: readonly string[]): string {
     "%PLATFORM%",
     PLATFORM_LABELS[platform] ?? platform,
   );
+}
+
+/** Названия ассистентов через запятую, как их читает человек. */
+function assistantList(ids: readonly string[]): string {
+  const labels = ids.map((id) => PLATFORM_LABELS[id] ?? id);
+  if (labels.length <= 1) return labels[0] ?? "";
+  return `${labels.slice(0, -1).join(", ")} and ${labels.at(-1)}`;
+}
+
+/**
+ * Приписка к изменению — по факту того, что сравнивалось.
+ *
+ * `null`, когда состав не менялся: заметка про неизменившийся набор — это
+ * шум, а шум приучает не читать заметки там, где они важны.
+ */
+export function assistantBasisNote(comparison: AssistantSetComparison): string | null {
+  switch (comparison.verdict) {
+    case "same":
+      return null;
+    case "unknown":
+      return MEASUREMENT_COPY.assistantSetUnknown;
+    case "disjoint":
+      return MEASUREMENT_COPY.assistantSetDisjoint;
+    default:
+      return `${MEASUREMENT_COPY.assistantSetChanged} ${MEASUREMENT_COPY.assistantSetComparedOn.replace(
+        "%ASSISTANTS%",
+        assistantList(comparison.shared),
+      )}`;
+  }
+}
+
+/**
+ * Та же мысль для клиентского отчёта — длиннее и без жаргона.
+ *
+ * Идёт в `caveats`, то есть в отдельный раздел отчёта, а не в подпись под
+ * числом: клиент подписывает отчёт именем, и основание сравнения он должен
+ * увидеть там же, где всё остальное, чего мы не скрываем.
+ */
+export function reportAssistantBasisFor(comparison: AssistantSetComparison): string | null {
+  switch (comparison.verdict) {
+    case "same":
+      return null;
+    case "unknown":
+    case "disjoint":
+      return REPORT_COPY.assistantSetNoOverlap;
+    default:
+      return REPORT_COPY.assistantSetChanged.replace(
+        "%ASSISTANTS%",
+        assistantList(comparison.shared),
+      );
+  }
 }
 
 export const OPPORTUNITY_COPY = {

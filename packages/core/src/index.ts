@@ -69,6 +69,7 @@ export * from "./metrics/confidence";
 export * from "./metrics/matrix";
 export * from "./metrics/prominence";
 export * from "./metrics/interval";
+export * from "./metrics/comparability";
 export * from "./api/keys";
 export * from "./analytics/referrers";
 export * from "./analytics/import";

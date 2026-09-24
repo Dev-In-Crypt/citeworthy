@@ -524,6 +524,15 @@ export interface PortfolioRow {
   sampleCount: number;
   sufficient: boolean;
   deltaPp: number | null;
+  /**
+   * Кем измерены две последние недели.
+   *
+   * Отдаются как есть, а не в виде вывода: доля считается от тех ответов,
+   * что есть, и сравнивать два среза можно только при одинаковом составе, —
+   * но решает это слой выше. Схема о правилах сравнения не знает.
+   */
+  latestAssistants: string[];
+  previousAssistants: string[];
   openActions: number;
   staleActions: number;
   reportsAwaitingApproval: number;
@@ -564,18 +573,24 @@ export async function listPortfolioRows(
 
   const ids = agencyClients.map((client) => client.id);
 
-  // Общие срезы (без разреза по кластеру и платформе) по всем клиентам разом.
-  const snapshots = await db
+  /**
+   * Срезы по всем клиентам разом — и свёртки, и разрезы по платформам.
+   *
+   * Разрезы нужны, чтобы понять, одним ли составом измерены две последние
+   * недели: доля считается от тех ответов, что есть, и включённый или
+   * выключенный ассистент двигает её сам по себе. Отдельным запросом это
+   * был бы второй проход по той же таблице, поэтому берётся одним, а
+   * разделяется в памяти.
+   */
+  const allSnapshots = await db
     .select()
     .from(visibilitySnapshots)
     .where(
-      and(
-        inArray(visibilitySnapshots.clientId, ids),
-        isNull(visibilitySnapshots.clusterId),
-        isNull(visibilitySnapshots.platform),
-      ),
+      and(inArray(visibilitySnapshots.clientId, ids), isNull(visibilitySnapshots.clusterId)),
     )
     .orderBy(visibilitySnapshots.periodStart);
+
+  const snapshots = allSnapshots.filter((row) => row.platform === null);
 
   const byClient = new Map<string, typeof snapshots>();
   for (const snapshot of snapshots) {
@@ -583,6 +598,20 @@ export async function listPortfolioRows(
     list.push(snapshot);
     byClient.set(snapshot.clientId, list);
   }
+
+  /** Кто отвечал в этой неделе у этого клиента. */
+  const measuredIn = (clientId: string, week: Date | undefined): string[] =>
+    week === undefined
+      ? []
+      : allSnapshots
+          .filter(
+            (row) =>
+              row.clientId === clientId &&
+              row.platform !== null &&
+              row.sampleCount > 0 &&
+              row.periodStart.getTime() === week.getTime(),
+          )
+          .map((row) => row.platform as string);
 
   const actionRows = await db
     .select({
@@ -634,6 +663,8 @@ export async function listPortfolioRows(
     const latestPct = latest ? Number(latest.clientVisibilityPct) : null;
     const previousPct = previous ? Number(previous.clientVisibilityPct) : null;
 
+
+
     return {
       clientId: client.id,
       name: client.name,
@@ -648,6 +679,8 @@ export async function listPortfolioRows(
         latest?.sufficient && previous?.sufficient && latestPct !== null && previousPct !== null
           ? Math.round((latestPct - previousPct) * 10) / 10
           : null,
+      latestAssistants: measuredIn(client.id, latest?.periodStart),
+      previousAssistants: measuredIn(client.id, previous?.periodStart),
       openActions: open.length,
       staleActions: open.filter((row) => row.createdAt.getTime() < staleBefore.getTime()).length,
       reportsAwaitingApproval: pendingApprovals.filter((row) => row.clientId === client.id).length,
@@ -888,6 +921,25 @@ export async function countFixtureAnswers(
     );
 
   return Number(rows[0]?.total ?? 0);
+}
+
+/**
+ * Который час по часам базы.
+ *
+ * Отметки времени на ответах ставит Postgres (`defaultNow()`), а границы
+ * окон до сих пор брались у Node. Часы расходятся — на этой машине база
+ * опережает приложение почти на полсекунды, — и только что записанный
+ * ответ оказывался «в будущем» относительно верхней границы окна: он
+ * выпадал из расчёта, пока разница не истечёт.
+ *
+ * В интерфейсе это полсекунды невидимой свежести, в тестах — падение
+ * через раз. Лечится не ожиданием, а тем, что обе величины берутся из
+ * одного источника.
+ */
+export async function databaseNow(db: Database): Promise<Date> {
+  const rows = await db.execute<{ now: Date }>(sql`select now() as now`);
+  const value = (rows as unknown as { rows?: { now: Date }[] }).rows?.[0]?.now;
+  return value ? new Date(value) : new Date();
 }
 
 export async function getUsageCounter(

@@ -1,4 +1,9 @@
-import { measurementBasisFor, REPORT_COPY } from "../copy";
+import { measurementBasisFor, reportAssistantBasisFor, REPORT_COPY } from "../copy";
+import {
+  compareAssistantSets,
+  shareOverAssistants,
+  type AssistantCell,
+} from "../metrics/comparability";
 import { competitorGapPp } from "../metrics/visibility";
 import type { VisibilitySnapshot } from "../metrics/visibility";
 import { reportPayloadSchema } from "./schema";
@@ -43,6 +48,17 @@ export interface ReportInputs {
    * оговорки: отчёт по одной платформе не вправе говорить «several platforms».
    */
   measuredPlatforms?: readonly string[];
+  /**
+   * Срезы по ассистентам на обоих концах периода.
+   *
+   * Отчёт читается клиентом как одно измерение в двух точках. Если точки
+   * стоят на разных наборах ассистентов, это не одно измерение: «было →
+   * стало» посчитано от разных знаменателей. Отсюда и концы, и разница
+   * пересчитываются по тем, кого мерили и там, и там.
+   *
+   * Не передали — сравнение остаётся как было: старые вызовы не ломаются.
+   */
+  assistantCells?: { first: readonly AssistantCell[]; last: readonly AssistantCell[] };
   /** Раздел бесплатного аудита; у платящего клиента его нет. */
   opportunity?: NonNullable<ReportPayload["opportunity"]> | null;
   topOpportunities?: NonNullable<ReportPayload["topOpportunities"]>;
@@ -101,8 +117,45 @@ export function buildReportPayload(inputs: ReportInputs): ReportPayload {
   const first = inputs.snapshots.at(0) ?? null;
   const last = inputs.snapshots.at(-1) ?? null;
 
-  const visibilityBefore = first ? first.clientVisibilityPct : 0;
-  const visibilityAfter = last ? last.clientVisibilityPct : 0;
+  const measuredIn = (cells: readonly AssistantCell[] | undefined): string[] =>
+    (cells ?? []).filter((cell) => cell.sampleCount > 0).map((cell) => cell.assistantId);
+
+  const basis = inputs.assistantCells
+    ? compareAssistantSets(
+        measuredIn(inputs.assistantCells.last),
+        measuredIn(inputs.assistantCells.first),
+      )
+    : null;
+
+  /**
+   * Пересчитываются оба конца, а не только разница.
+   *
+   * Две цифры, подписанные «было» и «стоит сейчас», обязаны стоять на одном
+   * знаменателе — иначе подпись врёт, даже если разница между ними честная.
+   */
+  const restricted =
+    basis && basis.delta === "recompute-on-shared" && inputs.assistantCells
+      ? {
+          before: shareOverAssistants(inputs.assistantCells.first, basis.shared).pct,
+          after: shareOverAssistants(inputs.assistantCells.last, basis.shared).pct,
+        }
+      : null;
+
+  const visibilityBefore = restricted?.before ?? (first ? first.clientVisibilityPct : 0);
+  const visibilityAfter = restricted?.after ?? (last ? last.clientVisibilityPct : 0);
+
+  /** Общего ассистента на весь период не нашлось — разницы нет вовсе. */
+  const deltaPp =
+    basis && basis.delta === "suppress" ? null : round1(visibilityAfter - visibilityBefore);
+
+  const assistantCaveat = basis ? reportAssistantBasisFor(basis) : null;
+
+  /**
+   * Оговорка о природе измерения описывает то, по чему считались числа:
+   * после пересчёта это общая часть, а не объединение наборов.
+   */
+  const basisPlatforms =
+    basis && basis.delta === "recompute-on-shared" ? basis.shared : inputs.measuredPlatforms ?? [];
 
   const payload: ReportPayload = {
     client: { name: inputs.clientName },
@@ -119,7 +172,7 @@ export function buildReportPayload(inputs: ReportInputs): ReportPayload {
     results: {
       newCitedUrls: inputs.newCitedUrls,
       newBrandMentions: inputs.newBrandMentions,
-      visibilityDeltaPp: round1(visibilityAfter - visibilityBefore),
+      visibilityDeltaPp: deltaPp,
     },
     highestImpactAction: null,
     nextSprint: inputs.nextSprint,
@@ -141,7 +194,11 @@ export function buildReportPayload(inputs: ReportInputs): ReportPayload {
     opportunity: inputs.opportunity ?? null,
     // Пояснение о природе измерения идёт в каждом отчёте, а не по желанию,
     // и описывает то, что измерялось на самом деле.
-    caveats: [measurementBasisFor(inputs.measuredPlatforms ?? []), ...inputs.caveats],
+    caveats: [
+      measurementBasisFor(basisPlatforms),
+      ...(assistantCaveat ? [assistantCaveat] : []),
+      ...inputs.caveats,
+    ],
   };
 
   const contribution = inputs.highestImpact
@@ -162,9 +219,16 @@ export function buildReportPayload(inputs: ReportInputs): ReportPayload {
        * сказать «мы не уверены» честнее, чем разбирать, какой именно из них
        * попал в «самое влиятельное».
        */
-      confidence: inputs.caveats.includes(REPORT_COPY.noComparisonGroup)
-        ? "low"
-        : inputs.highestImpact.confidence,
+      /**
+       * Смена состава ассистентов понижает уверенность по той же причине,
+       * что и отсутствие группы сравнения: часть периода измерялась не тем
+       * же, чем другая, и отделить вклад действия от смены знаменателя
+       * нечем.
+       */
+      confidence:
+        inputs.caveats.includes(REPORT_COPY.noComparisonGroup) || assistantCaveat !== null
+          ? "low"
+          : inputs.highestImpact.confidence,
     };
   }
 

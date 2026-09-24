@@ -2,7 +2,16 @@ import { describe, expect, it } from "vitest";
 import { ASSISTANTS } from "../adapters/catalogue";
 import { MIN_SAMPLES_PER_CELL } from "./visibility";
 import { confidenceFor } from "./confidence";
-import { collapsePromptFacts, computePromptMatrix, type PromptResponseRecord } from "./matrix";
+import { compareAssistantSets } from "./comparability";
+import { isDistinguishable } from "./interval";
+import {
+  collapsePromptFacts,
+  computeMovement,
+  computePromptMatrix,
+  measuredAssistants,
+  restrictToAssistants,
+  type PromptResponseRecord,
+} from "./matrix";
 
 /**
  * Verify T87: матрица — тот же контракт C3, разложенный по промптам.
@@ -231,5 +240,123 @@ describe("collapsePromptFacts", () => {
 
     expect(records).toHaveLength(1);
     expect(records[0]?.clientMentioned).toBe(false);
+  });
+});
+
+describe("сравнение окон с разным составом ассистентов", () => {
+  const PREVIOUS_FROM = new Date("2026-06-18T00:00:00.000Z");
+  const PREVIOUS_AT = new Date("2026-07-01T12:00:00.000Z");
+
+  /**
+   * Тот самый случай, ради которого всё это.
+   *
+   * Клиента называют в трети ответов ChatGPT и ни разу — в Claude. Агентство
+   * выключает Claude. У клиента не изменилось ничего, но знаменатель стал
+   * вдвое меньше, и доля «выросла» с 15% до 30%.
+   */
+  function windows() {
+    // Размер окна взят настоящий, а не символический: на пятидесяти ответах
+    // интервалы ещё перекрываются, и ловушка не видна. Именно на объёме,
+    // который набирает работающий клиент, она и захлопывается.
+    const previousRecords = [
+      ...times(50, { clientMentioned: true, createdAt: PREVIOUS_AT }),
+      ...times(100, { clientMentioned: false, createdAt: PREVIOUS_AT }),
+      ...times(150, { platform: "claude", clientMentioned: false, createdAt: PREVIOUS_AT }),
+    ];
+    const currentRecords = [
+      ...times(50, { clientMentioned: true }),
+      ...times(100, { clientMentioned: false }),
+    ];
+
+    const previousInput = {
+      records: previousRecords,
+      prompts: PROMPTS,
+      from: PREVIOUS_FROM,
+      to: FROM,
+    };
+    const currentInput = { records: currentRecords, prompts: PROMPTS, from: FROM, to: TO };
+
+    return { previousInput, currentInput };
+  }
+
+  it("наивное сравнение показало бы рост, которого не было", () => {
+    const { previousInput, currentInput } = windows();
+    const naive = computePromptMatrix(currentInput).totals.ratePct!;
+    const before = computePromptMatrix(previousInput).totals.ratePct!;
+
+    expect(before).toBeCloseTo(16.7, 1);
+    expect(naive).toBeCloseTo(33.3, 1);
+    expect(naive - before).toBeGreaterThan(15);
+  });
+
+  it("и выборка подтвердила бы этот рост как настоящий", () => {
+    const { previousInput, currentInput } = windows();
+    // Проверка «отличимо ли от шума» срабатывает задом наперёд: скачок
+    // крупный, интервалы не пересекаются, и продукт сказал бы «не случайность».
+    expect(
+      isDistinguishable(
+        computePromptMatrix(currentInput).totals.interval,
+        computePromptMatrix(previousInput).totals.interval,
+      ),
+    ).toBe(true);
+  });
+
+  it("по общему набору роста нет", () => {
+    const { previousInput, currentInput } = windows();
+    const current = computePromptMatrix(currentInput);
+    const previous = computePromptMatrix(previousInput);
+
+    const basis = compareAssistantSets(measuredAssistants(current), measuredAssistants(previous));
+    expect(basis.verdict).toBe("narrowed");
+    expect(basis.dropped).toEqual(["claude"]);
+    expect(basis.shared).toEqual(["chatgpt"]);
+
+    const sharedNow = restrictToAssistants(currentInput, basis.shared);
+    const sharedBefore = restrictToAssistants(previousInput, basis.shared);
+
+    expect(sharedNow.totals.ratePct).toBe(sharedBefore.totals.ratePct);
+    expect(isDistinguishable(sharedNow.totals.interval, sharedBefore.totals.interval)).toBe(false);
+  });
+
+  it("движение по вопросам тоже считается по общему набору", () => {
+    const { previousInput, currentInput } = windows();
+    const basis = compareAssistantSets(
+      measuredAssistants(computePromptMatrix(currentInput)),
+      measuredAssistants(computePromptMatrix(previousInput)),
+    );
+
+    const movement = computeMovement(
+      restrictToAssistants(currentInput, basis.shared),
+      restrictToAssistants(previousInput, basis.shared),
+    );
+
+    expect(movement.find((m) => m.promptId === "p1")?.deltaPp).toBe(0);
+  });
+
+  it("без общих ассистентов сравнивать нечего — не ноль, а пусто", () => {
+    const previousInput = {
+      records: times(30, { platform: "claude", clientMentioned: true, createdAt: PREVIOUS_AT }),
+      prompts: PROMPTS,
+      from: PREVIOUS_FROM,
+      to: FROM,
+    };
+    const currentInput = {
+      records: times(30, { platform: "grok", clientMentioned: false }),
+      prompts: PROMPTS,
+      from: FROM,
+      to: TO,
+    };
+
+    const basis = compareAssistantSets(
+      measuredAssistants(computePromptMatrix(currentInput)),
+      measuredAssistants(computePromptMatrix(previousInput)),
+    );
+    expect(basis.verdict).toBe("disjoint");
+
+    const movement = computeMovement(
+      restrictToAssistants(currentInput, basis.shared),
+      restrictToAssistants(previousInput, basis.shared),
+    );
+    expect(movement.every((m) => m.deltaPp === null)).toBe(true);
   });
 });

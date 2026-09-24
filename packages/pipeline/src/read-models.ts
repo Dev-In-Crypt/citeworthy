@@ -1,15 +1,20 @@
 import {
+  assistantBasisNote,
   collapsePromptFacts,
+  compareAssistantSets,
   computeMovement,
   computeProminence,
   computePromptMatrix,
   diagnose,
   DIAGNOSIS_COPY,
   isDistinguishable,
+  measuredAssistants,
   MIN_SAMPLES_PER_CELL,
+  restrictToAssistants,
 } from "@repo/core";
 import type { CitationFact, SourceType } from "@repo/core";
 import {
+  databaseNow,
   listActivePromptsForClient,
   listCitationFacts,
   listPromptPlatformFacts,
@@ -29,7 +34,14 @@ import {
  */
 
 export async function clientVisibility(db: Database, client: Client, windowDays = 28) {
-  const to = new Date();
+  /**
+   * Верхняя граница окна — по часам базы, а не приложения.
+   *
+   * Время на ответе ставит Postgres. Брать границу у Node значит сравнивать
+   * двое часов: там, где база спешит, только что записанный ответ выпадает
+   * за верхнюю границу и не попадает в расчёт, пока разница не истечёт.
+   */
+  const to = await databaseNow(db);
   const windowMs = windowDays * 86_400_000;
   const from = new Date(to.getTime() - windowMs);
   // Предыдущее окно той же длины — только для ответа «что изменилось».
@@ -55,13 +67,39 @@ export async function clientVisibility(db: Database, client: Client, windowDays 
     clusterId: prompt.clusterId,
   }));
 
-  const matrix = computePromptMatrix({ records, prompts: promptRows, from, to });
-  const previous = computePromptMatrix({
+  const currentInput = { records, prompts: promptRows, from, to };
+  const previousInput = {
     records: collapsePromptFacts(previousFacts),
     prompts: promptRows,
     from: previousFrom,
     to: from,
-  });
+  };
+
+  const matrix = computePromptMatrix(currentInput);
+  const previous = computePromptMatrix(previousInput);
+
+  /**
+   * Сравнивается только общая часть двух окон.
+   *
+   * Доля — это доля от тех ответов, что есть. Включили ассистента или
+   * выключили — знаменатель другой, и число едет само, без единого
+   * изменения у клиента. Причём едет заметно, и проверка «отличимо ли от
+   * шума» такой сдвиг подтверждает: интервалы не пересекаются. Защита
+   * срабатывает наоборот, поэтому её нельзя оставлять на неодинаковых
+   * наборах.
+   *
+   * Показываем при этом полное окно: агентство должно видеть всё, что
+   * измерено, включая только что включённого ассистента. А сравнение идёт
+   * по общему набору — и подпись говорит, по какому именно.
+   */
+  const basis = compareAssistantSets(measuredAssistants(matrix), measuredAssistants(previous));
+  const comparable =
+    basis.delta === "show"
+      ? { current: matrix, previous }
+      : {
+          current: restrictToAssistants(currentInput, basis.shared),
+          previous: restrictToAssistants(previousInput, basis.shared),
+        };
 
   /**
    * Заметность считается по тем же ответам, что и матрица: «назван» и
@@ -79,15 +117,27 @@ export async function clientVisibility(db: Database, client: Client, windowDays 
   return {
     ...matrix,
     prominence,
-    movement: computeMovement(matrix, previous),
+    movement: computeMovement(comparable.current, comparable.previous),
     // Общее движение — та же логика: сравнивать можно только два окна,
     // каждое из которых само по себе набрало порог.
     totalsDeltaPp:
-      matrix.totals.ratePct !== null && previous.totals.ratePct !== null
-        ? Math.round((matrix.totals.ratePct - previous.totals.ratePct) * 10) / 10
+      comparable.current.totals.ratePct !== null && comparable.previous.totals.ratePct !== null
+        ? Math.round(
+            (comparable.current.totals.ratePct - comparable.previous.totals.ratePct) * 10,
+          ) / 10
         : null,
-    /** Различает ли выборка это изменение вообще. */
-    totalsDistinguishable: isDistinguishable(matrix.totals.interval, previous.totals.interval),
+    /**
+     * Различает ли выборка это изменение вообще.
+     *
+     * Только по сопоставимой паре: на разных наборах непересечение
+     * интервалов не говорит о клиенте ничего.
+     */
+    totalsDistinguishable:
+      basis.allowDistinguishability &&
+      isDistinguishable(comparable.current.totals.interval, comparable.previous.totals.interval),
+    /** Состав измеренных ассистентов и приписка о нём — null, если не менялся. */
+    assistantBasis: basis,
+    assistantBasisNote: assistantBasisNote(basis),
     client: { name: client.name, domain: client.domain },
     competitorNames: client.competitorNames,
     minSamples: MIN_SAMPLES_PER_CELL,

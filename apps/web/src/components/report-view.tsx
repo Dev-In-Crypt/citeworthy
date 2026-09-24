@@ -35,7 +35,12 @@ function Stat({
   );
 }
 
-function formatPp(value: number): string {
+/**
+ * Прочерк, а не ноль: «изменения нет» и «сравнивать было нечем» — разные
+ * утверждения, и второе клиенту важнее первого.
+ */
+function formatPp(value: number | null): string {
+  if (value === null) return "—";
   return `${value >= 0 ? "+" : ""}${value} pp`;
 }
 
@@ -94,8 +99,20 @@ export function ReportView({
         <p data-testid="report-summary" className="max-w-prose text-sm leading-relaxed">
           Across the tracked buyer questions, {payload.client.name} was named in an estimated{" "}
           <span className="metric font-medium">{payload.visibility.after}%</span> of answers this
-          period, {payload.results.visibilityDeltaPp >= 0 ? "up" : "down"} from{" "}
-          <span className="metric">{payload.visibility.before}%</span>. The gap to the strongest
+          period
+          {payload.results.visibilityDeltaPp === null ? (
+            <>
+              {" "}
+              — the earlier figure rests on a different set of assistants and is shown on its own at{" "}
+              <span className="metric">{payload.visibility.before}%</span>
+            </>
+          ) : (
+            <>
+              , {payload.results.visibilityDeltaPp >= 0 ? "up" : "down"} from{" "}
+              <span className="metric">{payload.visibility.before}%</span>
+            </>
+          )}
+          . The gap to the strongest
           tracked competitor stands at{" "}
           <span className="metric">{formatPp(payload.competitorGap.after)}</span>. Every figure is
           an estimate from repeated samples of assistant answers, not a count of real buyer

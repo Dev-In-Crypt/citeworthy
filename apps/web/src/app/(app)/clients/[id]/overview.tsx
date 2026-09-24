@@ -406,6 +406,19 @@ function OneLineRead({ matrix }: { matrix: RouterOutputs["measurement"]["matrix"
                 , {matrix.totalsDeltaPp === 0 ? "flat" : matrix.totalsDeltaPp > 0 ? "up" : "down"}{" "}
                 <span className="metric">{Math.abs(matrix.totalsDeltaPp)} pp</span> against the
                 previous {matrix.windowDays} days
+                {/*
+                  Доля выше посчитана по всему, что измерено сейчас, а
+                  изменение — по общей части двух окон. Это намеренно разные
+                  основания, и фраза называет своё, вместо того чтобы
+                  притворяться, будто относится к числу выше.
+                */}
+                {matrix.assistantBasis.verdict !== "same" && (
+                  <span data-testid="delta-basis">
+                    {" "}
+                    on {matrix.assistantBasis.shared.length} shared{" "}
+                    {matrix.assistantBasis.shared.length === 1 ? "assistant" : "assistants"}
+                  </span>
+                )}
                 {/* Пересекающиеся интервалы — это «не различить», а не «выросло». */}
                 {!matrix.totalsDistinguishable && (
                   <span data-testid="within-noise"> — {MEASUREMENT_COPY.withinNoise}</span>
@@ -413,6 +426,13 @@ function OneLineRead({ matrix }: { matrix: RouterOutputs["measurement"]["matrix"
               </>
             )}
             .
+            {/*
+              Состав менялся — об этом говорится там же, где число, а не в
+              сноске: молчаливый пересчёт был бы вторым способом соврать.
+            */}
+            {matrix.assistantBasisNote && (
+              <span data-testid="assistant-basis"> {matrix.assistantBasisNote}</span>
+            )}
             {competitor && (
               <>
                 {" "}

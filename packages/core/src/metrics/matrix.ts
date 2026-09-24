@@ -277,6 +277,34 @@ export interface MatrixMovement {
 }
 
 /**
+ * Кем окно измерено на самом деле.
+ *
+ * По ответам, а не по расписанию. Расписание говорит, кого просили
+ * спросить; знаменатель доли складывается из тех, кто ответил. Прогон, где
+ * один адаптер упал на всех вызовах, — это окно, измеренное меньшим
+ * набором, чем предполагалось, и сравнивать его надо как меньший набор.
+ */
+export function measuredAssistants(matrix: PromptMatrix): string[] {
+  return matrix.assistants.filter((a) => a.samples > 0).map((a) => a.id);
+}
+
+/**
+ * Ограничить окно частью ассистентов.
+ *
+ * Тот же расчёт по тем же ответам, но с другим знаменателем: остальные
+ * ответы не учитываются нигде, включая общий итог. Нужно, чтобы сравнивать
+ * два окна с разным составом по их общей части.
+ */
+export function restrictToAssistants(
+  input: ComputePromptMatrixInput,
+  allow: readonly string[],
+): PromptMatrix {
+  const allowed = new Set(allow);
+  const assistants = (input.assistants ?? ASSISTANTS).filter((a) => allowed.has(a.id));
+  return computePromptMatrix({ ...input, assistants });
+}
+
+/**
  * Что изменилось по каждому вопросу против прошлого окна.
  *
  * Клиент агентства спрашивает не «какая у нас видимость», а «что изменилось

@@ -16,7 +16,8 @@ import { AGENCIES } from "./data";
  */
 
 /** Как в ReportView: знак плюс, минус — обычным дефисом. */
-function formatPp(value: number): string {
+function formatPp(value: number | null): string {
+  if (value === null) return "—";
   return `${value >= 0 ? "+" : ""}${value} pp`;
 }
 
@@ -31,7 +32,7 @@ function formatPp(value: number): string {
 function DeliveryBody({ payload }: { payload: ReportPayload }) {
   const work = payload.workCompleted;
   const shownWork = work.slice(0, 3);
-  const up = payload.results.visibilityDeltaPp >= 0;
+  const up = (payload.results.visibilityDeltaPp ?? 0) >= 0;
 
   return (
     <>

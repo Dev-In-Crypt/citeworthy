@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import {
   canAddClient,
   competitorGapPp,
+  compareAssistantSets,
   confidenceFor,
   normalizeDomain,
   PRIORITY_THRESHOLDS,
@@ -93,6 +94,17 @@ export const clientsRouter = router({
 
       const needs = needsFor(row);
 
+      /**
+       * В портфеле изменение показывается только при одинаковом составе.
+       *
+       * Это колонка для беглого просмотра всего списка: по ней решают, к
+       * кому идти. Сигнал, который на деле может быть следствием включённой
+       * галочки, а не работы, здесь хуже отсутствующего. Число, пересчитанное
+       * по общей части наборов, лежит на один клик дальше — на экране
+       * клиента, где рядом с ним стоит объяснение.
+       */
+      const deltaBasis = compareAssistantSets(row.latestAssistants, row.previousAssistants);
+
       return {
         clientId: row.clientId,
         name: row.name,
@@ -100,7 +112,8 @@ export const clientsRouter = router({
         status: row.status,
         visibilityPct: row.visibilityPct,
         gapPp,
-        deltaPp: row.deltaPp,
+        deltaPp: deltaBasis.verdict === "same" ? row.deltaPp : null,
+        deltaBasis: deltaBasis.verdict,
         sampleCount: row.sampleCount,
         sufficient: row.sufficient,
         confidence: confidenceFor(row.sampleCount),

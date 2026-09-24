@@ -28,7 +28,13 @@ export const reportPayloadSchema = z.object({
   results: z.object({
     newCitedUrls: z.number().int().min(0),
     newBrandMentions: z.number().int().min(0),
-    visibilityDeltaPp: z.number(),
+    /**
+     * null — сравнивать было нечем: внутри периода не осталось ассистента,
+     * которого мерили и в начале, и в конце. Ноль означал бы «не изменилось»,
+     * а это другое утверждение. Уже сохранённые отчёты несут число и остаются
+     * валидными.
+     */
+    visibilityDeltaPp: z.number().nullable(),
   }),
   highestImpactAction: z
     .object({
