@@ -199,6 +199,8 @@
 .mk .foot-col ul { display: grid; gap: 9px; font-size: 14.5px; }
 .mk .foot-small { display: flex; justify-content: space-between; gap: 12px 32px; flex-wrap: wrap; padding-top: 24px; font-family: var(--font-mono); font-size: 11.5px; line-height: 1.6; color: var(--cw-dark-muted); }
 .mk .foot-small span { max-width: 640px; }
+.mk .foot-legal { display: flex; gap: 18px; flex-wrap: wrap; }
+.mk .foot-legal a { color: var(--cw-dark-text); }
 
 .mk .only-sm { display: none; }
 .mk .chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -697,4 +699,39 @@
   /* Отступ слева съел бы половину строки, а колонка — всю форму. */
   .mk .auth-cols { grid-template-columns: minmax(0, 1fr); gap: 32px; }
   .mk .auth-included { padding-left: 0; border-left: 0; border-top: 1px solid var(--cw-rule); padding-top: 24px; }
+}
+
+/* ---------- юридические документы ---------- */
+/*
+  Одна колонка чтения и оглавление сбоку. Строка держится в 72 знака:
+  юридический текст читают целиком и внимательно, и длинная строка здесь
+  дороже, чем в любом другом месте сайта.
+*/
+.mk .legal-sec {
+  display: grid;
+  grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
+  gap: 56px;
+  align-items: start;
+  padding: 72px 0 112px;
+}
+.mk .legal-nav { display: grid; gap: 10px; position: sticky; top: 92px; font-size: 14px; }
+.mk .legal-nav a { color: var(--cw-ink-2); }
+.mk .legal-doc { max-width: 72ch; }
+.mk .legal-doc h1 { font: 500 40px/1.12 var(--font-serif); letter-spacing: -0.012em; margin-bottom: 14px; }
+.mk .legal-doc h2 { font: 500 22px/1.3 var(--font-serif); margin: 44px 0 12px; }
+.mk .legal-doc h3 { font: 600 15px/1.4 var(--font-sans); margin: 26px 0 8px; }
+.mk .legal-doc p { margin-bottom: 16px; line-height: 1.65; color: var(--cw-ink-2); }
+.mk .legal-doc ul, .mk .legal-doc ol { margin: 0 0 18px 20px; display: grid; gap: 9px; line-height: 1.6; color: var(--cw-ink-2); }
+.mk .legal-doc li { padding-left: 4px; }
+.mk .legal-doc .lede { font-size: 18px; color: var(--cw-ink-2); margin-bottom: 30px; }
+.mk .legal-doc table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 14.5px; }
+.mk .legal-doc th { text-align: left; font: 500 11px/1.4 var(--font-mono); letter-spacing: 0.04em; text-transform: uppercase; color: var(--cw-muted); padding: 8px 12px 8px 0; border-bottom: 1px solid var(--cw-rule); }
+.mk .legal-doc td { padding: 10px 12px 10px 0; border-bottom: 1px solid var(--cw-border); vertical-align: top; color: var(--cw-ink-2); }
+.mk .legal-foot { margin-top: 52px; padding-top: 20px; border-top: 1px solid var(--cw-rule); font-size: 13.5px; color: var(--cw-muted); display: grid; gap: 6px; }
+.mk .legal-foot p { margin: 0; font-size: inherit; color: inherit; }
+
+@media (max-width: 860px) {
+  .mk .legal-sec { grid-template-columns: minmax(0, 1fr); gap: 28px; padding: 48px 0 72px; }
+  .mk .legal-nav { position: static; grid-auto-flow: column; grid-auto-columns: max-content; overflow-x: auto; gap: 18px; padding-bottom: 6px; }
+  .mk .legal-doc h1 { font-size: 32px; }
 }

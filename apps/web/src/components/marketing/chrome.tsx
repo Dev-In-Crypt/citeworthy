@@ -125,6 +125,17 @@ export function MarketingFooter() {
         </div>
         <div className="foot-small">
           <span>{MARKETING_COPY.siteBasis}</span>
+          {/*
+            Юридические страницы стоят в подвале, а не отдельным разделом
+            в шапке: их ищут именно здесь, и вести их в навигацию значило
+            бы занимать место, нужное продукту.
+          */}
+          <span className="foot-legal">
+            <Link href="/legal/terms">Terms</Link>
+            <Link href="/legal/privacy">Privacy</Link>
+            <Link href="/legal/dpa">Data processing</Link>
+            <Link href="/legal/subprocessors">Sub-processors</Link>
+          </span>
           <span>© 2026 Citeworthy</span>
         </div>
       </div>
