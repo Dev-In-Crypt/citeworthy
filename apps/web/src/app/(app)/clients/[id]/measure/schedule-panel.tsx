@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { type Platform } from "@repo/core";
+import { MEASUREMENT_COPY, type Platform } from "@repo/core";
 import { estimateSchedule, type Cadence } from "@repo/core/adapters/capacity";
 import { api } from "@/trpc/react";
 import { buttonClass } from "@/components/ui/button";
@@ -142,7 +142,9 @@ export function SchedulePanel({ clientId }: { clientId: string }) {
    * на котором включается.
    *
    * Включённый, но больше не разрешённый (тариф понизили) остаётся
-   * доступным для снятия: иначе расписание нельзя было бы починить.
+   * доступным для снятия: иначе расписание нельзя было бы починить. И он
+   * подписан отдельно — раньше он выглядел обычной галочкой, и человек
+   * узнавал о проблеме только из отказа при сохранении.
    */
   const assistantOptions = [
     ...(options?.assistants ?? []),
@@ -151,12 +153,26 @@ export function SchedulePanel({ clientId }: { clientId: string }) {
       .map((id) => ({ id, label: id, allowed: options === undefined, unlocksOn: undefined })),
   ];
 
+  /**
+   * Сколько выбранных ассистентов тариф больше не покрывает.
+   *
+   * По ним измерение уже не идёт, поэтому и в оценку расхода они не входят:
+   * показать их в числе ответов значило бы обещать измерение, которого нет.
+   */
+  const outsidePlanCount = options
+    ? platforms.filter((id) => !options.assistants.some((a) => a.id === id && a.allowed)).length
+    : 0;
+
+  const measuredPlatforms = options
+    ? platforms.filter((id) => options.assistants.some((a) => a.id === id && a.allowed))
+    : platforms;
+
   const estimate =
-    options && platforms.length > 0 && options.promptCount > 0
+    options && measuredPlatforms.length > 0 && options.promptCount > 0
       ? estimateSchedule({
           plan: options.plan,
           prompts: options.promptCount,
-          assistants: platforms,
+          assistants: measuredPlatforms,
           samplesPerPrompt: samples,
           cadence,
         })
@@ -204,7 +220,10 @@ export function SchedulePanel({ clientId }: { clientId: string }) {
           <legend className="text-sm font-medium">Platforms</legend>
           <div className="flex flex-wrap gap-x-4 gap-y-1.5">
             {assistantOptions.map(({ id, label, allowed, unlocksOn }) => {
-              const locked = !allowed && !platforms.includes(id);
+              const selected = platforms.includes(id);
+              const locked = !allowed && !selected;
+              /** Стоит в расписании, но тариф его больше не даёт. */
+              const outsidePlan = !allowed && selected && options !== undefined;
 
               return (
                 <label
@@ -212,11 +231,13 @@ export function SchedulePanel({ clientId }: { clientId: string }) {
                   className={cn(
                     "flex items-center gap-1.5 text-sm",
                     locked && "text-muted-foreground",
+                    outsidePlan && "text-destructive",
                   )}
+                  title={outsidePlan ? MEASUREMENT_COPY.assistantOutsidePlan : undefined}
                 >
                   <input
                     type="checkbox"
-                    checked={platforms.includes(id)}
+                    checked={selected}
                     disabled={locked}
                     onChange={() => togglePlatform(id)}
                   />
@@ -228,6 +249,14 @@ export function SchedulePanel({ clientId }: { clientId: string }) {
                       className="metric rounded-full bg-muted px-1.5 py-0.5 text-[11px]"
                     >
                       {unlocksOn} and up
+                    </span>
+                  )}
+                  {outsidePlan && (
+                    <span
+                      data-testid={`assistant-outside-plan-${id}`}
+                      className="metric rounded-full bg-destructive/10 px-1.5 py-0.5 text-[11px] text-destructive"
+                    >
+                      not in plan
                     </span>
                   )}
                 </label>
@@ -260,6 +289,22 @@ export function SchedulePanel({ clientId }: { clientId: string }) {
           {trigger.isPending ? "Running…" : "Run now"}
         </button>
       </div>
+
+      {/*
+        Полной фразой и отдельной строкой, а не только плашкой у галочки.
+        Плашка говорит «что-то не так»; человеку нужно знать, что измерение
+        по этому ассистенту уже остановлено и что с этим сделать. Зажатая
+        между галочками и кнопкой, эта фраза читалась как подпись к кнопке.
+      */}
+      {outsidePlanCount > 0 && (
+        <p
+          data-testid="assistants-outside-plan"
+          role="alert"
+          className="max-w-prose text-sm text-destructive"
+        >
+          {MEASUREMENT_COPY.assistantOutsidePlan}
+        </p>
+      )}
 
       {/*
         Цена выбора — до сохранения, а не в счёте в конце месяца. Всё здесь

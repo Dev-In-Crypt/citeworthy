@@ -80,6 +80,17 @@ export const MEASUREMENT_COPY = {
   /** Нет записи о том, что мерялось в одном из периодов. */
   assistantSetUnknown:
     "There is no record of which assistants were measured in one of these periods, so the change is left out.",
+  /**
+   * Ассистент остался в расписании, но тариф его больше не даёт.
+   *
+   * Так бывает после перехода на младший тариф: расписание переживает смену
+   * плана, потому что строку с ним никто не переписывает. Раньше форма
+   * показывала его обычной галочкой, и человек узнавал о проблеме только
+   * когда нажимал «сохранить» и получал отказ, — а прогоны всё это время
+   * продолжали его спрашивать за наш счёт.
+   */
+  assistantOutsidePlan:
+    "Not included in your plan any more, so it is no longer measured. Remove it to save the schedule, or move to a plan that covers it.",
   /** Почему в разделе движения не все вопросы. */
   movementBasis:
     "Only questions where the change is larger than this sample size can explain on its own. Anything smaller is left out rather than shown as a result.",

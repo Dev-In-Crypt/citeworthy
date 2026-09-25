@@ -6,6 +6,7 @@ import {
   createRun,
   deleteAgency,
   listResponsesByRun,
+  upsertSubscription,
 } from "@repo/db";
 import { promptClusters, prompts, runSchedules } from "@repo/db/schema/measurement";
 import { eq } from "drizzle-orm";
@@ -164,6 +165,27 @@ describe("orchestrateRun (mock-режим)", () => {
     );
   });
 
+  it("ассистент, которого больше не даёт тариф, из прогона выпадает", async () => {
+    /**
+     * Расписание переживает переход на младший тариф: строку с ним никто не
+     * переписывает. Спрашивать ассистента, за которого агентство не платит,
+     * значит тратить наши деньги на то, о чём не просили.
+     *
+     * Молчаливым это не остаётся — форма показывает такой ассистент
+     * отдельной пометкой и говорит, что измерение по нему остановлено.
+     */
+    await db
+      .update(runSchedules)
+      .set({ platforms: ["chatgpt", "claude"] })
+      .where(eq(runSchedules.id, scheduleId));
+
+    const outcome = await orchestrateRun(db, runId, "mock");
+    const written = await listResponsesByRun(db, runId);
+
+    expect(outcome.status).toBe("done");
+    expect([...new Set(written.map((r) => r.platform))]).toEqual(["chatgpt"]);
+  });
+
   it("платформа, которую перестали измерять, из старого расписания выпадает", async () => {
     /**
      * Расписание переживает такое решение: строку с ним никто не
@@ -184,6 +206,14 @@ describe("orchestrateRun (mock-режим)", () => {
   });
 
   it("Claude и Grok измеряются, когда включены в расписании клиента", async () => {
+    // Claude даёт только старший тариф, поэтому агентству нужна подписка:
+    // иначе тест проверял бы не то, что заявлено в названии.
+    await upsertSubscription(db, {
+      agencyId,
+      customerId: `cus_${agencyId.slice(0, 8)}`,
+      plan: "scale",
+      status: "active",
+    });
     await db
       .update(runSchedules)
       .set({ platforms: ["chatgpt", "claude", "grok"] })
