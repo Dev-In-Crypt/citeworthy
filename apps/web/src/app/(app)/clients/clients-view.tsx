@@ -18,6 +18,17 @@ export function ClientsView() {
       row.sufficient && row.visibilityPct !== null ? `${Math.round(row.visibilityPct)}%` : "—",
     ]),
   );
+  /**
+   * Сколько у клиента настроено, но больше не спрашивается.
+   *
+   * Это справочник настроек клиента, и сломанная настройка здесь на месте.
+   * Но «чем заняться» продукт отвечает на экране «Сегодня» — здесь поэтому
+   * метка и ссылка на починку, а не строка в общем счёте ожидающего: два
+   * счёта одного и того же однажды разойдутся.
+   */
+  const dropped = new Map(
+    (portfolio.data ?? []).map((row) => [row.clientId, row.droppedAssistants]),
+  );
 
   if (clients.isPending) {
     return <SkeletonCards count={4} />;
@@ -60,6 +71,15 @@ export function ClientsView() {
             <div className="flex flex-col gap-0.5">
               <span className="flex items-center gap-2">
                 <span className="font-medium">{client.name}</span>
+                {(dropped.get(client.id) ?? 0) > 0 && (
+                  <span
+                    data-testid={`schedule-dropped-${client.id}`}
+                    className="rounded-full bg-destructive/10 px-2 py-0.5 text-xs text-destructive"
+                    title="Assistants in this client's schedule are no longer measured. Open Measure to fix the schedule."
+                  >
+                    schedule needs a fix
+                  </span>
+                )}
                 {client.status === "prospect" && (
                   <span
                     data-testid="prospect-badge"

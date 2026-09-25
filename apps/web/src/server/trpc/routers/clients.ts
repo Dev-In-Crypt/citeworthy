@@ -22,7 +22,7 @@ import { assertTenant, protectedProcedure, roleProcedure, router } from "../trpc
 import { capabilitiesFor } from "@repo/core/config/measurement";
 import { entitlementsForAgency } from "../../subscription";
 import { buildWeeklyBrief } from "../../weekly-brief";
-import { needsFor } from "../../needs";
+import { droppedAssistants, needsFor } from "../../needs";
 
 const clientInput = z.object({
   name: z.string().min(1).max(200),
@@ -119,6 +119,12 @@ export const clientsRouter = router({
         gapPp,
         deltaPp: deltaBasis.verdict === "same" ? row.deltaPp : null,
         deltaBasis: deltaBasis.verdict,
+        /**
+         * Сколько настроенных ассистентов больше не спрашивается. Числом, а
+         * не разбором строки из `needs`: справочник клиентов показывает ту же
+         * беду короче, и две формулировки одного факта однажды разойдутся.
+         */
+        droppedAssistants: droppedAssistants(row, allowedAssistants).length,
         sampleCount: row.sampleCount,
         sufficient: row.sufficient,
         confidence: confidenceFor(row.sampleCount),

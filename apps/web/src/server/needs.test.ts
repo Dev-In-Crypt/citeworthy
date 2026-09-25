@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PortfolioRow } from "@repo/db";
-import { needsFor } from "./needs";
+import { droppedAssistants, needsFor } from "./needs";
 
 /**
  * Расписание переживает и смену тарифа, и решение перестать измерять
@@ -94,5 +94,25 @@ describe("needsFor: расписание против тарифа", () => {
     expect(needs.find((n) => n.cta === "Fix schedule")).toBeUndefined();
     // Ему нужно другое, и это уже сказано отдельной строкой.
     expect(needs.find((n) => n.text === "Awaiting first run")).toBeDefined();
+  });
+});
+
+describe("droppedAssistants", () => {
+  it("возвращает именно тех, кого расписание просит, а тариф не даёт", () => {
+    expect(
+      droppedAssistants({ scheduledAssistants: ["chatgpt", "claude", "gemini"] }, STARTER),
+    ).toEqual(["claude", "gemini"]);
+  });
+
+  it("без прав возвращает пусто, а не весь набор", () => {
+    expect(droppedAssistants({ scheduledAssistants: ["chatgpt", "claude"] }, [])).toEqual([]);
+  });
+
+  it("считает то же, что и строка в списке клиентов", () => {
+    // Справочник клиентов показывает число, экран «Сегодня» — фразу. Оба
+    // берут его отсюда: две формулировки одного факта однажды разойдутся.
+    const r = row({ scheduledAssistants: ["chatgpt", "claude"] });
+    expect(droppedAssistants(r, STARTER)).toHaveLength(1);
+    expect(needsFor(r, STARTER).find((n) => n.cta === "Fix schedule")).toBeDefined();
   });
 });
