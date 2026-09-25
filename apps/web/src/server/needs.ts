@@ -34,8 +34,42 @@ export interface NeedsRow {
   to: NeedsTarget;
 }
 
-export function needsFor(row: PortfolioRow): NeedsRow[] {
+/**
+ * @param allowedAssistants кого тариф разрешает измерять прямо сейчас.
+ *   Передаётся снаружи, а не берётся здесь: права считаются по подписке, а
+ *   этот файл о них ничего не знает и знать не должен.
+ */
+export function needsFor(row: PortfolioRow, allowedAssistants: readonly string[] = []): NeedsRow[] {
   const needs: NeedsRow[] = [];
+
+  /**
+   * В расписании остались те, кого продукт уже не спрашивает.
+   *
+   * Так бывает после перехода на младший тариф и после решения перестать
+   * измерять платформу: строку расписания никто не переписывает. Экран
+   * измерения об этом говорит, но агентство доходит туда по одному клиенту
+   * и может месяц не знать, что часть книги измеряется уже, чем настроено.
+   *
+   * Пустой список разрешённых означает «ещё не знаем» — тогда молчим:
+   * поднять тревогу на незагруженных правах хуже, чем промолчать.
+   */
+  const dropped =
+    allowedAssistants.length > 0
+      ? row.scheduledAssistants.filter((id) => !allowedAssistants.includes(id))
+      : [];
+
+  if (dropped.length > 0) {
+    needs.push({
+      kind: "run",
+      tone: "needs-you",
+      text:
+        dropped.length === 1
+          ? "1 assistant in the schedule is no longer measured"
+          : `${dropped.length} assistants in the schedule are no longer measured`,
+      cta: "Fix schedule",
+      to: "measure",
+    });
+  }
 
   if (row.highPriorityOpportunities > 0) {
     needs.push({

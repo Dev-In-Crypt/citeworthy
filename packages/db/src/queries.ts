@@ -533,6 +533,8 @@ export interface PortfolioRow {
    */
   latestAssistants: string[];
   previousAssistants: string[];
+  /** Кого расписание просит спрашивать. Пусто — расписания ещё нет. */
+  scheduledAssistants: string[];
   openActions: number;
   staleActions: number;
   reportsAwaitingApproval: number;
@@ -613,6 +615,22 @@ export async function listPortfolioRows(
           )
           .map((row) => row.platform as string);
 
+  /**
+   * Что настроено измерять у каждого клиента.
+   *
+   * Настроено, а не измерено: срезы выше говорят, кто отвечал, а здесь —
+   * кого просили спросить. Разница между этими двумя списками и есть то,
+   * о чём агентству надо сказать, и увидеть её можно только рядом.
+   */
+  const scheduleRows = await db
+    .select({ clientId: runSchedules.clientId, platforms: runSchedules.platforms })
+    .from(runSchedules)
+    .where(inArray(runSchedules.clientId, ids));
+
+  const scheduledByClient = new Map<string, string[]>(
+    scheduleRows.map((row) => [row.clientId, row.platforms as string[]]),
+  );
+
   const actionRows = await db
     .select({
       clientId: actions.clientId,
@@ -681,6 +699,7 @@ export async function listPortfolioRows(
           : null,
       latestAssistants: measuredIn(client.id, latest?.periodStart),
       previousAssistants: measuredIn(client.id, previous?.periodStart),
+      scheduledAssistants: scheduledByClient.get(client.id) ?? [],
       openActions: open.length,
       staleActions: open.filter((row) => row.createdAt.getTime() < staleBefore.getTime()).length,
       reportsAwaitingApproval: pendingApprovals.filter((row) => row.clientId === client.id).length,

@@ -19,6 +19,7 @@ import {
   updateClient,
 } from "@repo/db";
 import { assertTenant, protectedProcedure, roleProcedure, router } from "../trpc";
+import { capabilitiesFor } from "@repo/core/config/measurement";
 import { entitlementsForAgency } from "../../subscription";
 import { buildWeeklyBrief } from "../../weekly-brief";
 import { needsFor } from "../../needs";
@@ -70,12 +71,16 @@ export const clientsRouter = router({
    * показывает только проценты, не отвечает на вопрос «чем мне заняться».
    */
   portfolio: protectedProcedure.query(async ({ ctx }) => {
-    const rows = await listPortfolioRows(
-      ctx.db,
-      ctx.user.agencyId,
-      new Date(),
-      PRIORITY_THRESHOLDS.high,
-    );
+    /**
+     * Права считаются здесь, а не в `needsFor`: расписание переживает и смену
+     * тарифа, и решение перестать измерять платформу, и понять, что из
+     * настроенного уже не спрашивается, можно только зная тариф.
+     */
+    const [rows, entitlements] = await Promise.all([
+      listPortfolioRows(ctx.db, ctx.user.agencyId, new Date(), PRIORITY_THRESHOLDS.high),
+      entitlementsForAgency(ctx.db, ctx.user.agencyId),
+    ]);
+    const allowedAssistants = capabilitiesFor(entitlements.plan).assistants;
 
     const mapped = rows.map((row) => {
       const gapPp =
@@ -92,7 +97,7 @@ export const clientsRouter = router({
               sufficient: row.sufficient,
             });
 
-      const needs = needsFor(row);
+      const needs = needsFor(row, allowedAssistants);
 
       /**
        * В портфеле изменение показывается только при одинаковом составе.
@@ -152,18 +157,22 @@ export const clientsRouter = router({
    * заводить не нужно.
    */
   weeklyBrief: protectedProcedure.query(async ({ ctx }) => {
-    const rows = await listPortfolioRows(
-      ctx.db,
-      ctx.user.agencyId,
-      new Date(),
-      PRIORITY_THRESHOLDS.high,
-    );
+    /**
+     * Права считаются здесь, а не в `needsFor`: расписание переживает и смену
+     * тарифа, и решение перестать измерять платформу, и понять, что из
+     * настроенного уже не спрашивается, можно только зная тариф.
+     */
+    const [rows, entitlements] = await Promise.all([
+      listPortfolioRows(ctx.db, ctx.user.agencyId, new Date(), PRIORITY_THRESHOLDS.high),
+      entitlementsForAgency(ctx.db, ctx.user.agencyId),
+    ]);
+    const allowedAssistants = capabilitiesFor(entitlements.plan).assistants;
 
     return buildWeeklyBrief(
       rows.map((row) => ({
         clientId: row.clientId,
         name: row.name,
-        needs: needsFor(row),
+        needs: needsFor(row, allowedAssistants),
         newOpportunities: row.newOpportunities,
         highPriorityOpportunities: row.highPriorityOpportunities,
         reportsAwaitingApproval: row.reportsAwaitingApproval,
