@@ -197,7 +197,7 @@ export default function ProductPage() {
                 {MEASUREMENT_COPY.matrixBasis} “Not measured” means we do not ask that assistant, so
                 there is nothing to report either way.
               </div>
-              <div className="label only-sm">Scroll the table sideways to see all five assistants →</div>
+              <div className="label only-sm">Scroll the table sideways to see every assistant →</div>
             </div>
           </div>
           <div className="facts">

@@ -1,6 +1,8 @@
 import {
+  ASSISTANTS,
   BASELINE_WINDOW_DAYS,
   CHECKS_PER_CLIENT_MONTH,
+  DEFAULT_PLATFORMS,
   PLAN_LIMITS,
   confidenceFor,
   wilsonInterval,
@@ -130,7 +132,15 @@ export function periodMean(series: number[], [from, to]: readonly [number, numbe
 
 /* ---------------- промпт × ассистент ---------------- */
 
-export const MATRIX_ASSISTANTS = ["ChatGPT", "Perplexity", "Grok", "Claude"] as const;
+/**
+ * Колонки таблицы на витрине — из каталога, а не списком имён.
+ *
+ * Список имён здесь уже один раз пережил и появление ассистентов, и уход
+ * Gemini: витрина обещала то, чего продукт не делает.
+ */
+export const MATRIX_ASSISTANTS: readonly string[] = ASSISTANTS.filter((a) => a.measurable).map(
+  (a) => a.label,
+);
 
 /** Число — доля ответов; "floor" — ниже порога сэмплов; null — ассистента не спрашивают. */
 export type MatrixCell = number | "floor" | null;
@@ -190,8 +200,20 @@ export type PlanId = "starter" | "growth" | "scale";
 export const TYPICAL_CHECKS_PER_CLIENT = Math.round(CHECKS_PER_CLIENT_MONTH / 50) * 50;
 export const TYPICAL_CHECKS_BIWEEKLY = Math.round(CHECKS_PER_CLIENT_MONTH / 2 / 50) * 50;
 
-/** С Claude и Grok клиента спрашивают пять ассистентов вместо трёх. */
-export const TYPICAL_CHECKS_FIVE_ASSISTANTS = Math.round((TYPICAL_CHECKS_PER_CLIENT * 5) / 3 / 50) * 50;
+/**
+ * Сколько проверок съедает клиент, которому включили всё, что даёт тариф.
+ *
+ * Считается из каталога и умолчания, а не «пять вместо трёх» числом в тексте:
+ * состав меняется решениями по тарифам и по тому, кого мы вообще измеряем, и
+ * вписанное число разъезжается с ними молча. Так уже было — фраза про пять
+ * ассистентов пережила и появление Grok в умолчании, и уход Gemini.
+ */
+export const MEASURABLE_ASSISTANT_COUNT = ASSISTANTS.filter((a) => a.measurable).length;
+
+export const TYPICAL_CHECKS_ALL_ASSISTANTS =
+  Math.round(
+    (TYPICAL_CHECKS_PER_CLIENT * MEASURABLE_ASSISTANT_COUNT) / DEFAULT_PLATFORMS.length / 50,
+  ) * 50;
 
 export const PLANS: {
   id: PlanId;

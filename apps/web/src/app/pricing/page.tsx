@@ -66,7 +66,7 @@ function faqItems(paymentsOn: boolean) {
   { q: "What exactly is an AI check?", a: PRICING_NOTES.checks },
   { q: "What happens if we go past the allowance?", a: PRICING_NOTES.overage },
   { q: "What if we need more clients than the plan allows?", a: PRICING_NOTES.clientLimit },
-  { q: "Do Claude and Grok cost extra?", a: PRICING_NOTES.extraAssistants },
+  { q: "Do extra assistants cost extra?", a: PRICING_NOTES.extraAssistants },
   { q: "Do we have to drop Semrush or Ahrefs?", a: `No. ${PRICING_NOTES.seoSuite}` },
   { q: "Can we pay by card on the site?", a: checkoutCopy(paymentsOn).faqAnswer },
   {

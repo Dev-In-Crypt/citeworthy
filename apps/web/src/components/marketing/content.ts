@@ -1,4 +1,5 @@
 import {
+  DEFAULT_PLATFORMS,
   MARKETING_COPY,
   VOLUME_ACCOUNT_PRICE_USD,
   VOLUME_DISCOUNT,
@@ -8,7 +9,8 @@ import {
   PER_CLIENT_MAX,
   PER_CLIENT_MIN,
   TYPICAL_CHECKS_BIWEEKLY,
-  TYPICAL_CHECKS_FIVE_ASSISTANTS,
+  MEASURABLE_ASSISTANT_COUNT,
+  TYPICAL_CHECKS_ALL_ASSISTANTS,
   TYPICAL_CHECKS_PER_CLIENT,
   int,
   usd,
@@ -63,7 +65,12 @@ export const PRICING_NOTES = {
    */
   clientLimit: `The plan sets how many client accounts the workspace can hold at once. Adding one beyond that means moving to the next plan, and the product asks you to rather than failing quietly. Above the top plan there is no next one: from the ${VOLUME_THRESHOLD}th account every further account is ${usd(VOLUME_ACCOUNT_PRICE_USD)} a month, ${Math.round(VOLUME_DISCOUNT * 100)}% off what the top plan works out to per account.`,
   seats: "The number of people on your team is not counted, and there is no charge per seat.",
-  extraAssistants: `Claude and Grok have no separate price. Switching them on for a client means five assistants instead of three, so that client uses about 5/3 as many AI checks (roughly ${int(TYPICAL_CHECKS_FIVE_ASSISTANTS)} a month if measured weekly).`,
+  /**
+   * Числа и имена — из каталога и умолчания, не из текста. Прежняя
+   * формулировка говорила «пять вместо трёх» и пережила два решения,
+   * которые её опровергли.
+   */
+  extraAssistants: `The assistants your plan allows have no separate price. Switching every one of them on for a client means ${MEASURABLE_ASSISTANT_COUNT} assistants instead of the ${DEFAULT_PLATFORMS.length} measured by default, so that client uses about ${MEASURABLE_ASSISTANT_COUNT}/${DEFAULT_PLATFORMS.length} as many AI checks (roughly ${int(TYPICAL_CHECKS_ALL_ASSISTANTS)} a month if measured weekly).`,
   /**
    * Как сегодня покупают.
    *
