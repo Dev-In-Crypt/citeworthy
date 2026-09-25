@@ -1,6 +1,6 @@
 # Citeworthy
 
-The operating system for AI Search retainers. Agencies measure how ChatGPT, Perplexity and Gemini
+The operating system for AI Search retainers. Agencies measure how ChatGPT, Perplexity and Grok
 answer about their clients, find where the client is losing and why, turn that into work, measure
 what moved, and hand the client a white-label report.
 
@@ -54,12 +54,15 @@ cp .env.example .env && docker compose up -d && pnpm install && pnpm db:migrate 
 Platform adapters run in mock mode by default (`ADAPTERS_MODE=mock`) — no network, no API keys, and
 tests never call out.
 
-Five assistants have adapters: ChatGPT, Perplexity, Gemini, Claude and Grok. A new client is
-measured on the first three; Claude and Grok are switched on per client in the schedule, because
-each one adds answers to every run and needs its own key (`ANTHROPIC_API_KEY`, `XAI_API_KEY`).
+Four assistants are measured: ChatGPT, Perplexity, Grok and Claude. A new client is measured on
+the first three; Claude is switched on per client in the schedule, because it adds answers to every
+run and needs its own key (`ANTHROPIC_API_KEY`). All four have been checked with live calls — run
+`live-check` (see `packages/core/src/adapters/live-check.ts`) with a key to repeat that.
+
 Copilot and Google's AI surfaces have no public answer API, so they stay listed as not measured.
-ChatGPT, Perplexity, Claude and Grok have been checked with live calls; Gemini has not — run
-`live-check` (see `packages/core/src/adapters/live-check.ts`) with a key before trusting it.
+Gemini is listed there too, and for a different reason: the adapter exists and works, but Google's
+terms for grounded search do not allow the results to be analysed, or kept the way every answer
+here is kept so a figure can be rechecked. It is not registered even when a key is set.
 
 Perplexity is measured through its Agent API (`fast` preset), which replaced Sonar on 2026-09-27.
 That preset answers with an OpenAI model over Perplexity's own search, so each answer records the
