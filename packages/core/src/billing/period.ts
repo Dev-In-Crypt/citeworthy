@@ -69,7 +69,7 @@ export const ESTIMATED_COST_PER_ANSWER_USD = ANSWER_PRICES.chatgpt.usd;
 export const PLAN_LIMITS: Record<"starter" | "growth" | "scale", PlanLimits> = {
   starter: { clientLimit: 3, aiCheckAllowance: 4_000, priceUsd: 499 },
   growth: { clientLimit: 10, aiCheckAllowance: 13_000, priceUsd: 1_299 },
-  scale: { clientLimit: 25, aiCheckAllowance: 26_000, priceUsd: 2_499 },
+  scale: { clientLimit: 25, aiCheckAllowance: 28_500, priceUsd: 2_499 },
 };
 
 export interface UsageStatus {
